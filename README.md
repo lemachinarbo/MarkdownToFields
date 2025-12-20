@@ -222,6 +222,16 @@ Maps directly to ProcessWire page fields (configurable via `getMarkdownSyncMap()
 
 **Important:** If you change the name, run a modules refresh.
 name isn’t treated as content in ProcessWire, it’s part of the page’s structure, so it needs a rebuild pass.
+## Debug Mode
+
+By default, the module logs only important events (errors, field updates, synced pages). For development and troubleshooting, you can enable verbose debug logging:
+
+**In `site/config-local.php` (development only):**
+```php
+$config->markdownSyncDebug = true;
+```
+
+**Important:** Don't enable this in `site/config.php` (production) as it generates 50-100 log lines per page update.
 
 
 ## Requirements

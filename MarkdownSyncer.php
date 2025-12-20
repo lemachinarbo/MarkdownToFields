@@ -23,6 +23,8 @@ class MarkdownSyncer
 
   protected const COMMENT_PLACEHOLDER_CLASS = 'md-comment-placeholder';
 
+  protected static $gettingContentSource = [];
+
   public static function supportsPage(Page $page): bool
   {
     if (self::isAdminPage($page)) {
@@ -45,28 +47,84 @@ class MarkdownSyncer
 
   public static function getContentSource(Page $page): string
   {
-    $config = self::requireConfig($page);
-    $source = $config['source'];
-
-    $fieldName = $source['pageField'];
-    if ($fieldName && $page->hasField($fieldName)) {
-      $document = trim((string) $page->get($fieldName));
-    } else {
-      $document = '';
+    // Prevent infinite recursion
+    $pageId = $page->id;
+    if (isset(self::$gettingContentSource[$pageId])) {
+      // We're already getting the source for this page - use fallback only
+      $config = self::requireConfig($page);
+      $source = $config['source'];
+      $fallback = trim((string) $source['fallback']);
+      if ($fallback !== '') {
+        return $fallback;
+      }
+      throw new WireException(
+        sprintf('Recursion detected getting source for page %s.', $page->path),
+      );
     }
 
-    if ($document !== '') {
-      return $document;
-    }
+    self::$gettingContentSource[$pageId] = true;
+    try {
+      // Check if page class has its own getContentSource() method
+      if (
+        method_exists($page, 'getContentSource') &&
+        get_class($page) !== 'ProcessWire\Page'
+      ) {
+        try {
+          $override = $page->getContentSource();
+          if (is_string($override) && $override !== '') {
+            return $override;
+          }
+        } catch (\Throwable $e) {
+          // If page method fails, log and fall through to default logic
+          self::logDebug($page, 'page getContentSource() failed', [
+            'class' => get_class($page),
+            'error' => $e->getMessage(),
+          ]);
+        }
+      }
 
-    $fallback = trim((string) $source['fallback']);
-    if ($fallback !== '') {
-      return $fallback;
-    }
+      $config = self::requireConfig($page);
+      $source = $config['source'];
 
-    throw new WireException(
-      sprintf('No markdown source configured for page %s.', $page->path),
-    );
+      $fieldName = $source['pageField'];
+      if ($fieldName && $page->hasField($fieldName)) {
+        $document = trim((string) $page->get($fieldName));
+      } else {
+        $document = '';
+      }
+
+      if ($document !== '') {
+        return $document;
+      }
+
+      // Try to get filename from frontmatter 'name' field in default language markdown
+      // This handles cases where the page name was changed via frontmatter but hasn't synced yet
+      try {
+        $content = self::loadLanguageMarkdown($page, null);
+        if ($content instanceof ContentData) {
+          $frontmatter = $content->getFrontmatter();
+          if (is_array($frontmatter) && isset($frontmatter['name'])) {
+            $frontmatterName = trim((string) $frontmatter['name']);
+            if ($frontmatterName !== '') {
+              return $frontmatterName . '.md';
+            }
+          }
+        }
+      } catch (\Throwable $e) {
+        // If we can't load markdown to check frontmatter, continue to fallback
+      }
+
+      $fallback = trim((string) $source['fallback']);
+      if ($fallback !== '') {
+        return $fallback;
+      }
+
+      throw new WireException(
+        sprintf('No markdown source configured for page %s.', $page->path),
+      );
+    } finally {
+      unset(self::$gettingContentSource[$pageId]);
+    }
   }
 
   public static function getLanguageCode(Page $page, $language = null): string
@@ -276,7 +334,26 @@ class MarkdownSyncer
     return array_values(array_unique($codes));
   }
 
+  private static array $syncingFromMarkdown = [];
+
   public static function syncFromMarkdown(Page $page): array
+  {
+    $config = self::config($page);
+    if ($config === null) {
+      return [];
+    }
+
+    // Mark this page as being synced from markdown to skip hash checks during field saves
+    self::$syncingFromMarkdown[$page->id] = true;
+
+    try {
+      return self::doSyncFromMarkdown($page);
+    } finally {
+      unset(self::$syncingFromMarkdown[$page->id]);
+    }
+  }
+
+  private static function doSyncFromMarkdown(Page $page): array
   {
     $config = self::config($page);
     if ($config === null) {
@@ -387,6 +464,8 @@ class MarkdownSyncer
     }
 
     $savedFields = [];
+    $failedFields = [];
+
     foreach (array_unique($dirtyFields) as $field) {
       if (!self::pageSupportsMappedField($page, $field)) {
         continue;
@@ -399,14 +478,51 @@ class MarkdownSyncer
         );
         $page->save($field);
         $savedFields[] = $field;
-      } catch (\Throwable $_e) {
-        // ignore save errors for individual fields
+      } catch (\Throwable $e) {
+        $failedFields[$field] = $e->getMessage();
+        self::logInfo(
+          $page,
+          sprintf('failed to save field %s: %s', $field, $e->getMessage()),
+        );
+      }
+    }
+
+    // Log summary of what changed (production-level)
+    if ($savedFields) {
+      self::logInfo(
+        $page,
+        sprintf('synced from markdown: %d fields updated', count($savedFields)),
+        ['fields' => implode(', ', $savedFields)],
+      );
+    }
+
+    // If protected fields failed to save, throw to prevent hash update
+    if ($failedFields) {
+      $protectedFields = array_intersect(
+        ['name', 'title'],
+        array_keys($failedFields),
+      );
+      if ($protectedFields) {
+        // Extract the actual error message for better diagnostics
+        $firstError = reset($failedFields);
+        $errorPreview = is_string($firstError)
+          ? (strlen($firstError) > 200
+            ? substr($firstError, 0, 200) . '...'
+            : $firstError)
+          : json_encode($firstError);
+
+        $errorMsg = sprintf(
+          'Failed to save protected fields (%s) during markdown sync: %s',
+          implode(', ', $protectedFields),
+          $errorPreview,
+        );
+
+        self::logInfo($page, $errorMsg);
+        throw new WireException($errorMsg);
       }
     }
 
     return $savedFields;
-
-    return array_unique($dirtyFields);
   }
 
   public static function syncToMarkdown(
@@ -452,7 +568,11 @@ class MarkdownSyncer
 
     $currentHashes = self::languageFileHashes($page, $languageCodes);
 
-    if ($expectedSubset) {
+    // Skip hash mismatch check if we're currently syncing FROM markdown
+    // (the sync operation itself updates both content and hash atomically)
+    $skipHashCheck = isset(self::$syncingFromMarkdown[$page->id]);
+
+    if ($expectedSubset && !$skipHashCheck) {
       $mismatch = self::detectHashMismatchLanguage(
         $page,
         $expectedSubset,
@@ -611,12 +731,13 @@ class MarkdownSyncer
       }
 
       [$frontRaw, $bodyContent] = self::splitDocument($markdownValue);
-      self::logDebug($page, 'syncToMarkdown document snapshot', [
-        'language' => self::languageLogLabel($page, $language),
-        'postedLen' => strlen($markdownValue),
-        'frontLen' => strlen($frontRaw),
-        'bodyLen' => strlen($bodyContent),
-      ]);
+      // Uncomment for deep debugging:
+      // self::logDebug($page, 'syncToMarkdown document snapshot', [
+      //   'language' => self::languageLogLabel($page, $language),
+      //   'postedLen' => strlen($markdownValue),
+      //   'frontLen' => strlen($frontRaw),
+      //   'bodyLen' => strlen($bodyContent),
+      // ]);
 
       $postedHtml = $htmlField
         ? self::postedLanguageValue(
@@ -868,13 +989,14 @@ class MarkdownSyncer
         ? self::composeDocument($frontmatter, $bodyContent)
         : '';
 
-      self::logDebug($page, 'syncToMarkdown compose result', [
-        'language' => self::languageLogLabel($page, $language),
-        'documentLen' => strlen($document),
-        'hasContent' => $hasDocumentContent ? 1 : 0,
-        'bodyLen' => strlen($bodyContent),
-        'bodyPreview' => substr($bodyContent, 0, 80),
-      ]);
+      // Uncomment for deep debugging:
+      // self::logDebug($page, 'syncToMarkdown compose result', [
+      //   'language' => self::languageLogLabel($page, $language),
+      //   'documentLen' => strlen($document),
+      //   'hasContent' => $hasDocumentContent ? 1 : 0,
+      //   'bodyLen' => strlen($bodyContent),
+      //   'bodyPreview' => substr($bodyContent, 0, 80),
+      // ]);
 
       $storedMarkdown = (string) self::getFieldValueForLanguage(
         $page,
@@ -1164,13 +1286,19 @@ class MarkdownSyncer
           $existingEncoded = self::encodeHashPayload($p, $existingDecoded);
 
           if ($existingEncoded !== '' && $currentEncoded === $existingEncoded) {
-            self::logDebug($p, 'skip page: file hash unchanged', [
-              'path' => (string) $p->path,
-            ]);
+            // Uncomment for deep debugging to see all skipped pages:
+            // self::logDebug($p, 'skip page: file hash unchanged', [
+            //   'path' => (string) $p->path,
+            // ]);
             $processed++;
             continue;
           }
           $dirtyFields = self::syncFromMarkdown($p);
+
+          // If syncFromMarkdown threw an exception (e.g., protected field save failed),
+          // it will be caught in the outer catch block and we skip hash updates.
+          // This ensures we don't persist a hash when critical fields couldn't be saved.
+
           $payload = self::buildHashPayload($p);
 
           $didHashSave = false;
@@ -1289,6 +1417,12 @@ class MarkdownSyncer
             }
             $updated++;
             $updatedPages[] = sprintf('%s [%s]', (string) $p->path, $label);
+
+            // Production-level log for actual updates
+            self::logInfo($p, 'page synced from markdown', [
+              'changes' => $label,
+            ]);
+
             try {
               $log->save(
                 $logChannel,
@@ -1300,8 +1434,29 @@ class MarkdownSyncer
 
           $processed++;
         } catch (\Throwable $e) {
+          $isProtectedFieldError = str_contains(
+            $e->getMessage(),
+            'protected fields',
+          );
+
+          if ($isProtectedFieldError) {
+            // Log prominently for protected field failures
+            try {
+              $log->save(
+                $logChannel,
+                sprintf(
+                  'ERROR: Failed to sync %s - %s',
+                  (string) $p->path,
+                  $e->getMessage(),
+                ),
+              );
+            } catch (\Throwable $_logErr) {
+            }
+          }
+
           self::logDebug($p, 'syncAllManagedPages failed', [
             'message' => $e->getMessage(),
+            'protectedFieldError' => $isProtectedFieldError,
           ]);
         }
       }
@@ -1309,14 +1464,16 @@ class MarkdownSyncer
       // Release any locks and persist TTL marker if requested
       try {
         if ($useLock && $gotLock) {
+          // Release file lock if acquired
           if (isset($lockFp) && $lockFp) {
             @flock($lockFp, LOCK_UN);
             @fclose($lockFp);
             @unlink(wire('config')->paths->cache . 'markdown-sync.lock');
           }
 
+          // Release APCu lock if available (independent of file lock)
           if (function_exists('apcu_delete')) {
-            \call_user_func('apcu_delete', $apcuKey);
+            @\call_user_func('apcu_delete', $apcuKey);
           }
         }
       } catch (\Throwable $_e) {
@@ -3095,6 +3252,19 @@ class MarkdownSyncer
           'respectChanges' => $respectChanges,
           'changedViaForm' => $changedViaForm,
         ]);
+
+        // Log path change if name will change
+        if ((string) $currentValue !== (string) $pageValue) {
+          $oldPath = $page->path;
+          $parentPath = rtrim(dirname($oldPath), '/');
+          $newPath = $parentPath . '/' . $pageValue . '/';
+          self::logInfo($page, 'name field changing', [
+            'from' => $currentValue,
+            'to' => $pageValue,
+            'oldPath' => $oldPath,
+            'newPath' => $newPath,
+          ]);
+        }
       }
 
       if (is_array($pageValue)) {
@@ -3122,15 +3292,34 @@ class MarkdownSyncer
       }
 
       self::setFieldValueForLanguage($page, $field, $pageValue, $language);
-      self::logDebug(
-        $page,
-        sprintf(
-          'set field %s for %s',
-          $field,
-          self::languageLogLabel($page, $language),
-        ),
-        ['value' => self::summarizeValue($pageValue)],
-      );
+
+      // Log path change after setting name field
+      if ($field === 'name') {
+        $newPath = $page->path;
+        $parentPath = rtrim(dirname($oldPath ?? ''), '/');
+        $expectedPath = $parentPath . '/' . $pageValue . '/';
+        if ($oldPath !== $newPath) {
+          self::logInfo(
+            $page,
+            sprintf('path updated: %s → %s', $oldPath, $newPath),
+            [
+              'field' => 'name',
+              'value' => $pageValue,
+            ],
+          );
+        }
+      }
+
+      // Uncomment for deep debugging to see all field assignments:
+      // self::logDebug(
+      //   $page,
+      //   sprintf(
+      //     'set field %s for %s',
+      //     $field,
+      //     self::languageLogLabel($page, $language),
+      //   ),
+      //   ['value' => self::summarizeValue($pageValue)],
+      // );
       $updated[] = $field;
     }
 
@@ -3233,14 +3422,15 @@ class MarkdownSyncer
       } else {
         $page->set($field, $value);
       }
-      self::logDebug(
-        $page,
-        sprintf('write %s (%s) default context', $field, $languageLabel),
-        [
-          'len' => self::valueLength($value),
-          'value' => self::summarizeValue($value),
-        ],
-      );
+      // Uncomment for deep debugging to see all field writes:
+      // self::logDebug(
+      //   $page,
+      //   sprintf('write %s (%s) default context', $field, $languageLabel),
+      //   [
+      //     'len' => self::valueLength($value),
+      //     'value' => self::summarizeValue($value),
+      //   ],
+      // );
       return;
     }
 
@@ -3490,6 +3680,22 @@ class MarkdownSyncer
       return;
     }
 
+    self::writeLog($page, $message, $context);
+  }
+
+  protected static function logInfo(
+    ?Page $page,
+    string $message,
+    array $context = [],
+  ): void {
+    self::writeLog($page, $message, $context);
+  }
+
+  private static function writeLog(
+    ?Page $page,
+    string $message,
+    array $context = [],
+  ): void {
     $parts = [];
 
     if ($page instanceof Page) {
