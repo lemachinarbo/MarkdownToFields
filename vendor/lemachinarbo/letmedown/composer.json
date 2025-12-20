@@ -1,0 +1,20 @@
+{
+  "name": "lemachinarbo/letmedown",
+  "description": "A Markdown parser that probably will.",
+  "type": "library",
+  "license": "DoAsYouWish",
+  "authors": [
+    {
+      "name": "lemachinarbo",
+      "email": ""
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "LetMeDown\\": "src/"
+    }
+  },
+  "require": {
+    "erusev/parsedown": "^1.7"
+  }
+}
