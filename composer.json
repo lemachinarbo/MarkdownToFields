@@ -1,11 +1,11 @@
 {
-  "name": "lemachinarbo/markdown-to-fields",
+  "name": "lemachinarbo/markdowntofields",
   "description": "Markdown files as source of truth in ProcessWire",
   "type": "processwire-module",
   "license": "MIT",
   "authors": [
     {
-      "name": "Daniela Fenini"
+      "name": "Lemachi Narbo"
     }
   ],
   "require": {
@@ -17,12 +17,6 @@
   "autoload": {
     "psr-4": {
       "MarkdownToFields\\": "src/"
-    }
-  },
-  "repositories": {
-    "letmedown": {
-      "type": "vcs",
-      "url": "https://github.com/lemachinarbo/LetMeDown"
     }
   }
 }

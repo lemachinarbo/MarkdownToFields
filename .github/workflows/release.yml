@@ -1,0 +1,53 @@
+name: Create Release with Vendor Files
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+
+      - name: Install Composer dependencies
+        run: composer install --no-dev --optimize-autoloader
+
+      - name: Create release artifact
+        run: |
+          # Create a temporary directory for the module
+          RELEASE_DIR="MarkdownToFields-${GITHUB_REF#refs/tags/}"
+          mkdir -p "$RELEASE_DIR"
+
+          # Copy all files except those in .gitignore
+          rsync -av \
+            --exclude=.git/ \
+            --exclude=.github/ \
+            --exclude=.vscode/ \
+            --exclude=wip.md \
+            --exclude=.env \
+            . "$RELEASE_DIR/"
+
+          # Create zip
+          zip -r "${RELEASE_DIR}.zip" "$RELEASE_DIR"
+          rm -rf "$RELEASE_DIR"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: MarkdownToFields-v*.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
