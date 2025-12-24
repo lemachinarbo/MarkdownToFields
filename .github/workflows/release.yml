@@ -26,8 +26,9 @@ jobs:
 
       - name: Create release artifact
         run: |
-          # Create a temporary directory for the module
-          RELEASE_DIR="MarkdownToFields-${GITHUB_REF#refs/tags/}"
+          RELEASE_NAME="MarkdownToFields-${GITHUB_REF#refs/tags/}"
+          RELEASE_DIR="$RELEASE_NAME"
+
           mkdir -p "$RELEASE_DIR"
 
           # Copy all files except those in .gitignore
@@ -39,8 +40,11 @@ jobs:
             --exclude=.env \
             . "$RELEASE_DIR/"
 
-          # Create zip
-          zip -r "${RELEASE_DIR}.zip" "$RELEASE_DIR"
+          # Zip only the contents (no top-level folder)
+          pushd "$RELEASE_DIR" >/dev/null
+          zip -r "../${RELEASE_NAME}.zip" .
+          popd >/dev/null
+
           rm -rf "$RELEASE_DIR"
 
       - name: Create GitHub Release
