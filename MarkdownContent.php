@@ -110,7 +110,7 @@ trait MarkdownContent {
    * Load markdown content for this page
    * Automatically handles language if multilingual
    */
-  public function loadContent(string $source = null, ?string $language = null) {
+  public function loadContent(?string $source = null, ?string $language = null) {
     self::ensureMarkdownSyncer();
     $source = $source ?? $this->getContentSource();
     $syncerClass = '\\ProcessWire\\MarkdownSyncer';
@@ -126,5 +126,25 @@ trait MarkdownContent {
     // Sensible default: use page name
     // Override in a Page class if needed.
     return $this->name . '.md';
+  }
+
+  /**
+   * Load content for this page
+   * Convenience wrapper: loadContent($this->getContentSource())
+   */
+  public function content() {
+    return $this->loadContent($this->getContentSource());
+  }
+
+  /**
+   * Template data boundary - the canonical view contract
+   * Default: return loaded content
+   * Override in your page class to shape/normalize data for templates
+   * 
+   * This is the only method templates should call.
+   * Subclasses transform raw content into view-ready structure here.
+   */
+  public function templateData() {
+    return $this->content();
   }
 }
