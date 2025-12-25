@@ -9,6 +9,7 @@ $__moduleVendor = __DIR__ . '/vendor/autoload.php';
 if (is_file($__moduleVendor)) {
   require_once $__moduleVendor;
 }
+require_once __DIR__ . '/MarkdownContent.php';
 require_once __DIR__ . '/MarkdownSyncer.php';
 require_once __DIR__ . '/MarkdownEditor.php';
 require_once __DIR__ . '/MarkdownSyncHooks.php';
