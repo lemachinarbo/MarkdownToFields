@@ -343,8 +343,8 @@ class MarkdownSyncHooks
     try {
       $result = MarkdownSyncer::syncAllManagedPages(
         10000,
-        'markdown_hash',
-        'markdown-migrate',
+        'md_markdown_hash',
+        'markdown-sync',
         true,
         5,
         true,

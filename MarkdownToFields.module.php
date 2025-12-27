@@ -28,7 +28,9 @@ require_once __DIR__ . '/MarkdownSyncHooks.php';
  *
  * @property array  $templates     Configured templates with markdown sync enabled
  * @property string $markdownField Default field name for markdown content
+ * @property string $htmlField     Markdown editor field (authoring surface)
  * @property string $contentPath   Base path for markdown files
+ * @property bool   $debug         Enable debug logging to markdown-sync.txt
  */
 
 class MarkdownToFields extends WireData implements Module, ConfigurableModule
@@ -39,6 +41,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     'md_markdown' => ['FieldtypeTextarea', 'Markdown'],
     'md_markdown_hash' => ['FieldtypeText', 'Markdown hash'],
     'md_markdown_tab_END' => ['FieldtypeFieldsetClose', 'Close Markdown tab'],
+    'md_editor' => ['FieldtypeTextarea', 'Content Editor'],
   ];
 
   public static function getModuleInfo()
@@ -101,19 +104,29 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   public function install()
   {
     $this->syncTemplateFields();
+    
+    // Set default config
+    $this->wire('modules')->saveConfig($this, [
+      'htmlField' => 'md_editor',
+      'templates' => [],
+    ]);
   }
 
   public function getModuleConfigInputfields(array $data): InputfieldWrapper
   {
-
     $defaults = [
       'templates' => (array) ($this->templates ?? []),
+      'htmlField' => $this->htmlField ?? 'md_editor',
+      'debug' => (bool) ($this->debug ?? false),
     ];
     $data = array_merge($defaults, $data);
 
     $modules = $this->wire('modules');
     $templates = $this->wire('templates');
+    $fields = $this->wire('fields');
+    $wrapper = new InputfieldWrapper();
 
+    // Template selection
     $options = [];
     foreach ($templates as $template) {
       if ($this->isTemplateExcluded($template)) {
@@ -133,9 +146,69 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       'Attach Markdown fields to selected templates. System/admin templates are ignored.';
     $checkboxes->addOptions($options);
     $checkboxes->attr('value', $data['templates']);
-
-    $wrapper = new InputfieldWrapper();
     $wrapper->add($checkboxes);
+
+    // HTML/Editor field selection with compatibility filter
+    $f = $modules->get('InputfieldSelect');
+    $f->name = 'htmlField';
+    $f->label = 'Markdown Editor Field (Authoring Surface)';
+    $f->description = 'The field where users edit content. Must be a compatible TinyMCE editor.';
+    $f->notes = 'Only compatible fields are shown. The field must support markdown placeholders.';
+    
+    $compatibleFields = [];
+    $incompatibleFields = [];
+    
+    foreach ($fields as $field) {
+      if ($field->type->name !== 'FieldtypeTextarea') continue;
+      
+      if ($this->isMarkdownEditorCompatible($field)) {
+        $compatibleFields[] = $field;
+        $label = $field->label ? "{$field->label} ({$field->name})" : $field->name;
+        $f->addOption($field->name, $label);
+      } else {
+        $incompatibleFields[] = $field;
+      }
+    }
+    
+    // Warn if current selection is incompatible
+    $currentField = $data['htmlField'] ? $fields->get($data['htmlField']) : null;
+    if ($currentField && !$this->isMarkdownEditorCompatible($currentField)) {
+      $f->error(
+        "Currently selected field '{$currentField->name}' is not compatible with markdown editing. " .
+        "It must be a TinyMCE editor with noneditable plugin configured for placeholders."
+      );
+    }
+    
+    // Show incompatible fields as info
+    if (count($incompatibleFields) > 0) {
+      $names = implode(', ', array_map(function($field) { return $field->name; }, $incompatibleFields));
+      $f->notes .= "
+
+**Incompatible textarea fields found:** {$names}
+These fields lack proper TinyMCE configuration.";
+    }
+    
+    // If no compatible fields exist, show warning
+    if (count($compatibleFields) === 0) {
+      $f->warning(
+        'No compatible editor fields found. The "md_editor" field will be created/configured on next modules refresh.'
+      );
+      $f->addOption('md_editor', 'md_editor (will be created)');
+    }
+    
+    $f->attr('value', $data['htmlField']);
+    $wrapper->add($f);
+
+    // Debug mode checkbox
+    $debugCheck = $modules->get('InputfieldCheckbox');
+    $debugCheck->name = 'debug';
+    $debugCheck->label = 'Debug Mode';
+    $debugCheck->description = 'Enable debug logging to markdown-sync.txt log file';
+    $debugCheck->attr('value', 1);
+    if ($data['debug']) {
+      $debugCheck->attr('checked', 'checked');
+    }
+    $wrapper->add($debugCheck);
 
     return $wrapper;
   }
@@ -163,9 +236,58 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     MarkdownSyncer::syncToMarkdown($page, null, null);
   }
 
+  /**
+   * Check if a field is compatible as a markdown editor surface.
+   * This field is the authoring UI, not just storage—strict requirements apply.
+   *
+   * @param Field $field The field to check
+   * @return bool True if field meets all markdown editor requirements
+   */
+  public function isMarkdownEditorCompatible(Field $field): bool
+  {
+    // Must be textarea type
+    if ($field->type->name !== 'FieldtypeTextarea') {
+      return false;
+    }
+    
+    // Must use TinyMCE inputfield
+    if ($field->inputfieldClass !== 'InputfieldTinyMCE') {
+      return false;
+    }
+    
+    // Must have contentType = 1 (Markup/HTML)
+    if ($field->contentType != 1) {
+      return false;
+    }
+    
+    // Must have noneditable plugin configured for placeholders
+    $settingsJSON = (string) ($field->settingsJSON ?? '');
+    $plugins = $field->plugins ?? [];
+    // Normalize plugins to array of strings
+    if (is_string($plugins)) {
+      $plugins = array_filter(array_map('trim', explode(',', $plugins)));
+    } elseif (!is_array($plugins)) {
+      $plugins = [];
+    }
+
+    $hasNonEditable = in_array('noneditable', $plugins, true) || strpos($settingsJSON, 'noneditable') !== false;
+    if (!$hasNonEditable) {
+      return false;
+    }
+    
+    // Must have md-comment-placeholder class configured (via settingsJSON)
+    $hasPlaceholderClass = strpos($settingsJSON, 'md-comment-placeholder') !== false || strpos($settingsJSON, 'noneditable_class') !== false;
+    if (!$hasPlaceholderClass) {
+      return false;
+    }
+    
+    return true;
+  }
+
   private function syncTemplateFields(): void
   {
     $this->createFields();
+    $this->ensureMdEditorConfigured();
 
     $enabled = (array) ($this->templates ?? []);
     $fields = $this->wire('fields');
@@ -218,9 +340,86 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
           $f->rows = 40;
         }
         
+        // Configure md_editor field with TinyMCE and markdown support
+        if ($name === 'md_editor') {
+          $f->inputfieldClass = 'InputfieldTinyMCE';
+          $f->contentType = 1; // Markup/HTML
+          $f->height = 1000;
+          $f->rows = 40;
+          $f->features = ['toolbar', 'stickybars', 'purifier', 'imgResize', 'pasteFilter'];
+          // Plugins without ProcessWire image picker (pwimage) – images via markdown only
+          $f->plugins = ['anchor', 'code', 'link', 'lists', 'pwlink', 'table', 'noneditable'];
+          // Toolbar: remove pwimage button
+          $f->toolbar = 'styles bold italic pwlink blockquote bullist numlist anchor code';
+          
+          // Configure TinyMCE placeholders and disable image interactions
+          // Do NOT override plugins here; manage via field properties
+          $tinymceSettings = [
+            'noneditable_class' => 'md-comment-placeholder',
+            // Prevent clicks on images inside the editor surface
+            'content_style' => '.md-comment-placeholder{display:inline-block;padding:2px 6px;border-radius:4px;font-family:monospace;opacity:.9;} .md-comment-placeholder--section{display:block;width:100%;text-align:center;background:#ececec;color:#555;font-size:12px;font-weight:600;} .md-comment-placeholder--sub{display:block;width:100%;background:#f2f2f2;color:#666;font-size:11px;font-weight:500;} .md-comment-placeholder--field{background:#f7f7f7;color:#666;font-size:10px;border-left:4px solid #d0d0d0;padding-left:6px;} .md-comment-placeholder--close{background:#e8e8e8;color:#888;font-size:10px;font-style:italic;} img{pointer-events:none;}',
+            // Disable object resizing (images, tables) to avoid accidental handles
+            'object_resizing' => false,
+          ];
+          $f->settingsJSON = json_encode($tinymceSettings);
+        }
+
         $fields->save($f);
       }
     }
+  }
+
+  private function ensureMdEditorConfigured(): void
+  {
+    $fields = $this->wire('fields');
+    $existing = $fields->get('md_editor');
+    if (!$existing) return;
+    $modified = false;
+    if ($existing->inputfieldClass !== 'InputfieldTinyMCE') { $existing->inputfieldClass = 'InputfieldTinyMCE'; $modified = true; }
+    if ((int) $existing->contentType !== 1) { $existing->contentType = 1; $modified = true; }
+    // Normalize plugins
+    $plugins = $existing->plugins ?? [];
+    if (is_string($plugins)) { $plugins = array_filter(array_map('trim', explode(',', $plugins))); }
+    if (!is_array($plugins)) { $plugins = []; }
+    // Required plugins (no pwimage)
+    $required = ['anchor','code','link','lists','pwlink','table','noneditable'];
+    $union = array_values(array_unique(array_merge($plugins, $required)));
+    if ($union !== $plugins) { $existing->plugins = $union; $modified = true; }
+    // Ensure toolbar contains pwimage
+    $toolbar = (string) ($existing->toolbar ?? '');
+    // Strip pwimage button if present
+    if (strpos($toolbar, 'pwimage') !== false) { $existing->toolbar = trim(str_replace('pwimage', '', $toolbar)); $modified = true; }
+    // Ensure placeholder class/style present and disable image interactions
+    $settingsJSON = (string) ($existing->settingsJSON ?? '');
+    $settings = [];
+    if ($settingsJSON !== '') {
+      $decoded = json_decode($settingsJSON, true);
+      if (is_array($decoded)) { $settings = $decoded; }
+    }
+    // Remove any plugins override from settingsJSON (we manage plugins via field property)
+    if (isset($settings['plugins'])) { unset($settings['plugins']); $modified = true; }
+    if (!isset($settings['noneditable_class']) || strpos($settingsJSON, 'md-comment-placeholder') === false) {
+      $settings['noneditable_class'] = 'md-comment-placeholder';
+      $modified = true;
+    }
+    // Merge/append content_style with image pointer-events safeguard
+    $contentStyle = isset($settings['content_style']) ? (string) $settings['content_style'] : '';
+    $needsImgPE = (strpos($contentStyle, 'img{pointer-events:none') === false);
+    if ($contentStyle === '') {
+      $contentStyle = '.md-comment-placeholder{display:inline-block;padding:2px 6px;border-radius:4px;font-family:monospace;opacity:.9;} .md-comment-placeholder--section{display:block;width:100%;text-align:center;background:#ececec;color:#555;font-size:12px;font-weight:600;} .md-comment-placeholder--sub{display:block;width:100%;background:#f2f2f2;color:#666;font-size:11px;font-weight:500;} .md-comment-placeholder--field{background:#f7f7f7;color:#666;font-size:10px;border-left:4px solid #d0d0d0;padding-left:6px;} .md-comment-placeholder--close{background:#e8e8e8;color:#888;font-size:10px;font-style:italic;}';
+    }
+    if ($needsImgPE) {
+      $contentStyle = rtrim($contentStyle) . ' img{pointer-events:none;}';
+      $modified = true;
+    }
+    $settings['content_style'] = $contentStyle;
+    // Enforce disabling object resizing
+    if (!isset($settings['object_resizing']) || $settings['object_resizing'] !== false) {
+      $settings['object_resizing'] = false;
+      $modified = true;
+    }
+    if ($modified) { $existing->settingsJSON = json_encode($settings); }
+    if ($modified) { $fields->save($existing); }
   }
 
   private function isTemplateExcluded(Template $template): bool

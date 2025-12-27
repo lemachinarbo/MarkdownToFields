@@ -72,7 +72,7 @@ trait MarkdownContent {
   protected string $sourcePageField = 'md_markdown_source';
   protected string $markdownField = 'md_markdown';
   protected string $hashField = 'md_markdown_hash';
-  protected string $htmlField = 'body';
+  protected string $htmlField = 'md_editor';
   
   /**
    * Ensure MarkdownSyncer class is loaded
