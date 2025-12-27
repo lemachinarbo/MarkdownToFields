@@ -2,6 +2,8 @@
 
 namespace ProcessWire;
 
+use LetMeDown\ContentData;
+
 /**
  * MarkdownContent Trait
  * 
@@ -39,7 +41,7 @@ namespace ProcessWire;
  *   use MarkdownContent;
  *   protected string $sourcePath = '/var/markdown/';  // path to markdown files
  *   protected string $sourcePageField = 'md_ref';     // page reference field name
- *   protected string $markdownField = 'md';           // markdown content field
+ *   protected string $markdownField = 'md_content';   // markdown content field
  *   protected string $htmlField = 'html';             // rendered HTML field
  *   protected string $hashField = 'md_hash';          // hash tracking field
  * }
@@ -67,14 +69,18 @@ trait MarkdownContent {
   
   // Defaults (override by setting the property in your class)
   protected string $sourcePath = '';  // empty = site/content/, or set to any path
-  protected string $sourcePageField = 'markdown_source';
-  protected string $markdownField = 'markdown';
+  protected string $sourcePageField = 'md_markdown_source';
+  protected string $markdownField = 'md_markdown';
+  protected string $hashField = 'md_markdown_hash';
   protected string $htmlField = 'body';
-  protected string $hashField = 'markdown_hash';
   
   /**
    * Ensure MarkdownSyncer class is loaded
    */
+
+  // TODO: Consider moving MarkdownSyncer loading to module bootstrap.
+  // This trait currently guards against load-order issues in PW.
+
   protected static function ensureMarkdownSyncer(): void {
     if (class_exists('\\ProcessWire\\MarkdownSyncer', false)) {
       return;
@@ -107,14 +113,19 @@ trait MarkdownContent {
   }
 
   /**
-   * Load markdown content for this page
-   * Automatically handles language if multilingual
+   * Low-level markdown loader.
+   * Do not call from templates—use content() instead.
+   * 
+   * @param string|null $source The markdown file source (relative to content path)
+   * @param string|null $language Language code to load (defaults to current language)
+   * @return ContentData The parsed markdown content
+   * @internal For advanced use cases only
    */
-  public function loadContent(?string $source = null, ?string $language = null) {
+  public function loadContent(?string $source = null, ?string $language = null): ContentData {
     self::ensureMarkdownSyncer();
     $source = $source ?? $this->getContentSource();
     $syncerClass = '\\ProcessWire\\MarkdownSyncer';
-    $lang = $syncerClass::getLanguageCode($this);
+    $lang = $language ?? $syncerClass::getLanguageCode($this);
     return $syncerClass::loadMarkdown($this, $source, $lang);
   }
 
@@ -129,10 +140,13 @@ trait MarkdownContent {
   }
 
   /**
-   * Load content for this page
-   * Convenience wrapper: loadContent($this->getContentSource())
+   * Canonical content access point.
+   * Safe place to add caching, pre-processing, and other optimizations later.
+   * Always call this from templates and page logic.
+   * 
+   * @return ContentData The parsed and ready-to-use markdown content
    */
-  public function content() {
+  public function content(): ContentData {
     return $this->loadContent($this->getContentSource());
   }
 
@@ -143,8 +157,10 @@ trait MarkdownContent {
    * 
    * This is the only method templates should call.
    * Subclasses transform raw content into view-ready structure here.
+   * 
+   * @return ContentData The content prepared for template rendering
    */
-  public function templateData() {
+  public function templateData(): ContentData {
     return $this->content();
   }
 }
