@@ -2,12 +2,14 @@
 
 namespace ProcessWire;
 
+use ProcessWire\MarkdownEditor;
+
 class MarkdownSyncHooks
 {
   public static function prepareEditForm(HookEvent $event): void
   {
     wire('log')->save('markdown-sync', 'Hook: prepareEditForm triggered');
-    $page = MarkdownEditor::pageFromProcess($event);
+    $page = \ProcessWire\MarkdownEditor::pageFromProcess($event);
     if (!$page) {
       return;
     }
@@ -19,6 +21,46 @@ class MarkdownSyncHooks
 
     if (!MarkdownSyncer::supportsPage($page)) {
       return;
+    }
+
+    // Ensure the page's selected editor field exists and is attached to the template
+    try {
+      $htmlFieldName = MarkdownSyncer::getHtmlField($page);
+      if ($htmlFieldName) {
+        $fields = wire('fields');
+        $modules = wire('modules');
+        $mtf = $modules->get('MarkdownToFields');
+
+        $field = $fields->get($htmlFieldName);
+        if (!$field && $mtf) {
+          // Create/repair the requested editor field
+          $mtf->repairMarkdownEditor($htmlFieldName);
+          $field = $fields->get($htmlFieldName);
+        }
+
+        // Attach to template if missing
+        if ($field) {
+          $fg = $page->template->fieldgroup;
+          if ($fg && !$fg->has($field)) {
+            $fg->add($field);
+            $fg->save();
+          }
+        }
+
+        // If the override is valid, align module config/htmlField so UI reflects programmatic choice
+        if ($mtf && $field && $mtf->isMarkdownEditorCompatible($field)) {
+          $currentConfig = $modules->getConfig($mtf) ?? [];
+          $currentValue = $currentConfig['htmlField'] ?? null;
+          if ($currentValue !== $htmlFieldName) {
+            $currentConfig['htmlField'] = $htmlFieldName;
+            $modules->saveConfig($mtf, $currentConfig);
+            $mtf->htmlField = $htmlFieldName;
+          }
+        }
+      }
+    } catch (\Throwable $e) {
+      // non-fatal: continue without blocking edit form
+      wire('log')->save('markdown-sync', 'Editor ensure failed: ' . $e->getMessage());
     }
 
     $documentField = MarkdownSyncer::getMarkdownField($page);
@@ -74,7 +116,7 @@ class MarkdownSyncHooks
           ),
         );
       }
-      MarkdownEditor::rememberHash($page);
+      \ProcessWire\MarkdownEditor::rememberHash($page);
     } catch (\Throwable $e) {
       wire('log')->save('markdown-sync', $e->getMessage());
       $event->wire('session')->error($e->getMessage());
@@ -84,7 +126,7 @@ class MarkdownSyncHooks
   public static function appendHashField(HookEvent $event): void
   {
     wire('log')->save('markdown-sync', 'Hook: appendHashField triggered');
-    $page = MarkdownEditor::pageFromProcess($event);
+    $page = \ProcessWire\MarkdownEditor::pageFromProcess($event);
     if (!$page) {
       return;
     }
@@ -102,7 +144,7 @@ class MarkdownSyncHooks
       }
     }
 
-    $field = MarkdownEditor::hashField($page);
+    $field = \ProcessWire\MarkdownEditor::hashField($page);
     if ($form->get($field)) {
       return;
     }
@@ -125,7 +167,7 @@ class MarkdownSyncHooks
   public static function handleSaveReady(HookEvent $event): void
   {
     wire('log')->save('markdown-sync', 'Hook: handleSaveReady triggered');
-    $page = MarkdownEditor::pageFromArgs($event);
+    $page = \ProcessWire\MarkdownEditor::pageFromArgs($event);
     if (!$page) {
       return;
     }
@@ -151,7 +193,7 @@ class MarkdownSyncHooks
     }
 
     $input = $event->wire('input');
-    $hashFieldName = MarkdownEditor::hashField($page);
+    $hashFieldName = \ProcessWire\MarkdownEditor::hashField($page);
     $expectedHash =
       $input->post($hashFieldName) ?? MarkdownSyncer::recallFileHash($page);
     $postedLanguageValues = [];
@@ -242,7 +284,7 @@ class MarkdownSyncHooks
         $languageScope ?: null,
         $postedLanguageValues,
       );
-      MarkdownEditor::rememberHash($page);
+      \ProcessWire\MarkdownEditor::rememberHash($page);
 
       // Persist DB-level hash field for this page if template defines it
       try {

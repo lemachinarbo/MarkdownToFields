@@ -67,13 +67,6 @@ use LetMeDown\ContentData;
  */
 trait MarkdownContent {
   
-  // Defaults (override by setting the property in your class)
-  protected string $sourcePath = '';  // empty = site/content/, or set to any path
-  protected string $sourcePageField = 'md_markdown_source';
-  protected string $markdownField = 'md_markdown';
-  protected string $hashField = 'md_markdown_hash';
-  protected string $htmlField = 'md_editor';
-  
   /**
    * Ensure MarkdownSyncer class is loaded
    */
@@ -98,17 +91,17 @@ trait MarkdownContent {
    */
   public function getMarkdownSyncMap(): array {
     $config = $this->wire('config');
-    $path = $this->sourcePath ?: $config->paths->site . 'content/';
+    $path = ($this->sourcePath ?? '') ?: $config->paths->site . 'content/';
     
     return [
       'source' => [
         'path' => $path,
-        'pageField' => $this->sourcePageField,
+        'pageField' => $this->sourcePageField ?? 'md_markdown_source',
         'fallback' => $this->contentSource(),
       ],
-      'markdownField' => $this->markdownField,
-      'htmlField' => $this->htmlField,
-      'hashField' => $this->hashField,
+      'markdownField' => $this->markdownField ?? 'md_markdown',
+      'htmlField' => $this->htmlField ?? 'md_editor',
+      'hashField' => $this->hashField ?? 'md_markdown_hash',
     ];
   }
 
