@@ -53,7 +53,7 @@ use LetMeDown\ContentData;
  * class HomePage extends Page {
  *   use MarkdownContent;
  *   
- *   public function getContentSource(): string {
+ *   public function contentSource(): string {
  *     return 'home.md';  // Syncer handles language folders automatically
  *   }
  * }
@@ -104,7 +104,7 @@ trait MarkdownContent {
       'source' => [
         'path' => $path,
         'pageField' => $this->sourcePageField,
-        'fallback' => $this->getContentSource(),
+        'fallback' => $this->contentSource(),
       ],
       'markdownField' => $this->markdownField,
       'htmlField' => $this->htmlField,
@@ -123,7 +123,7 @@ trait MarkdownContent {
    */
   public function loadContent(?string $source = null, ?string $language = null): ContentData {
     self::ensureMarkdownSyncer();
-    $source = $source ?? $this->getContentSource();
+    $source = $source ?? $this->contentSource();
     $syncerClass = '\\ProcessWire\\MarkdownSyncer';
     $lang = $language ?? $syncerClass::getLanguageCode($this);
     return $syncerClass::loadMarkdown($this, $source, $lang);
@@ -133,7 +133,7 @@ trait MarkdownContent {
    * Default markdown source: page name + .md
    * Override in your page class to customize
    */
-  public function getContentSource(): string {
+  public function contentSource(): string {
     // Sensible default: use page name
     // Override in a Page class if needed.
     return $this->name . '.md';
@@ -147,7 +147,7 @@ trait MarkdownContent {
    * @return ContentData The parsed and ready-to-use markdown content
    */
   public function content(): ContentData {
-    return $this->loadContent($this->getContentSource());
+    return $this->loadContent($this->contentSource());
   }
 
   /**
