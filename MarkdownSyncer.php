@@ -45,7 +45,7 @@ class MarkdownSyncer
     return null;
   }
 
-  public static function getContentSource(Page $page): string
+  public static function contentSource(Page $page): string
   {
     // Prevent infinite recursion
     $pageId = $page->id;
@@ -64,19 +64,30 @@ class MarkdownSyncer
 
     self::$gettingContentSource[$pageId] = true;
     try {
-      // Check if page class has its own getContentSource() method
-      if (
-        method_exists($page, 'getContentSource') &&
-        get_class($page) !== 'ProcessWire\Page'
-      ) {
+      // Check if page class has its own contentSource() method
+      $hasMethod = method_exists($page, 'contentSource');
+      $pageClass = get_class($page);
+      $isNotBaseClass = $pageClass !== 'ProcessWire\Page';
+      
+      self::logInfo($page, 'checking page getContentSource', [
+        'hasMethod' => $hasMethod ? 'yes' : 'no',
+        'pageClass' => $pageClass,
+        'isNotBase' => $isNotBaseClass ? 'yes' : 'no',
+      ]);
+      
+      if ($hasMethod && $isNotBaseClass) {
         try {
-          $override = $page->getContentSource();
+          self::logInfo($page, 'calling page contentSource()');
+          $override = $page->contentSource();
+          self::logInfo($page, 'page contentSource() returned', ['value' => $override]);
+          // Only use if it returns a non-empty string; otherwise fall through to field/default
           if (is_string($override) && $override !== '') {
             return $override;
           }
         } catch (\Throwable $e) {
-          // If page method fails, log and fall through to default logic
-          self::logDebug($page, 'page getContentSource() failed', [
+          // Method exists but implementation is broken - log and fall through gracefully
+          // This handles cases where method signature requires string but returns null
+          self::logInfo($page, 'page contentSource() failed or incomplete', [
             'class' => get_class($page),
             'error' => $e->getMessage(),
           ]);
@@ -206,12 +217,21 @@ class MarkdownSyncer
     $config = self::requireConfig($page);
 
     $languageCode ??= self::getLanguageCode($page);
-    $source ??= self::getContentSource($page);
+    $source ??= self::contentSource($page);
 
     $root = $config['source']['path'];
     $source = ltrim($source, '/');
 
-    return $root . $languageCode . '/' . $source;
+    // Only append language code if site actually uses multiple languages
+    $languages = $page->wire('languages');
+    $isMultilingual = $languages && count($languages) > 1;
+    
+    if ($isMultilingual) {
+      return $root . $languageCode . '/' . $source;
+    } else {
+      // Single language site: no language subfolder
+      return $root . $source;
+    }
   }
 
   public static function loadMarkdown(
@@ -225,7 +245,7 @@ class MarkdownSyncer
     }
 
     $languageCode = self::getLanguageCode($page, $language);
-    $source ??= self::getContentSource($page);
+    $source ??= self::contentSource($page);
 
     self::redirectToDefaultLanguage($page, $languageCode);
     throw new WireException(
@@ -239,7 +259,7 @@ class MarkdownSyncer
     ?string $source = null,
   ): ?ContentData {
     $languageCode = self::determineLanguageCode($page, $language);
-    $source ??= self::getContentSource($page);
+    $source ??= self::contentSource($page);
 
     $path = self::getMarkdownFilePath($page, $languageCode, $source);
     if (!is_file($path)) {
@@ -262,7 +282,7 @@ class MarkdownSyncer
     ?string $source = null,
   ): void {
     $languageCode = self::determineLanguageCode($page, $language);
-    $source ??= self::getContentSource($page);
+    $source ??= self::contentSource($page);
     $path = self::getMarkdownFilePath($page, $languageCode, $source);
 
     self::ensureDirectory($path);
@@ -280,7 +300,7 @@ class MarkdownSyncer
     ?string $source = null,
   ): void {
     $languageCode = self::determineLanguageCode($page, $language);
-    $source ??= self::getContentSource($page);
+    $source ??= self::contentSource($page);
     $path = self::getMarkdownFilePath($page, $languageCode, $source);
 
     if (!is_file($path)) {
@@ -306,7 +326,7 @@ class MarkdownSyncer
     ?string $source = null,
   ): bool {
     $languageCode = self::determineLanguageCode($page, $language);
-    $source ??= self::getContentSource($page);
+    $source ??= self::contentSource($page);
 
     $path = self::getMarkdownFilePath($page, $languageCode, $source);
     return is_file($path);
@@ -360,6 +380,62 @@ class MarkdownSyncer
     }
   }
 
+
+  /**
+   * Check if a page class has overridden contentSource().
+   * Uses reflection to detect actual method overrides, not inheritance or traits.
+   */
+  protected static function hasContentSourceOverride(Page $page): bool
+  {
+    if (!method_exists($page, 'contentSource')) {
+      return false;
+    }
+
+    try {
+      $reflClass = new \ReflectionClass($page);
+      $method = $reflClass->getMethod('contentSource');
+      $declaringClass = $method->getDeclaringClass()->getName();
+      return $declaringClass !== 'ProcessWire\Page';
+    } catch (\Throwable $e) {
+      return false;
+    }
+  }
+
+  /**
+   * Save a field value with centralized error handling and logging.
+   * WARNING: This method persists data to the database immediately!
+   */
+  protected static function saveField(
+    Page $page,
+    string $fieldName,
+    mixed $fieldValue,
+    ?string $logAction = null,
+  ): bool {
+    $page->set($fieldName, $fieldValue);
+
+    try {
+      // Full save() instead of field-scoped to ensure hooks run and consistency
+      $page->save();
+
+      if ($logAction !== null) {
+        self::logInfo($page, $logAction, [
+          'field' => $fieldName,
+          'value' => $fieldValue,
+        ]);
+      }
+
+      return true;
+    } catch (\Throwable $e) {
+      self::logInfo($page, 'failed to save field', [
+        'field' => $fieldName,
+        'action' => $logAction,
+        'error' => $e->getMessage(),
+      ]);
+
+      return false;
+    }
+  }
+
   private static function doSyncFromMarkdown(Page $page): array
   {
     $config = self::config($page);
@@ -373,16 +449,31 @@ class MarkdownSyncer
     $htmlField = $config['htmlField'] ?? null;
     $sourcePageField = $config['source']['pageField'] ?? null;
 
-    $dirtyFields = [];
+        $dirtyFields = [];
 
-    // Populate source field with effective default if empty
+    // Sync source field: programmatic override takes priority, then user input, then default
     if ($sourcePageField && $page->hasField($sourcePageField)) {
+      $effectiveSource = self::contentSource($page);
       $currentSource = trim((string) $page->get($sourcePageField));
-      if ($currentSource === '') {
-        $effectiveSource = self::getContentSource($page);
+      $hasOverride = self::hasContentSourceOverride($page);
+
+      if ($hasOverride && $currentSource !== $effectiveSource) {
+        // Programmatic override present - sync it to field immediately
+        self::saveField(
+          $page,
+          $sourcePageField,
+          $effectiveSource,
+          'synced programmatic source to field',
+        );
+      } elseif (!$hasOverride && $currentSource === '') {
+        // No override, field is empty - populate with default
         if ($effectiveSource !== '') {
-          $page->set($sourcePageField, $effectiveSource);
-          $dirtyFields[] = $sourcePageField;
+          self::saveField(
+            $page,
+            $sourcePageField,
+            $effectiveSource,
+            'populated source field with default',
+          );
         }
       }
     }
@@ -487,14 +578,16 @@ class MarkdownSyncer
     $failedFields = [];
 
     foreach (array_unique($dirtyFields) as $field) {
-      if (!self::pageSupportsMappedField($page, $field)) {
+      $supports = self::pageSupportsMappedField($page, $field);
+      if (!$supports) {
+        self::logInfo($page, 'skipping field: not supported', ['field' => $field]);
         continue;
       }
 
       try {
-        self::logDebug(
+        self::logInfo(
           $page,
-          sprintf('save field %s after markdown sync', $field),
+          sprintf('saving field %s after markdown sync', $field),
         );
         $page->save($field);
         $savedFields[] = $field;
@@ -1093,7 +1186,7 @@ class MarkdownSyncer
       return null;
     }
 
-    $source ??= self::getContentSource($page);
+    $source ??= self::contentSource($page);
     $languageCode ??= self::getLanguageCode($page);
     $path = self::getMarkdownFilePath($page, $languageCode, $source);
 
