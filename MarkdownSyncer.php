@@ -119,6 +119,12 @@ class MarkdownSyncer
         return $fallback;
       }
 
+      // Default: use page name with .md extension
+      $pageName = trim((string) $page->name);
+      if ($pageName !== '') {
+        return $pageName . '.md';
+      }
+
       throw new WireException(
         sprintf('No markdown source configured for page %s.', $page->path),
       );
@@ -203,8 +209,9 @@ class MarkdownSyncer
     $source ??= self::getContentSource($page);
 
     $root = $config['source']['path'];
+    $source = ltrim($source, '/');
 
-    return $root . $languageCode . '/' . ltrim($source, '/');
+    return $root . $languageCode . '/' . $source;
   }
 
   public static function loadMarkdown(
@@ -239,7 +246,7 @@ class MarkdownSyncer
       self::logDebug(
         $page,
         sprintf('markdown file not found for language %s', $languageCode),
-        ['path' => $path],
+        ['path' => $path, 'source' => $source, 'exists' => file_exists($path) ? 'yes' : 'no'],
       );
       return null;
     }
@@ -364,8 +371,21 @@ class MarkdownSyncer
 
     $markdownField = $config['markdownField'];
     $htmlField = $config['htmlField'] ?? null;
+    $sourcePageField = $config['source']['pageField'] ?? null;
 
     $dirtyFields = [];
+
+    // Populate source field with effective default if empty
+    if ($sourcePageField && $page->hasField($sourcePageField)) {
+      $currentSource = trim((string) $page->get($sourcePageField));
+      if ($currentSource === '') {
+        $effectiveSource = self::getContentSource($page);
+        if ($effectiveSource !== '') {
+          $page->set($sourcePageField, $effectiveSource);
+          $dirtyFields[] = $sourcePageField;
+        }
+      }
+    }
 
     $languageCodes = self::availableLanguageCodes($page);
     $defaultCode = self::getDefaultLanguageCode($page);
