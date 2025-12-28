@@ -121,7 +121,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       MarkdownSyncHooks::class . '::handleModulesRefresh',
     );
 
-    // Auto-refresh modules after config save and configure selected editor field
+    // Auto-refresh modules and auto-configure editor field after config save
     $this->addHookAfter(
       'Modules::saveConfig',
       function(HookEvent $event) {
@@ -133,17 +133,21 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
         
         if ($moduleStr === 'MarkdownToFields' || $moduleName === 'MarkdownToFields' || $module instanceof MarkdownToFields) {
           $this->syncTemplateFields();
-          // Auto-configure the selected editor field
-          $this->repairMarkdownEditor($this->htmlField ?? 'md_editor');
-          // Explicit restore to defaults action
-          $restore = $this->wire('input')->post('restore_default_editor') ?? null;
-          if ($restore) {
-              // Restore the currently selected editor field (fallback to md_editor)
-              $target = $this->wire('input')->post('htmlField') ?? ($this->htmlField ?? 'md_editor');
-              $this->repairMarkdownEditor($target);
-              $this->wire('log')->save('markdown-sync', "Editor field '{$target}' restored to required configuration.");
+          
+          // Configure editor field only if checkbox is checked
+          $configure = $this->wire('input')->post('configure_editor_field') ?? null;
+          if ($configure) {
+            $config = $this->wire('config');
+            $mdConfig = $config->MarkdownToFields ?? [];
+            $fieldName = $mdConfig['htmlField'] ?? 'md_editor';
+            $this->repairMarkdownEditor($fieldName);
+            
+            // Show success message
+            $this->message("Editor field '{$fieldName}' has been configured with required TinyMCE settings.");
+            $this->wire('log')->save('markdown-sync', "Editor field '{$fieldName}' configured with required TinyMCE settings.");
           }
-          $this->wire('log')->save('markdown-sync', 'Template field sync and editor configuration complete.');
+          
+          $this->wire('log')->save('markdown-sync', 'Template field sync complete.');
         }
       }
     );
@@ -164,17 +168,16 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   {
     $defaults = [
       'templates' => (array) ($this->templates ?? []),
-      'htmlField' => $this->htmlField ?? 'md_editor',
-      'debug' => (bool) ($this->debug ?? false),
     ];
     $data = array_merge($defaults, $data);
 
     $modules = $this->wire('modules');
     $templates = $this->wire('templates');
-    $fields = $this->wire('fields');
     $wrapper = new InputfieldWrapper();
+    $config = $this->wire('config');
+    $mdConfig = $config->MarkdownToFields ?? [];
 
-    // Template selection
+    // Template selection only
     $options = [];
     foreach ($templates as $template) {
       if ($this->isTemplateExcluded($template)) {
@@ -189,138 +192,69 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
 
     $checkboxes = $modules->get('InputfieldCheckboxes');
     $checkboxes->attr('name', 'templates');
-    $checkboxes->label = 'Select templates';
-    $checkboxes->description =
-      'Select the templates where Markdown should be used as the content source:
-      - When a template is enabled, the module adds a Markdown tab and its editor fields. 
-      - Disable a template to remove those module fields. 
-      
-      System and admin templates are ignored.';
-
-    $checkboxes->notes =
-      'These checkboxes only manage fields created by the module. 
-      Custom or user-selected fields are never added or removed.';
-
+    $checkboxes->label = 'Enabled templates';
+    $checkboxes->description = 'Enable Markdown sync for these templates. System and admin templates are ignored.';
     $checkboxes->addOptions($options);
     $checkboxes->attr('value', $data['templates']);
     $wrapper->add($checkboxes);
 
-    // HTML/Editor field selection (shallow compatibility: textarea + TinyMCE only)
-    $f = $modules->get('InputfieldSelect');
-    $f->name = 'htmlField';
-    $f->label = 'Content Editor field';
-    $f->description = 'By default, this module uses the md_editor TinyMCE field as the content editor. 
-    You can replace it by selecting another TinyMCE field here.';
-    $f->notes = "Only TinyMCE fields are shown.
+    // Configuration and editor field setup
+    $configFieldset = $modules->get('InputfieldFieldset');
+    $configFieldset->name = 'editor_field_setup';
+    $configFieldset->label = 'Editor Field Setup';
+    $configFieldset->description = 'If you choose a different TinyMCE field in config.php to be the content editor, use this option to set up the required settings. Or use it to reset to defaults if needed.';
     
-    If you choose a different field, it will be automatically configured with the required TinyMCE settings (noneditable plugin, disabled image interaction, and custom CSS).";
-    $f->columnWidth = 50;
+    $currentField = $mdConfig['htmlField'] ?? 'md_editor';
     
-    $compatibleFields = [];
+    $setupCheckbox = $modules->get('InputfieldCheckbox');
+    $setupCheckbox->name = 'configure_editor_field';
+    $setupCheckbox->label = 'Apply default settings to ' . htmlspecialchars($currentField) . '?';
+    $setupCheckbox->description = 'Applies required TinyMCE settings: noneditable plugin, disabled image interaction, and custom CSS.';
+    $setupCheckbox->attr('value', 1);
+    $configFieldset->add($setupCheckbox);
     
-    foreach ($fields as $field) {
-      if ($field->type->name !== 'FieldtypeTextarea') continue;
-      
-      if ($this->isMarkdownEditorCompatible($field)) {
-        $compatibleFields[] = $field;
-        $label = $field->label ? "{$field->label} ({$field->name})" : $field->name;
-        $f->addOption($field->name, $label);
-      }
+    $wrapper->add($configFieldset);
+
+    // Configuration reference
+    $refFieldset = $modules->get('InputfieldFieldset');
+    $refFieldset->name = 'configuration_reference';
+    $refFieldset->label = 'Configuration Reference';
+    $refFieldset->description = 'All settings are managed in /site/config.php';
+    
+    $refMarkup = $modules->get('InputfieldMarkup');
+    $html = '<p>To customize field names and paths, add to <code>/site/config.php:</code></p>';
+    $html .= '<pre style="background:#f0f0f0; padding:12px; border-radius:4px; overflow-x:auto; font-size:11px;">$config->MarkdownToFields = [' . "\n";
+    $html .= '  \'htmlField\' => \'md_editor\',           // Editor field' . "\n";
+    $html .= '  \'markdownField\' => \'md_markdown\',     // Raw markdown' . "\n";
+    $html .= '  \'hashField\' => \'md_markdown_hash\',    // Sync state' . "\n";
+    $html .= '  \'sourcePageField\' => \'md_markdown_source\', // File ref' . "\n";
+    $html .= '  \'sourcePath\' => \'content/\',           // Markdown location' . "\n";
+    $html .= '];' . "\n</pre>";
+    
+    $html .= '<h4>Current values:</h4>';
+    $html .= '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
+    $html .= '<tr style="background:#f5f5f5;">';
+    $html .= '<th style="text-align:left; padding:8px; border:1px solid #ddd;">Setting</th>';
+    $html .= '<th style="text-align:left; padding:8px; border:1px solid #ddd;">Value</th>';
+    $html .= '</tr>';
+    
+    $settings = [
+      'htmlField' => $mdConfig['htmlField'] ?? 'md_editor',
+      'markdownField' => $mdConfig['markdownField'] ?? 'md_markdown',
+      'hashField' => $mdConfig['hashField'] ?? 'md_markdown_hash',
+      'sourcePageField' => $mdConfig['sourcePageField'] ?? 'md_markdown_source',
+      'sourcePath' => $mdConfig['sourcePath'] ?? 'content/',
+    ];
+    
+    foreach ($settings as $key => $value) {
+      $html .= '<tr><td style="padding:8px; border:1px solid #ddd;"><code>' . htmlspecialchars($key) . '</code></td>';
+      $html .= '<td style="padding:8px; border:1px solid #ddd;"><code>' . htmlspecialchars($value) . '</code></td></tr>';
     }
+    $html .= '</table>';
     
-    // If no compatible fields exist, guide user to create one
-    if (count($compatibleFields) === 0) {
-      $f->warning(
-        'No compatible editor fields found. The "md_editor" field will be created on next modules refresh.'
-      );
-      $f->addOption('md_editor', 'md_editor (will be created)');
-    }
-    
-    $f->attr('value', $data['htmlField']);
-
-    
-    // Two-column layout: left is the select, right is a fieldset
-    $restoreFieldset = $modules->get('InputfieldFieldset');
-    $restoreFieldset->label = 'Restore Selected Editor';
-    $restoreFieldset->description = 'Reset the currently selected content editor field to the required TinyMCE configuration (noneditable plugin, disabled image interaction, custom CSS). If you select md_editor, it restores defaults for that field.';
-    $restoreFieldset->columnWidth = 50;
-
-    // Restore to defaults action
-    $restoreBtn = $modules->get('InputfieldSubmit');
-    $restoreBtn->name = 'restore_default_editor';
-    $restoreBtn->value = 'Reset';
-    $restoreBtn->columnWidth = 50;
-    $restoreFieldset->add($restoreBtn);
-    
-    // Add select directly (no extra wrapper) and the restore fieldset side by side
-    $wrapper->add($f);
-    $wrapper->add($restoreFieldset);
-
-    // Information section: field names and how to override programmatically
-    $infoFieldset = $modules->get('InputfieldFieldset');
-    $infoFieldset->label = 'Field Names & Programmatic Overrides';
-    $infoFieldset->description = 'These are the field names used for markdown sync. You can override them per-page by setting protected properties in your page class.';
-    
-    $infoMarkup = $modules->get('InputfieldMarkup');
-    $infoMarkup->value = '
-<table style="width:100%; border-collapse:collapse; font-size:13px;">
-  <tr style="background:#f5f5f5;">
-    <th style="text-align:left; padding:8px; border:1px solid #ddd;"><strong>Internal name</strong></th>
-    <th style="text-align:left; padding:8px; border:1px solid #ddd;"><strong>Field</strong></th>
-    <th style="text-align:left; padding:8px; border:1px solid #ddd;"><strong>Purpose</strong></th>
-  </tr>
-  <tr>
-    <td style="padding:8px; border:1px solid #ddd;"><code>htmlField</code></td>
-    <td style="padding:8px; border:1px solid #ddd;"><code>' . htmlspecialchars($data['htmlField']) . '</code></td>
-    <td style="padding:8px; border:1px solid #ddd;">Editor field (TinyMCE textarea)</td>
-  </tr>
-  <tr style="background:#fafafa;">
-    <td style="padding:8px; border:1px solid #ddd;"><code>markdownField</code></td>
-    <td style="padding:8px; border:1px solid #ddd;"><code>md_markdown</code></td>
-    <td style="padding:8px; border:1px solid #ddd;">Raw markdown source</td>
-  </tr>
-  <tr>
-    <td style="padding:8px; border:1px solid #ddd;"><code>hashField</code></td>
-    <td style="padding:8px; border:1px solid #ddd;"><code>md_markdown_hash</code></td>
-    <td style="padding:8px; border:1px solid #ddd;">Sync state tracker</td>
-  </tr>
-  <tr style="background:#fafafa;">
-    <td style="padding:8px; border:1px solid #ddd;"><code>sourcePageField</code></td>
-    <td style="padding:8px; border:1px solid #ddd;"><code>md_markdown_source</code></td>
-    <td style="padding:8px; border:1px solid #ddd;">File reference field</td>
-  </tr>
-  <tr>
-    <td style="padding:8px; border:1px solid #ddd;"><code>sourcePath</code></td>
-    <td style="padding:8px; border:1px solid #ddd;"><code>site/content/</code></td>
-    <td style="padding:8px; border:1px solid #ddd;">Base path for markdown files</td>
-  </tr>
-</table>
-
-<h4 style="margin-top:16px;">Override per page:</h4>
-<pre style="background:#f0f0f0; padding:12px; border-radius:4px; overflow-x:auto; font-size:12px;">class HomePage extends Page {
-  use MarkdownContent;
-  
-  // Override defaults for this page only
-  protected string $htmlField = \'custom_editor\';
-  protected string $markdownField = \'content_md\';
-  protected string $sourcePath = \'/var/markdown/\';
-}</pre>
-
-<p><strong>Priority:</strong> Page class override → Module config (htmlField only) → Trait defaults</p>
-    ';
-    $infoFieldset->add($infoMarkup);
-    $wrapper->add($infoFieldset);
-
-    // Debug mode checkbox (at the end)
-    $debugCheck = $modules->get('InputfieldCheckbox');
-    $debugCheck->name = 'debug';
-    $debugCheck->label = 'Debug Mode';
-    $debugCheck->description = 'Enable debug logging to markdown-sync.txt log file';
-    $debugCheck->attr('value', 1);
-    if ($data['debug']) {
-      $debugCheck->attr('checked', 'checked');
-    }
-    $wrapper->add($debugCheck);
+    $refMarkup->value = $html;
+    $refFieldset->add($refMarkup);
+    $wrapper->add($refFieldset);
 
     return $wrapper;
   }

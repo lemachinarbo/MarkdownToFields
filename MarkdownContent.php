@@ -87,21 +87,24 @@ trait MarkdownContent {
 
   /**
    * Get markdown sync configuration
-   * Override to customize paths or settings
+   * Reads from $config->MarkdownToFields, falls back to defaults
    */
   public function getMarkdownSyncMap(): array {
     $config = $this->wire('config');
-    $path = ($this->sourcePath ?? '') ?: $config->paths->site . 'content/';
+    $mdConfig = $config->MarkdownToFields ?? [];
+    
+    $sourcePath = $mdConfig['sourcePath'] ?? 'content/';
+    $path = $sourcePath[0] === '/' ? $sourcePath : $config->paths->site . $sourcePath;
     
     return [
       'source' => [
         'path' => $path,
-        'pageField' => $this->sourcePageField ?? 'md_markdown_source',
+        'pageField' => $mdConfig['sourcePageField'] ?? 'md_markdown_source',
         'fallback' => $this->contentSource(),
       ],
-      'markdownField' => $this->markdownField ?? 'md_markdown',
-      'htmlField' => $this->htmlField ?? 'md_editor',
-      'hashField' => $this->hashField ?? 'md_markdown_hash',
+      'markdownField' => $mdConfig['markdownField'] ?? 'md_markdown',
+      'htmlField' => $mdConfig['htmlField'] ?? 'md_editor',
+      'hashField' => $mdConfig['hashField'] ?? 'md_markdown_hash',
     ];
   }
 
