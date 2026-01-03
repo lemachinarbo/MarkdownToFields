@@ -38,17 +38,18 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   private array $fieldDefs = [
     'md_markdown_tab' => ['FieldtypeFieldsetTabOpen', 'Markdown'],
     'md_markdown_source' => ['FieldtypeText', 'Source file path'],
-    'md_markdown' => ['FieldtypeTextarea', 'Markdown'],
+    'md_markdown' => ['FieldtypeTextarea', 'Markdown editor'],
     'md_markdown_hash' => ['FieldtypeText', 'Markdown hash'],
+    'md_markdown_lock' => ['FieldtypeCheckbox', 'Enable Markdown editor'],
     'md_markdown_tab_END' => ['FieldtypeFieldsetClose', 'Close Markdown tab'],
-    'md_editor' => ['FieldtypeTextarea', 'Content Editor'],
+    'md_editor' => ['FieldtypeTextarea', 'Content editor'],
   ];
 
   public static function getModuleInfo()
   {
     return [
       'title' => 'Markdown to fields',
-      'version' => '1.0.2',
+      'version' => '1.0.3',
       'summary' => 'Markdown files as your content source of truth',
       'description' =>
         'Parse markdown into structured content API, sync bidirectionally with fields.',
@@ -116,6 +117,83 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       'Pages::saveReady',
       MarkdownSyncHooks::class . '::handleSaveReady',
     );
+
+    // UI behavior: when building the edit form, ensure the raw markdown field is disabled when locked
+    $this->addHookAfter('ProcessPageEdit::buildForm', function(HookEvent $event) {
+      try {
+        $page = $event->arguments(0);
+        $form = $event->return ?: null;
+        if (!$form || !$page) return;
+
+        // Locate lock and markdown inputs in the form (they are added via field groups)
+        if (method_exists($form, 'get')) {
+          $lockInput = $form->get('md_markdown_lock');
+          $mdInput = $form->get('md_markdown');
+          $mdEditorInput = $form->get('md_editor');
+
+          if ($lockInput) {
+            // set explicit description text
+            $lockInput->description = 'Uncheck this to edit the raw Markdown file below.';
+
+            // Add a short explanatory note (appears under the checkbox)
+            $lockInput->notes = 'When unchecked, changes made in the Markdown file are saved and take priority over the fields in the Content tab.';
+
+            // Ensure checkbox value is set; default is unchecked (editor disabled)
+            if (!isset($page->md_markdown_lock) || $page->md_markdown_lock === '' || $page->md_markdown_lock === null) {
+              $lockInput->attr('value', 1);
+            }
+          }
+
+          if ($mdInput) {
+            if ($page->md_markdown_lock ?? true) {
+              // disable the raw markdown input while locked (server-side safety)
+              $mdInput->attr('disabled', 'disabled');
+            }
+          }
+
+          // Move the lock checkbox above the editor (server-side) and add a small onchange handler to toggle raw textarea immediately
+          if ($lockInput && ($mdInput || $mdEditorInput)) {
+            try {
+              // Prefer inserting the lock before the raw markdown textarea so order is:
+              // md_markdown_lock, md_markdown
+              $before = $mdInput ?: $mdEditorInput;
+              $form->insertBefore($lockInput, $before);
+            } catch (\Throwable $e) {
+              // ignore if insert fails
+            }
+
+            // Ensure explicit value and checked state when page says locked
+            $lockInput->attr('value', '1');
+            if ($page->md_markdown_lock ?? false) {
+              $lockInput->attr('checked', 'checked');
+            }
+
+            // Setup immediate toggle via onchange attribute (client-side)
+            $onchange = "var md=document.querySelector('[name=\"md_markdown\"]'); if(md){ if(this.checked){ md.setAttribute('disabled','disabled'); md.classList.add('disabled'); } else { md.removeAttribute('disabled'); md.classList.remove('disabled'); } }";
+            $lockInput->attr('onchange', $onchange);
+
+            // Apply initial disabled state to raw markdown input when the editor is disabled by default
+            $editorEnabled = (bool) ($page->md_markdown_lock ?? false);
+            if (!$editorEnabled && $mdInput) {
+              $mdInput->attr('disabled', 'disabled');
+            }
+
+            // Also set the onchange handler to reflect current state immediately
+            $lockInput->attr('onchange', "var md=document.querySelector('[name=\"md_markdown\"]');if(md){ if(this.checked){ md.removeAttribute('disabled'); md.classList.remove('disabled'); } else { md.setAttribute('disabled','disabled'); md.classList.add('disabled'); }}");
+          } else {
+            // If lock input not positioned, ensure we at least set onchange so toggling still works
+            if ($lockInput) $lockInput->attr('onchange', "var md=document.querySelector('[name=\"md_markdown\"]');if(md){ if(this.checked){ md.setAttribute('disabled','disabled'); md.classList.add('disabled'); } else { md.removeAttribute('disabled'); md.classList.remove('disabled'); }}");
+          }
+        }
+      } catch (\Throwable $e) {
+        // be defensive; do not break form rendering
+      }
+    });
+
+    // Raw-markdown write hook removed: logic centralized in MarkdownSyncer::syncToMarkdown
+    // (Doing writes in multiple hooks caused ordering and duplication problems.)
+
+
     $this->addHookAfter(
       'Modules::refresh',
       MarkdownSyncHooks::class . '::handleModulesRefresh',
@@ -151,6 +229,9 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
         }
       }
     );
+
+    // Pages::saved finalizer removed — writing is centralized in MarkdownSyncer::syncToMarkdown to avoid race conditions and duplicated logic.
+
   }
 
   public function install()
@@ -443,6 +524,12 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
         // Configure markdown textarea with larger editor
         if ($name === 'md_markdown') {
           $f->rows = 40;
+        }
+
+        if ($name === 'md_markdown_lock') {
+          $f->description = 'Enable the Markdown editor for this page.';
+          // Default to unchecked (editor disabled)
+          $f->defaultValue = 0;
         }
         
         // Configure md_editor field authoritatively

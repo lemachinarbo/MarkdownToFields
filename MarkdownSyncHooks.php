@@ -278,6 +278,14 @@ class MarkdownSyncHooks
         MarkdownSyncer::syncFieldsFromMarkdown($page, (string) $bodyPost);
       }
 
+      // Debug: log posted markdown presence and lock state before calling sync
+      try {
+        $postedMdKeys = array_keys($postedLanguageValues[$documentField] ?? []);
+      } catch (\Throwable $_e) {
+        $postedMdKeys = [];
+      }
+      wire('log')->save('markdown-sync', sprintf('handleSaveReady page=%s lock=%d postedMdKeys=%s', (string)$page->path, (int)($page->md_markdown_lock ?? 0), json_encode($postedMdKeys)));
+
       MarkdownSyncer::syncToMarkdown(
         $page,
         $expectedHash,

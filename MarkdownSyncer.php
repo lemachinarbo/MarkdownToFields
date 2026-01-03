@@ -287,6 +287,20 @@ class MarkdownSyncer
 
     self::ensureDirectory($path);
 
+    // Log details about the document being written for diagnostics (length and
+    // presence of frontmatter). This helps detect accidental overwrites that
+    // strip frontmatter.
+    try {
+      [$frontRaw, $body] = self::splitDocument($document);
+      self::logDebug($page, 'saveLanguageMarkdown', [
+        'language' => $languageCode,
+        'len' => strlen($document),
+        'frontmatter' => $frontRaw !== '' ? 1 : 0,
+      ]);
+    } catch (\Throwable $_e) {
+      // Best-effort logging; don't fail the write if logging fails.
+    }
+
     if (wire('files')->filePutContents($path, $document) === false) {
       throw new WireException(
         sprintf('Unable to write markdown file at %s', $path),
@@ -679,7 +693,77 @@ class MarkdownSyncer
       }
     }
 
+    // Normalize posted markdown map for easy per-language access
+    $postedMarkdownMap = $postedByField[$markdownField] ?? [];
+    if ($postedMarkdownMap && !is_array($postedMarkdownMap)) {
+      $defaultCode = self::getDefaultLanguageCode($page);
+      $postedMarkdownMap = [$defaultCode => (string) $postedMarkdownMap];
+    }
+
+    $postedWrittenLanguages = [];
+    if (!empty($postedMarkdownMap)) {
+      self::logInfo($page, 'postedMarkdown', ['langs' => array_keys($postedMarkdownMap), 'wrote' => $postedWrittenLanguages]);
+    }
+
     $currentHashes = self::languageFileHashes($page, $languageCodes);
+
+    // If page indicates raw markdown should be authoritative (checkbox checked),
+    // write any posted markdown content now (one central place) and update hashes.
+    try {
+      $rawPriority = (bool) ($page->md_markdown_lock ?? false);
+      if ($rawPriority && !empty($postedMarkdownMap)) {
+        foreach ($languageCodes as $languageCode) {
+          if (!array_key_exists($languageCode, $postedMarkdownMap)) continue;
+          $doc = (string) $postedMarkdownMap[$languageCode];
+
+          // Empty posted markdown indicates an explicit intent to delete the file.
+          if ($doc === '') {
+            $path = self::getMarkdownFilePath($page, $languageCode);
+            if (is_file($path)) {
+              try {
+                self::deleteLanguageMarkdown($page, $languageCode);
+                self::rememberFileHash($page, [$languageCode => null]);
+                $postedWrittenLanguages[] = $languageCode;
+                self::logInfo($page, 'deletedPostedMarkdown', ['lang' => $languageCode]);
+              } catch (\Throwable $e) {
+                self::logInfo($page, 'deletePostedError', ['lang' => $languageCode, 'error' => $e->getMessage()]);
+              }
+            } else {
+              self::logInfo($page, 'postedEmptyNoFile', ['lang' => $languageCode]);
+            }
+
+            continue;
+          }
+
+          $path = self::getMarkdownFilePath($page, $languageCode);
+          $existing = is_file($path) ? file_get_contents($path) : '';
+
+          if ($doc !== $existing) {
+            self::ensureDirectory($path);
+            wire('files')->filePutContents($path, $doc);
+            $hash = md5($doc);
+            self::rememberFileHash($page, [$languageCode => $hash]);
+            // Stage the page fields so the ongoing save will persist them (avoid nested saves here)
+            $page->of(false);
+            $page->set($markdownField, [$languageCode => $doc]);
+            $hashField = self::hashFieldName($page, null);
+            if ($hashField) {
+              $page->set($hashField, self::encodeHashPayload($page, [$languageCode => $hash]));
+            }
+            $postedWrittenLanguages[] = $languageCode;
+            self::logInfo($page, 'wrotePostedMarkdown', ['lang' => $languageCode]);
+          } else {
+            self::logInfo($page, 'postedMatchesExisting', ['lang' => $languageCode]);
+          }
+        }
+      }
+    } catch (\Throwable $e) {
+      self::logInfo($page, 'writePostedError', ['error' => $e->getMessage()]);
+    }
+
+    if (!empty($postedWrittenLanguages)) {
+      self::logInfo($page, 'wrotePostedMarkdowns', ['langs' => $postedWrittenLanguages]);
+    }
 
     // Skip hash mismatch check if we're currently syncing FROM markdown
     // (the sync operation itself updates both content and hash atomically)
@@ -881,11 +965,22 @@ class MarkdownSyncer
         }
       }
 
+      // If raw priority is enabled and the user posted raw markdown for this
+      // language, prefer that posted markdown and do not let the HTML editor
+      // override it during the same save.
+      $rawPriority = (bool) ($page->md_markdown_lock ?? false);
+
       if ($postedHtml !== null) {
         $normalizedHtml = (string) $postedHtml;
         $trimmedHtml = trim($normalizedHtml);
 
-        if ($trimmedHtml === '' && $postedMarkdown !== null) {
+        if ($rawPriority && $postedMarkdown !== null) {
+          self::logDebug(
+            $page,
+            'skip html override: raw priority and posted markdown present',
+            ['language' => self::languageLogLabel($page, $language)],
+          );
+        } elseif ($trimmedHtml === '' && $postedMarkdown !== null) {
           self::logDebug(
             $page,
             'skip html fallback: empty submission with markdown input',
@@ -3473,16 +3568,48 @@ class MarkdownSyncer
           // Use getUnformatted with language ID appended
           $languageFieldName = $fieldName . $language->id;
           try {
-            return (string) $page->getUnformatted($languageFieldName);
+            $val = $page->getUnformatted($languageFieldName);
+            if (is_array($val)) {
+              $defaultCode = self::getDefaultLanguageCode($page);
+              if (isset($val[$defaultCode]) && is_scalar($val[$defaultCode])) {
+                return (string) $val[$defaultCode];
+              }
+              foreach ($val as $v) {
+                if (is_scalar($v)) return (string) $v;
+              }
+              return '';
+            }
+            return (string) $val;
           } catch (\Throwable $_e) {
-            return (string) $page->get($fieldName);
+            $val = $page->get($fieldName);
+            if (is_array($val)) {
+              $defaultCode = self::getDefaultLanguageCode($page);
+              if (isset($val[$defaultCode]) && is_scalar($val[$defaultCode])) {
+                return (string) $val[$defaultCode];
+              }
+              foreach ($val as $v) {
+                if (is_scalar($v)) return (string) $v;
+              }
+              return '';
+            }
+            return (string) $val;
           }
         }
       }
 
-      return $field === 'title'
-        ? (string) $page->get('title')
-        : (string) $page->get($field);
+      $val = $field === 'title' ? $page->get('title') : $page->get($field);
+      if (is_array($val)) {
+        $defaultCode = self::getDefaultLanguageCode($page);
+        if (isset($val[$defaultCode]) && is_scalar($val[$defaultCode])) {
+          return (string) $val[$defaultCode];
+        }
+        foreach ($val as $v) {
+          if (is_scalar($v)) return (string) $v;
+        }
+        return '';
+      }
+
+      return (string) $val;
     }
 
     // For non-default languages
