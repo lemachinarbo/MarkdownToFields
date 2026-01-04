@@ -31,6 +31,8 @@ require_once __DIR__ . '/MarkdownSyncHooks.php';
 
 class MarkdownToFields extends WireData implements Module, ConfigurableModule
 {
+  private static bool $uninstalling = false;
+  
   private array $fieldDefs = [
     'md_markdown_tab' => ['FieldtypeFieldsetTabOpen', 'Markdown'],
     'md_markdown_source' => ['FieldtypeText', 'Source file path'],
@@ -216,7 +218,80 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
 
   public function uninstall()
   {
+    self::$uninstalling = true;
+    
+    $fields = $this->wire('fields');
+    $templates = $this->wire('templates');
+    $log = $this->wire('log');
+    
+    // Get all fields created by this module
+    $fieldNames = array_keys($this->fieldDefs);
+    $fieldsInUse = false;
+    
+    // Check if any field is still assigned to a template
+    foreach ($fieldNames as $fieldName) {
+      $field = $fields->get($fieldName);
+      if (!$field) {
+        continue;
+      }
+      
+      foreach ($templates as $template) {
+        if ($template->fieldgroup->has($field)) {
+          $fieldsInUse = true;
+          break 2;
+        }
+      }
+    }
+    
+    // If any fields are in use, abort uninstall
+    if ($fieldsInUse) {
+      throw new WireException(
+        'Cannot uninstall MarkdownToFields: some fields are still in use. ' .
+        'Go to the module settings and uncheck all templates in "Enabled templates" to remove these fields.'
+      );
+    }
+    
+    // Remove and delete fields (reverse order for fieldset pairs)
+    $fieldsToDelete = array_reverse($fieldNames);
+    $deletedCount = 0;
+    
+    foreach ($fieldsToDelete as $fieldName) {
+      $field = $fields->get($fieldName);
+      if (!$field) {
+        continue;
+      }
+      
+      // Remove from all templates/fieldgroups
+      foreach ($templates as $template) {
+        if ($template->fieldgroup->has($field)) {
+          $template->fieldgroup->remove($field);
+          $template->fieldgroup->save();
+        }
+      }
+      
+      // Reset flags before deletion
+      $field->flags = 0;
+      $fields->save($field);
+      
+      // Delete the field
+      try {
+        $deleted = $fields->delete($field);
+        if ($deleted) {
+          $deletedCount++;
+        } else {
+          throw new WireException("Field deletion returned false");
+        }
+      } catch (\Throwable $e) {
+        throw new WireException("Cannot delete field '$fieldName': " . $e->getMessage());
+      }
+    }
+    
+    // Clear module config
     $this->wire('modules')->saveConfig($this, ['templates' => []]);
+    
+    if ($deletedCount > 0) {
+      $log->save('markdown-sync', "Uninstall complete: removed $deletedCount fields");
+    }
   }
 
   /**
@@ -261,6 +336,12 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
 
   public function syncTemplateFields(): void
   {
+    // Skip field operations during uninstall
+    if (self::$uninstalling) {
+      $this->wire('log')->save('markdown-sync', 'Template field sync skipped (uninstalling)');
+      return;
+    }
+    
     // Create missing fields only; authoritative repair is explicit
     $this->createFields();
 
