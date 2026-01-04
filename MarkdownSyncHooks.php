@@ -3,13 +3,70 @@
 namespace ProcessWire;
 
 use ProcessWire\MarkdownEditor;
+use ProcessWire\HookEvent;
+use ProcessWire\InputfieldForm;
 
 class MarkdownSyncHooks
 {
+  public static function enqueueAssets(HookEvent $event): void
+  {
+    $config = $event->wire('config');
+    $url = $config->urls->MarkdownToFields ?? null;
+    if (!$url) {
+      return;
+    }
+
+    $config->scripts->add($url . 'assets/markdown-editor.js');
+  }
+
+  public static function lockRawMarkdownField(HookEvent $event): void
+  {
+    $form = $event->return;
+    if (!$form) {
+      return;
+    }
+
+    $markdown = $form->get('md_markdown');
+    if (!$markdown) {
+      return;
+    }
+
+    $markdown->attr('disabled', 'disabled');
+    $markdown->description = 'Double-click the field to edit the Markdown content.
+    While editing Markdown, do not modify the same content in other fields (such as the title or content editor) to avoid losing changes.';
+  }
+
+  public static function handleSaveConfig(HookEvent $event): void
+  {
+    $moduleArg = $event->arguments(0);
+    $moduleName = $event->arguments(1) ?? '';
+
+    $module = $moduleArg instanceof MarkdownToFields
+      ? $moduleArg
+      : ($moduleArg === 'MarkdownToFields' || $moduleName === 'MarkdownToFields'
+        ? $event->wire('modules')->get('MarkdownToFields')
+        : null);
+    if (!$module) return;
+
+    $module->syncTemplateFields();
+
+    if ($event->wire('input')->post('configure_editor_field')) {
+      $config = $event->wire('config');
+      $mdConfig = $config->MarkdownToFields ?? [];
+      $fieldName = $mdConfig['htmlField'] ?? 'md_editor';
+
+      $module->repairMarkdownEditor($fieldName);
+      $module->message("Editor field '{$fieldName}' has been configured with required TinyMCE settings.");
+      $module->wire('log')->save('markdown-sync', "Editor field '{$fieldName}' configured with required TinyMCE settings.");
+    }
+
+    $module->wire('log')->save('markdown-sync', 'Template field sync complete.');
+  }
+
   public static function prepareEditForm(HookEvent $event): void
   {
     wire('log')->save('markdown-sync', 'Hook: prepareEditForm triggered');
-    $page = \ProcessWire\MarkdownEditor::pageFromProcess($event);
+    $page = MarkdownEditor::pageFromProcess($event);
     if (!$page) {
       return;
     }
@@ -117,7 +174,7 @@ class MarkdownSyncHooks
           ),
         );
       }
-      \ProcessWire\MarkdownEditor::rememberHash($page);
+      MarkdownEditor::rememberHash($page);
     } catch (\Throwable $e) {
       wire('log')->save('markdown-sync', $e->getMessage());
       $event->wire('session')->error($e->getMessage());
@@ -127,7 +184,7 @@ class MarkdownSyncHooks
   public static function appendHashField(HookEvent $event): void
   {
     wire('log')->save('markdown-sync', 'Hook: appendHashField triggered');
-    $page = \ProcessWire\MarkdownEditor::pageFromProcess($event);
+    $page = MarkdownEditor::pageFromProcess($event);
     if (!$page) {
       return;
     }
@@ -145,7 +202,7 @@ class MarkdownSyncHooks
       }
     }
 
-    $field = \ProcessWire\MarkdownEditor::hashField($page);
+    $field = MarkdownEditor::hashField($page);
     if ($form->get($field)) {
       return;
     }
@@ -168,7 +225,7 @@ class MarkdownSyncHooks
   public static function handleSaveReady(HookEvent $event): void
   {
     wire('log')->save('markdown-sync', 'Hook: handleSaveReady triggered');
-    $page = \ProcessWire\MarkdownEditor::pageFromArgs($event);
+    $page = MarkdownEditor::pageFromArgs($event);
     if (!$page) {
       return;
     }
@@ -194,7 +251,7 @@ class MarkdownSyncHooks
     }
 
     $input = $event->wire('input');
-    $hashFieldName = \ProcessWire\MarkdownEditor::hashField($page);
+    $hashFieldName = MarkdownEditor::hashField($page);
     $expectedHash =
       $input->post($hashFieldName) ?? MarkdownSyncer::recallFileHash($page);
     $postedLanguageValues = [];
@@ -279,13 +336,6 @@ class MarkdownSyncHooks
         MarkdownSyncer::syncFieldsFromMarkdown($page, (string) $bodyPost);
       }
 
-      // Debug: log posted markdown presence and lock state before calling sync
-      try {
-        $postedMdKeys = array_keys($postedLanguageValues[$documentField] ?? []);
-      } catch (\Throwable $_e) {
-        $postedMdKeys = [];
-      }
-
       // Read transient override flag (if present) - this control is transient and should not be persisted
       $rawPriorityOverride = null;
       $rawPostDebug = null;
@@ -360,7 +410,7 @@ class MarkdownSyncHooks
         $postedLanguageValues,
         $rawPriorityOverride,
       );
-      \ProcessWire\MarkdownEditor::rememberHash($page);
+      MarkdownEditor::rememberHash($page);
 
       // Persist DB-level hash field for this page if template defines it
       try {
@@ -437,25 +487,14 @@ class MarkdownSyncHooks
 
   public static function handleModulesRefresh(HookEvent $event): void
   {
+    wire('log')->save('markdown-sync', 'Hook: handleModulesRefresh triggered - starting sync');
+    $user = $event->wire('user');
+    $userName = $user ? ($user->name ?? '') : '?';
+    $url = $event->wire('input') ? ($event->wire('input')->url() ?? '') : '';
     wire('log')->save(
       'markdown-sync',
-      'Hook: handleModulesRefresh triggered - starting sync',
+      sprintf('Modules::refresh hook invoked: user=%s request=%s', $userName, $url),
     );
-    try {
-      $user = $event->wire('user');
-      $userName = $user ? $user->name ?? '' : '?';
-      $url = $event->wire('input') ? $event->wire('input')->url() ?? '' : '';
-      wire('log')->save(
-        'markdown-sync',
-        sprintf(
-          'Modules::refresh hook invoked: user=%s request=%s',
-          $userName,
-          $url,
-        ),
-      );
-    } catch (\Throwable $_e) {
-      // best-effort logging only
-    }
 
     // Delegates TTL, locking and logging logic to the MarkdownSyncer helper
     try {

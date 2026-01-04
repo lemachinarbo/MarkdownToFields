@@ -103,100 +103,13 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   {
     $this->syncTemplateFields();
 
-    // Register hooks
-    $this->addHook(
-      'ProcessPageEdit::buildForm',
-      MarkdownSyncHooks::class . '::prepareEditForm',
-    );
-    $this->addHook(
-      'ProcessPageEdit::buildFormContent',
-      MarkdownSyncHooks::class . '::appendHashField',
-    );
-    $this->addHook(
-      'Pages::saveReady',
-      MarkdownSyncHooks::class . '::handleSaveReady',
-    );
-
-    $this->addHookAfter('ProcessPageEdit::execute', function() {
-      wire('config')->scripts->add(
-          $this->config->urls->MarkdownToFields . 'assets/markdown-editor.js'
-      );
-    });
-
-    // UI behavior: when building the edit form, ensure the raw markdown field is disabled when locked
-    $this->addHookAfter('ProcessPageEdit::buildForm', function(HookEvent $event) {
-      try {
-        $page = $event->arguments(0);
-        $form = $event->return ?: null;
-        if (!$form || !$page) return;
-
-
-        // Locate lock and markdown inputs in the form (they are added via field groups)
-        if (method_exists($form, 'get')) {
-          $mdInput = $form->get('md_markdown');
-          $mdEditorInput = $form->get('md_editor');
-
-
-
-          if ($mdInput) {
-            // Start with the raw markdown textarea disabled by default (unchecked transient)
-            $mdInput->attr('disabled', 'disabled');
-
-            // UX: brief description instructing how to enable editing
-            $mdInput->description = 'Double-click the field to edit the Markdown content.
-            While editing Markdown, do not modify the same content in other fields (such as the title or content editor) to avoid losing changes.';
-
-          }
-
-            // Ensure raw textarea starts disabled by default (overlay will enable editing)
-            if ($mdInput) {
-              $mdInput->attr('disabled', 'disabled');
-            }
-        }
-      } catch (\Throwable $e) {
-        // be defensive; do not break form rendering
-      }
-    });
-
-
-    $this->addHookAfter(
-      'Modules::refresh',
-      MarkdownSyncHooks::class . '::handleModulesRefresh',
-    );
-
-    // Auto-refresh modules and auto-configure editor field after config save
-    $this->addHookAfter(
-      'Modules::saveConfig',
-      function(HookEvent $event) {
-        $module = $event->arguments(0);
-        $moduleName = $event->arguments(1) ?? '';
-        
-        // $module might be a string (module class name)
-        $moduleStr = is_string($module) ? $module : (is_object($module) ? get_class($module) : '');
-        
-        if ($moduleStr === 'MarkdownToFields' || $moduleName === 'MarkdownToFields' || $module instanceof MarkdownToFields) {
-          $this->syncTemplateFields();
-          
-          // Configure editor field only if checkbox is checked
-          $configure = $this->wire('input')->post('configure_editor_field') ?? null;
-          if ($configure) {
-            $config = $this->wire('config');
-            $mdConfig = $config->MarkdownToFields ?? [];
-            $fieldName = $mdConfig['htmlField'] ?? 'md_editor';
-            $this->repairMarkdownEditor($fieldName);
-            
-            // Show success message
-            $this->message("Editor field '{$fieldName}' has been configured with required TinyMCE settings.");
-            $this->wire('log')->save('markdown-sync', "Editor field '{$fieldName}' configured with required TinyMCE settings.");
-          }
-          
-          $this->wire('log')->save('markdown-sync', 'Template field sync complete.');
-        }
-      }
-    );
-
-    // Pages::saved finalizer removed — writing is centralized in MarkdownSyncer::syncToMarkdown to avoid race conditions and duplicated logic.
-
+    $this->addHook('ProcessPageEdit::buildForm', MarkdownSyncHooks::class . '::prepareEditForm');
+    $this->addHook('ProcessPageEdit::buildFormContent', MarkdownSyncHooks::class . '::appendHashField');
+    $this->addHook('Pages::saveReady', MarkdownSyncHooks::class . '::handleSaveReady');
+    $this->addHookAfter('ProcessPageEdit::execute', MarkdownSyncHooks::class . '::enqueueAssets');
+    $this->addHookAfter('ProcessPageEdit::buildForm', MarkdownSyncHooks::class . '::lockRawMarkdownField');
+    $this->addHookAfter('Modules::refresh', MarkdownSyncHooks::class . '::handleModulesRefresh');
+    $this->addHookAfter('Modules::saveConfig', MarkdownSyncHooks::class . '::handleSaveConfig');
   }
 
   public function install()
@@ -350,7 +263,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     return true;
   }
 
-  private function syncTemplateFields(): void
+  public function syncTemplateFields(): void
   {
     // Create missing fields only; authoritative repair is explicit
     $this->createFields();
