@@ -119,7 +119,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
 
     $this->addHookAfter('ProcessPageEdit::execute', function() {
       wire('config')->scripts->add(
-          $this->config->urls->MarkdownToFields . 'assets/markdown-admin.js'
+          $this->config->urls->MarkdownToFields . 'assets/markdown-editor.js'
       );
     });
 
