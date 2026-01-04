@@ -3,8 +3,6 @@
 namespace ProcessWire;
 
 use ProcessWire\MarkdownEditor;
-use ProcessWire\HookEvent;
-use ProcessWire\InputfieldForm;
 
 class MarkdownSyncHooks
 {
@@ -224,18 +222,15 @@ class MarkdownSyncHooks
 
   public static function handleSaveReady(HookEvent $event): void
   {
-    wire('log')->save('markdown-sync', 'Hook: handleSaveReady triggered');
     $page = MarkdownEditor::pageFromArgs($event);
     if (!$page) {
       return;
     }
 
-    // Skip markdown sync when page is being trashed or already in trash
     if ($page->isTrash()) {
       return;
     }
 
-    // Check if page is being moved to trash (parent changed to trash)
     $parentPrevious = $page->parentPrevious;
     if ($parentPrevious && $page->parent && $page->parent->isTrash()) {
       return;
@@ -331,157 +326,36 @@ class MarkdownSyncHooks
       MarkdownSyncer::applyLanguageValues($page, $fieldName, $languageValues);
     }
 
-    try {
-      if (is_string($bodyPost)) {
-        MarkdownSyncer::syncFieldsFromMarkdown($page, (string) $bodyPost);
-      }
+    if ($bodyPost) {
+      MarkdownSyncer::syncFieldsFromMarkdown($page, $bodyPost);
+    }
 
-      // Read transient override flag (if present) - this control is transient and should not be persisted
-      $rawPriorityOverride = null;
-      $rawPostDebug = null;
+    $raw = wire('input')->post('md_markdown_lock_transient_value');
+    if ($raw === null) {
+      $raw = wire('input')->post('md_markdown_lock_transient');
+    }
 
-      try {
-        // Prefer the robust dedicated hidden value (always present if JS injected)
-        if (isset($_POST['md_markdown_lock_transient_value'])) {
-          $rawPostDebug = $_POST['md_markdown_lock_transient_value'];
-          $s = strtolower(trim((string) $rawPostDebug));
-          $rawPriorityOverride = ($s === '1' || $s === 'true' || $s === 'on');
-        } elseif (isset($_POST['md_markdown_lock_transient'])) {
-          // Try raw $_POST value first
-          $rawPostDebug = $_POST['md_markdown_lock_transient'];
-          if (is_array($rawPostDebug)) {
-            $rawPriorityOverride = false;
-            foreach ($rawPostDebug as $v) {
-              $s = (string) $v;
-              if ($s === '1' || $s === 'true' || $s === 'on') {
-                $rawPriorityOverride = true;
-                break;
-              }
-            }
-          } else {
-            $s = strtolower(trim((string) $rawPostDebug));
-            $rawPriorityOverride = ($s === '1' || $s === 'true' || $s === 'on');
-          }
-        } elseif (wire('input')->post->has('md_markdown_lock_transient_value')) {
-          // Fallback to ProcessWire Input API
-          $rawPostDebug = wire('input')->post('md_markdown_lock_transient_value');
-          $s = strtolower(trim((string) $rawPostDebug));
-          $rawPriorityOverride = ($s === '1' || $s === 'true' || $s === 'on');
-        } elseif (wire('input')->post->has('md_markdown_lock_transient')) {
-          $rawPostDebug = wire('input')->post('md_markdown_lock_transient');
-          $val = $rawPostDebug;
-          if (is_array($val)) {
-            $rawPriorityOverride = false;
-            foreach ($val as $v) {
-              $s = (string) $v;
-              if ($s === '1' || $s === 'true' || $s === 'on') {
-                $rawPriorityOverride = true;
-                break;
-              }
-            }
-          } else {
-            $s = strtolower(trim((string) $val));
-            $rawPriorityOverride = ($s === '1' || $s === 'true' || $s === 'on');
-          }
-        }
-      } catch (\Throwable $_e) {
-        $rawPriorityOverride = null;
-      }
+    $rawPriorityOverride = null;
+    if ($raw !== null) {
+      $normalized = strtolower(trim((string) $raw));
+      $rawPriorityOverride = in_array($normalized, ['1', 'true', 'on'], true);
+    }
 
-      // Additional debug: log the POST keys and posted markdown lengths to diagnose missing saves
-      try {
-        $postedKeys = array_keys((array) $_POST);
-        $postedMd = $postedLanguageValues[$documentField] ?? [];
-        $mdLens = [];
-        foreach ((array) $postedMd as $k => $v) {
-          $mdLens[$k] = is_scalar($v) || (is_object($v) && method_exists($v, '__toString')) ? strlen((string)$v) : null;
-        }
-      } catch (\Throwable $_e) {
-        $postedKeys = [];
-        $mdLens = [];
-      }
+    MarkdownSyncer::syncToMarkdown(
+      $page,
+      $expectedHash,
+      $languageScope ?: null,
+      $postedLanguageValues,
+      $rawPriorityOverride,
+    );
+    
+    MarkdownEditor::rememberHash($page);
 
-      wire('log')->save('markdown-sync', sprintf('handleSaveReady page=%s lock_transient=%s rawPost=%s postedKeys=%s postedMdLens=%s', (string)$page->path, $rawPriorityOverride ? '1' : '0', json_encode($rawPostDebug), json_encode($postedKeys), json_encode($mdLens)));
-
-      MarkdownSyncer::syncToMarkdown(
-        $page,
-        $expectedHash,
-        $languageScope ?: null,
-        $postedLanguageValues,
-        $rawPriorityOverride,
-      );
-      MarkdownEditor::rememberHash($page);
-
-      // Persist DB-level hash field for this page if template defines it
-      try {
-        $payload = MarkdownSyncer::buildHashPayload($page);
-        $hashField = MarkdownSyncer::getHashField($page);
-        if (
-          is_string($hashField) &&
-          $hashField !== '' &&
-          $page->hasField($hashField)
-        ) {
-          $page->of(false);
-          $page->set($hashField, $payload);
-          $page->save($hashField);
-        }
-      } catch (\Throwable $_e) {
-        // best effort – log but do not prevent save
-        wire('log')->save(
-          'migrate-markdown',
-          sprintf(
-            'failed persisting markdown hash for %s: %s',
-            $page->path,
-            $_e->getMessage(),
-          ),
-        );
-      }
-    } catch (\Throwable $e) {
-      if ($bodyPost !== null) {
-        MarkdownSyncer::storePendingBody($page, $bodyPost, $documentField);
-      }
-
-      $pendingFields = [];
-      $titlePost = $input->post('title');
-      if ($titlePost !== null) {
-        $pendingFields['title'] = $titlePost;
-      }
-
-      foreach (
-        MarkdownSyncer::getFrontmatterMap($page)
-        as $fieldName => $_frontKey
-      ) {
-        if ($fieldName === '' || $fieldName === 'title') {
-          continue;
-        }
-
-        if (!$page->hasField($fieldName)) {
-          continue;
-        }
-
-        $value = $input->post($fieldName);
-        if ($value !== null) {
-          $pendingFields[$fieldName] = $value;
-        }
-      }
-
-      $htmlField = MarkdownSyncer::getHtmlField($page);
-      if ($htmlField && $page->hasField($htmlField)) {
-        $htmlPost = $input->post($htmlField);
-        if ($htmlPost !== null) {
-          $pendingFields[
-            $htmlField
-          ] = MarkdownSyncer::editorPlaceholdersToComments((string) $htmlPost);
-        }
-      }
-
-      if ($pendingFields) {
-        MarkdownSyncer::storePendingFields($page, $pendingFields);
-      }
-
-      wire('log')->save('markdown-sync', $e->getMessage());
-      $event->wire('session')->error($e->getMessage());
-      throw $e;
+    $hashField = MarkdownSyncer::getHashField($page);
+    if ($hashField && $page->hasField($hashField)) {
+      $page->of(false);
+      $page->set($hashField, MarkdownSyncer::buildHashPayload($page));
+      $page->save($hashField);
     }
   }
 

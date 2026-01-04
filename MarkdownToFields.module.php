@@ -3,12 +3,8 @@
 namespace ProcessWire;
 
 use LetMeDown\ContentData;
-use ProcessWire\ConfigurableModule;
-use ProcessWire\Field;
-use ProcessWire\InputfieldWrapper;
 use ProcessWire\MarkdownSyncer;
 use ProcessWire\MarkdownSyncHooks;
-use ProcessWire\Template;
 
 // Load dependencies and module classes early so they are available before init hooks run
 $__moduleVendor = __DIR__ . '/vendor/autoload.php';

@@ -64,33 +64,16 @@ class MarkdownSyncer
 
     self::$gettingContentSource[$pageId] = true;
     try {
-      // Check if page class has its own contentSource() method
-      $hasMethod = method_exists($page, 'contentSource');
-      $pageClass = get_class($page);
-      $isNotBaseClass = $pageClass !== 'ProcessWire\Page';
-      
-      self::logInfo($page, 'checking page getContentSource', [
-        'hasMethod' => $hasMethod ? 'yes' : 'no',
-        'pageClass' => $pageClass,
-        'isNotBase' => $isNotBaseClass ? 'yes' : 'no',
-      ]);
-      
-      if ($hasMethod && $isNotBaseClass) {
+      // Check if page class has overridden contentSource()
+      if (self::hasContentSourceOverride($page)) {
         try {
-          self::logInfo($page, 'calling page contentSource()');
           $override = $page->contentSource();
-          self::logInfo($page, 'page contentSource() returned', ['value' => $override]);
           // Only use if it returns a non-empty string; otherwise fall through to field/default
           if (is_string($override) && $override !== '') {
             return $override;
           }
         } catch (\Throwable $e) {
-          // Method exists but implementation is broken - log and fall through gracefully
-          // This handles cases where method signature requires string but returns null
-          self::logInfo($page, 'page contentSource() failed or incomplete', [
-            'class' => get_class($page),
-            'error' => $e->getMessage(),
-          ]);
+          // Override exists but implementation failed; fall through to field/default
         }
       }
 
@@ -100,16 +83,12 @@ class MarkdownSyncer
       $fieldName = $source['pageField'];
       if ($fieldName && $page->hasField($fieldName)) {
         $document = trim((string) $page->get($fieldName));
-      } else {
-        $document = '';
+        if ($document !== '') {
+          return $document;
+        }
       }
 
-      if ($document !== '') {
-        return $document;
-      }
-
-      // Try to get filename from frontmatter 'name' field in default language markdown
-      // This handles cases where the page name was changed via frontmatter but hasn't synced yet
+      // Try frontmatter 'name' field in case page name was changed via markdown
       try {
         $content = self::loadLanguageMarkdown($page, null);
         if ($content instanceof ContentData) {
@@ -287,19 +266,13 @@ class MarkdownSyncer
 
     self::ensureDirectory($path);
 
-    // Log details about the document being written for diagnostics (length and
-    // presence of frontmatter). This helps detect accidental overwrites that
-    // strip frontmatter.
-    try {
-      [$frontRaw, $body] = self::splitDocument($document);
-      self::logDebug($page, 'saveLanguageMarkdown', [
-        'language' => $languageCode,
-        'len' => strlen($document),
-        'frontmatter' => $frontRaw !== '' ? 1 : 0,
-      ]);
-    } catch (\Throwable $_e) {
-      // Best-effort logging; don't fail the write if logging fails.
-    }
+    // Log document details (length and frontmatter presence) to detect overwrites
+    [$frontRaw, $body] = self::splitDocument($document);
+    self::logDebug($page, 'saveLanguageMarkdown', [
+      'language' => $languageCode,
+      'len' => strlen($document),
+      'frontmatter' => $frontRaw !== '' ? 1 : 0,
+    ]);
 
     if (wire('files')->filePutContents($path, $document) === false) {
       throw new WireException(
@@ -1563,48 +1536,24 @@ class MarkdownSyncer
               $p->hasField($targetField)
             ) {
               // Only persist the hash if it is different to the existing value
-              $existingPayloadNormalized =
-                $existingPayload === null ? '' : (string) $existingPayload;
+              $existingPayloadNormalized = $existingPayload === null ? '' : (string) $existingPayload;
               $payloadStr = (string) $payload;
               if ($existingPayloadNormalized !== $payloadStr) {
                 $p->of(false);
                 $p->set($targetField, $payloadStr);
                 $p->save($targetField);
                 $didHashSave = true;
-                // If we've persisted to a real page field, ensure there's no stale cache fallback
-                try {
-                  $cacheKeyPage = 'markdown-sync-hash-' . (int) $p->id;
-                  wire('cache')->delete($cacheKeyPage);
-                } catch (\Throwable $_e) {
-                }
-              }
-            } else {
-              self::logDebug(
-                $p,
-                'skip persisting hash for page: hash field missing',
-                ['hashField' => $targetField],
-              );
-              if ($persist) {
-                try {
-                  self::logDebug(
-                    $p,
-                    'skip persisting hash for page: hash field missing',
-                    ['hashField' => $targetField],
-                  );
-                } catch (\Throwable $_e) {
-                  // ignore
-                }
+                // Clear stale cache fallback if we persisted to the field
+                wire('cache')->delete('markdown-sync-hash-' . (int) $p->id);
               }
             }
+
             // If we couldn't write the hash to the page field but persistence is desired,
             // store the value in site cache so subsequent runs are stable.
             if ($persist && !$didHashSave) {
-              try {
-                $cacheKeyPage = 'markdown-sync-hash-' . (int) $p->id;
-                if ($payload !== '') {
-                  wire('cache')->save($cacheKeyPage, (string) $payload, 0);
-                }
-              } catch (\Throwable $_e) {
+              $cacheKeyPage = 'markdown-sync-hash-' . (int) $p->id;
+              if ($payload !== '') {
+                wire('cache')->save($cacheKeyPage, (string) $payload, 0);
               }
             }
           }
@@ -1654,17 +1603,14 @@ class MarkdownSyncer
 
           if ($isProtectedFieldError) {
             // Log prominently for protected field failures
-            try {
-              $log->save(
-                $logChannel,
-                sprintf(
-                  'ERROR: Failed to sync %s - %s',
-                  (string) $p->path,
-                  $e->getMessage(),
-                ),
-              );
-            } catch (\Throwable $_logErr) {
-            }
+            $log->save(
+              $logChannel,
+              sprintf(
+                'ERROR: Failed to sync %s - %s',
+                (string) $p->path,
+                $e->getMessage(),
+              ),
+            );
           }
 
           self::logDebug($p, 'syncAllManagedPages failed', [
@@ -1675,28 +1621,22 @@ class MarkdownSyncer
       }
     } finally {
       // Release any locks and persist TTL marker if requested
-      try {
-        if ($useLock && $gotLock) {
-          // Release file lock if acquired
-          if (isset($lockFp) && $lockFp) {
-            @flock($lockFp, LOCK_UN);
-            @fclose($lockFp);
-            @unlink(wire('config')->paths->cache . 'markdown-sync.lock');
-          }
-
-          // Release APCu lock if available (independent of file lock)
-          if (function_exists('apcu_delete')) {
-            @\call_user_func('apcu_delete', $apcuKey);
-          }
+      if ($useLock && $gotLock) {
+        // Release file lock if acquired
+        if (isset($lockFp) && $lockFp) {
+          @flock($lockFp, LOCK_UN);
+          @fclose($lockFp);
+          @unlink(wire('config')->paths->cache . 'markdown-sync.lock');
         }
-      } catch (\Throwable $_e) {
+
+        // Release APCu lock if available (independent of file lock)
+        if (function_exists('apcu_delete')) {
+          @\call_user_func('apcu_delete', $apcuKey);
+        }
       }
 
       if ($didRun && $ttlSeconds > 0) {
-        try {
-          wire('cache')->save($cacheKey, time(), $ttlSeconds);
-        } catch (\Throwable $_e) {
-        }
+        wire('cache')->save($cacheKey, time(), $ttlSeconds);
       }
     }
 
@@ -1863,11 +1803,7 @@ class MarkdownSyncer
 
       $fieldObject = null;
       if ($field === 'title' || $page->hasField($field)) {
-        try {
-          $fieldObject = $page->getField($field);
-        } catch (\Throwable $exception) {
-          $fieldObject = null;
-        }
+        $fieldObject = $page->getField($field);
       }
 
       $isTranslatable =
@@ -3572,33 +3508,18 @@ class MarkdownSyncer
         if ($page->hasField($fieldName) || $fieldName === 'title') {
           // Use getUnformatted with language ID appended
           $languageFieldName = $fieldName . $language->id;
-          try {
-            $val = $page->getUnformatted($languageFieldName);
-            if (is_array($val)) {
-              $defaultCode = self::getDefaultLanguageCode($page);
-              if (isset($val[$defaultCode]) && is_scalar($val[$defaultCode])) {
-                return (string) $val[$defaultCode];
-              }
-              foreach ($val as $v) {
-                if (is_scalar($v)) return (string) $v;
-              }
-              return '';
+          $val = $page->getUnformatted($languageFieldName);
+          if (is_array($val)) {
+            $defaultCode = self::getDefaultLanguageCode($page);
+            if (isset($val[$defaultCode]) && is_scalar($val[$defaultCode])) {
+              return (string) $val[$defaultCode];
             }
-            return (string) $val;
-          } catch (\Throwable $_e) {
-            $val = $page->get($fieldName);
-            if (is_array($val)) {
-              $defaultCode = self::getDefaultLanguageCode($page);
-              if (isset($val[$defaultCode]) && is_scalar($val[$defaultCode])) {
-                return (string) $val[$defaultCode];
-              }
-              foreach ($val as $v) {
-                if (is_scalar($v)) return (string) $v;
-              }
-              return '';
+            foreach ($val as $v) {
+              if (is_scalar($v)) return (string) $v;
             }
-            return (string) $val;
+            return '';
           }
+          return (string) $val;
         }
       }
 
@@ -3631,18 +3552,13 @@ class MarkdownSyncer
     if ($language instanceof Language) {
       $languageFieldName = $field . $language->id;
 
-      try {
-        if ($field === 'title') {
-          return (string) $page->getUnformatted($languageFieldName);
-        }
+      if ($field === 'title') {
+        return (string) $page->getUnformatted($languageFieldName);
+      }
 
-        if ($page->hasField($field)) {
-          $value = $page->getUnformatted($languageFieldName);
-          return (string) $value;
-        }
-      } catch (\Throwable $exception) {
-        // Fallback to regular get
-        return (string) $page->get($field);
+      if ($page->hasField($field)) {
+        $value = $page->getUnformatted($languageFieldName);
+        return (string) $value;
       }
     }
 
@@ -3694,26 +3610,14 @@ class MarkdownSyncer
     $written = false;
 
     if (method_exists($page, 'setLanguageValue')) {
-      try {
-        if ($field === 'title') {
-          $page->setLanguageValue($language, 'title', $value);
-        } elseif ($field === 'name') {
-          $page->setLanguageValue($language, 'name', $value);
-        } else {
-          $page->setLanguageValue($language, $field, $value);
-        }
-        $written = true;
-      } catch (\Throwable $exception) {
-        self::logDebug(
-          $page,
-          sprintf(
-            'failed writing %s (%s) via page API: %s',
-            $field,
-            $languageLabel,
-            $exception->getMessage(),
-          ),
-        );
+      if ($field === 'title') {
+        $page->setLanguageValue($language, 'title', $value);
+      } elseif ($field === 'name') {
+        $page->setLanguageValue($language, 'name', $value);
+      } else {
+        $page->setLanguageValue($language, $field, $value);
       }
+      $written = true;
     }
 
     if (!$written && $language instanceof Language) {
