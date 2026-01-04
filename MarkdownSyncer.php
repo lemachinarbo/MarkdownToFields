@@ -389,6 +389,36 @@ class MarkdownSyncer
   }
 
   /**
+   * Determine whether raw markdown or form fields should be the source of truth
+   * for this save operation.
+   *
+   * When a user explicitly unlocks md_markdown (via checkbox overlay), markdown
+   * becomes authoritative because some HTML editors report changes on submit
+   * even when the user didn't actually edit them.
+   *
+   * When md_markdown is not unlocked, form fields are the source of truth.
+   *
+   * This is the single point where UI intent (unlock checkbox) influences
+   * the entire sync decision tree.
+   *
+   * @param bool|null $rawPriorityOverride Value of overlay unlock checkbox (or null if not set)
+   * @param string|null $postedMarkdown The raw markdown submitted (or null if not posted)
+   * @return bool True if markdown should be authoritative for this save
+   */
+  protected static function shouldPreferMarkdownForSync(
+    ?bool $rawPriorityOverride,
+    ?string $postedMarkdown,
+  ): bool {
+    // Normalize the override flag
+    $rawPriority = $rawPriorityOverride ?? false;
+
+    // Markdown is only authoritative if:
+    // 1. User explicitly unlocked md_markdown (rawPriority = true), AND
+    // 2. Markdown content was actually posted for this save
+    return $rawPriority && $postedMarkdown !== null;
+  }
+
+  /**
    * Save a field value with centralized error handling and logging.
    * WARNING: This method persists data to the database immediately!
    */
@@ -684,18 +714,22 @@ class MarkdownSyncer
     // If page indicates raw markdown should be authoritative (checkbox checked),
     // write any posted markdown content now (one central place) and update hashes.
     try {
-      $rawPriority = $rawPriorityOverride ?? false;
       if ($rawPriorityOverride !== null) {
         self::logInfo($page, 'rawPriorityOverrideUsed', ['value' => $rawPriorityOverride ? 1 : 0]);
       }
 
-      if ($rawPriority && !empty($postedMarkdownMap)) {
+      if (!empty($postedMarkdownMap)) {
         foreach ($languageCodes as $languageCode) {
           if (!array_key_exists($languageCode, $postedMarkdownMap)) continue;
-          $doc = (string) $postedMarkdownMap[$languageCode];
+          $postedMarkdown = (string) $postedMarkdownMap[$languageCode];
+
+          // Only persist posted markdown immediately if it's the authoritative source
+          if (!self::shouldPreferMarkdownForSync($rawPriorityOverride, $postedMarkdown)) {
+            continue;
+          }
 
           // Empty posted markdown indicates an explicit intent to delete the file.
-          if ($doc === '') {
+          if ($postedMarkdown === '') {
             $path = self::getMarkdownFilePath($page, $languageCode);
             if (is_file($path)) {
               try {
@@ -716,14 +750,14 @@ class MarkdownSyncer
           $path = self::getMarkdownFilePath($page, $languageCode);
           $existing = is_file($path) ? file_get_contents($path) : '';
 
-          if ($doc !== $existing) {
+          if ($postedMarkdown !== $existing) {
             self::ensureDirectory($path);
-            wire('files')->filePutContents($path, $doc);
-            $hash = md5($doc);
+            wire('files')->filePutContents($path, $postedMarkdown);
+            $hash = md5($postedMarkdown);
             self::rememberFileHash($page, [$languageCode => $hash]);
             // Stage the page fields so the ongoing save will persist them (avoid nested saves here)
             $page->of(false);
-            $page->set($markdownField, [$languageCode => $doc]);
+            $page->set($markdownField, [$languageCode => $postedMarkdown]);
             $hashField = self::hashFieldName($page, null);
             if ($hashField) {
               $page->set($hashField, self::encodeHashPayload($page, [$languageCode => $hash]));
@@ -943,16 +977,11 @@ class MarkdownSyncer
         }
       }
 
-      // If raw priority is enabled and the user posted raw markdown for this
-      // language, prefer that posted markdown and do not let the HTML editor
-      // override it during the same save.
-      $rawPriority = $rawPriorityOverride ?? false;
-
       if ($postedHtml !== null) {
         $normalizedHtml = (string) $postedHtml;
         $trimmedHtml = trim($normalizedHtml);
 
-        if ($rawPriority && $postedMarkdown !== null) {
+        if (self::shouldPreferMarkdownForSync($rawPriorityOverride, $postedMarkdown)) {
           self::logDebug(
             $page,
             'skip html override: raw priority and posted markdown present',
@@ -1018,10 +1047,10 @@ class MarkdownSyncer
           ? self::postedLanguageValue($postedFieldValues, $languageCode)
           : null;
 
-        // When raw markdown priority is enabled and markdown was posted,
+        // When raw markdown is the authoritative source for this save,
         // ignore form field values for frontmatter fields and use only
         // the values extracted from the markdown document itself
-        if ($rawPriority && $postedMarkdown !== null) {
+        if (self::shouldPreferMarkdownForSync($rawPriorityOverride, $postedMarkdown)) {
           $postedFrontRaw = null;
         }
 
@@ -1102,7 +1131,7 @@ class MarkdownSyncer
           self::logInfo($page, 'syncToMarkdown title frontmatter start', [
             'language' => $languageCode,
             'frontKey' => $frontKey,
-            'rawPriority' => $rawPriority ? 1 : 0,
+            'preferMarkdown' => self::shouldPreferMarkdownForSync($rawPriorityOverride, $postedMarkdown) ? 1 : 0,
             'postedFrontRaw' => $postedFrontRaw,
             'normalizedPosted' => $normalizedPosted,
             'currentValue' => $currentValue,
