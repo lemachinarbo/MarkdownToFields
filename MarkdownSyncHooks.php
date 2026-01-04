@@ -326,10 +326,6 @@ class MarkdownSyncHooks
       MarkdownSyncer::applyLanguageValues($page, $fieldName, $languageValues);
     }
 
-    if ($bodyPost) {
-      MarkdownSyncer::syncFieldsFromMarkdown($page, $bodyPost);
-    }
-
     $raw = wire('input')->post('md_markdown_lock_transient_value');
     if ($raw === null) {
       $raw = wire('input')->post('md_markdown_lock_transient');

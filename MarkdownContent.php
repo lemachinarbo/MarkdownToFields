@@ -105,6 +105,10 @@ trait MarkdownContent {
       'markdownField' => $mdConfig['markdownField'] ?? 'md_markdown',
       'htmlField' => $mdConfig['htmlField'] ?? 'md_editor',
       'hashField' => $mdConfig['hashField'] ?? 'md_markdown_hash',
+      'frontmatter' => [
+        'title' => 'title',
+        'name' => 'name',
+      ],
     ];
   }
 

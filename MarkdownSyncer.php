@@ -1017,6 +1017,14 @@ class MarkdownSyncer
         $postedFrontRaw = is_array($postedFieldValues)
           ? self::postedLanguageValue($postedFieldValues, $languageCode)
           : null;
+
+        // When raw markdown priority is enabled and markdown was posted,
+        // ignore form field values for frontmatter fields and use only
+        // the values extracted from the markdown document itself
+        if ($rawPriority && $postedMarkdown !== null) {
+          $postedFrontRaw = null;
+        }
+
         $normalizedPosted =
           $postedFrontRaw !== null
             ? self::normalizeFrontmatterAssignmentValue($postedFrontRaw)
@@ -1090,6 +1098,21 @@ class MarkdownSyncer
           ]);
         }
 
+        if ($field === 'title') {
+          self::logInfo($page, 'syncToMarkdown title frontmatter start', [
+            'language' => $languageCode,
+            'frontKey' => $frontKey,
+            'rawPriority' => $rawPriority ? 1 : 0,
+            'postedFrontRaw' => $postedFrontRaw,
+            'normalizedPosted' => $normalizedPosted,
+            'currentValue' => $currentValue,
+            'documentValue' => $documentValue,
+            'previousValue' => $previousValue,
+            'fieldChanged' => $fieldChanged,
+            'markdownChanged' => $markdownChanged,
+          ]);
+        }
+
         if ($fieldChanged && $markdownChanged) {
           if (
             $existingDocument !== null &&
@@ -1145,6 +1168,23 @@ class MarkdownSyncer
 
         if (self::frontmatterValuesDiffer($finalValue, $currentValue)) {
           $frontmatterUpdates[$field] = $finalValue;
+          
+          if ($field === 'title') {
+            self::logInfo($page, 'syncToMarkdown title will update', [
+              'language' => $languageCode,
+              'from' => $currentValue,
+              'to' => $finalValue,
+            ]);
+          }
+        }
+
+        if ($field === 'title') {
+          self::logInfo($page, 'syncToMarkdown title decision', [
+            'language' => $languageCode,
+            'finalValue' => $finalValue,
+            'source' => $fieldChanged ? 'posted' : ($markdownChanged ? 'markdown' : 'fallback'),
+            'currentValue' => $currentValue,
+          ]);
         }
 
         if ($field === 'name') {
@@ -1162,6 +1202,12 @@ class MarkdownSyncer
 
       if ($frontmatterUpdates) {
         foreach ($frontmatterUpdates as $field => $value) {
+          if ($field === 'title') {
+            self::logInfo($page, 'syncToMarkdown title applying update', [
+              'language' => $languageCode,
+              'value' => $value,
+            ]);
+          }
           self::setFieldValueForLanguage($page, $field, $value, $language);
         }
       }
@@ -1174,6 +1220,14 @@ class MarkdownSyncer
       $document = $hasDocumentContent
         ? self::composeDocument($frontmatter, $bodyContent)
         : '';
+
+      if (array_key_exists('title', $frontmatter)) {
+        self::logInfo($page, 'syncToMarkdown title in composed document', [
+          'language' => $languageCode,
+          'frontmatterTitle' => $frontmatter['title'] ?? null,
+          'documentLen' => strlen($document),
+        ]);
+      }
 
       // Uncomment for deep debugging:
       // self::logDebug($page, 'syncToMarkdown compose result', [
@@ -1197,6 +1251,15 @@ class MarkdownSyncer
           $document,
           $language,
         );
+        
+        if (array_key_exists('title', $frontmatter)) {
+          self::logInfo($page, 'syncToMarkdown markdown field updated with new document', [
+            'language' => $languageCode,
+            'frontmatterTitle' => $frontmatter['title'] ?? null,
+            'oldLen' => strlen($storedMarkdown),
+            'newLen' => strlen($document),
+          ]);
+        }
       }
 
       if ($htmlField && $page->hasField($htmlField)) {
