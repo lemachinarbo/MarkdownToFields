@@ -2,36 +2,29 @@
   console.log("markdown-admin: parsed");
   var runOnReady = function () {
     console.log("markdown-admin: runOnReady");
-    var cb =
-      document.getElementById("md_markdown_lock_transient_cb") ||
-      document.querySelector('[name="md_markdown_lock_transient"]');
-    var hidden = document.querySelector(
-      '[name="md_markdown_lock_transient_value"]'
-    );
+    // Hidden transient field name used to indicate overlay-enabled editing
+    var hiddenSelectorName = "md_markdown_lock_transient_value";
 
-    var ensureHidden = function (cb) {
+    var ensureHiddenInForm = function (form) {
       try {
-        var h = document.querySelector(
-          '[name="md_markdown_lock_transient_value"]'
-        );
-        if (!h && cb && cb.parentNode) {
+        if (!form || !form.querySelector) return null;
+        var h = form.querySelector('[name="' + hiddenSelectorName + '"]');
+        if (!h) {
           h = document.createElement("input");
           h.type = "hidden";
-          h.name = "md_markdown_lock_transient_value";
-          cb.parentNode.insertBefore(h, cb.nextSibling);
-          console.log("markdown-admin: hidden input created");
+          h.name = hiddenSelectorName;
+          h.value = "0";
+          form.appendChild(h);
+          console.log("markdown-admin: hidden input created in form");
         }
         return h;
       } catch (e) {
-        console.error("markdown-admin: ensureHidden error", e);
+        console.error("markdown-admin: ensureHiddenInForm error", e);
         return null;
       }
     };
 
-    // Ensure a hidden input exists next to the checkbox so server can reliably read the transient flag
-    hidden = hidden || ensureHidden(cb);
-    if (cb) console.log("markdown-admin: checkbox found");
-    else console.warn("markdown-admin: checkbox not found");
+    // No checkbox is needed; overlay handles transient enable and hidden input is created per-form when needed.
 
     // Inject overlay CSS once
     var _injectOverlayCSS = function () {
@@ -74,14 +67,25 @@
           // ensure overlay receives pointer events so dblclick works
           overlay.style.pointerEvents = "auto";
 
-          // Double-clicking the overlay should enable the editor via the same checkbox change path.
-          // Reuse existing checkbox state handler by checking the checkbox and dispatching a change event.
+          // Double-clicking the overlay should enable the editor: set transient in the form and enable editors.
           overlay.addEventListener("dblclick", function (e) {
             e.preventDefault();
-            if (!cb) return;
-            if (!cb.checked) {
-              cb.checked = true;
-              cb.dispatchEvent(new Event("change", { bubbles: true }));
+            try {
+              var form = el.closest("form");
+              // mark the form as having transient raw-edit enabled for this save
+              var h = ensureHiddenInForm(form);
+              if (h) h.value = "1";
+              // enable editors (globally for this page)
+              setDisabled(true);
+              try {
+                el.focus();
+              } catch (err) {}
+              console.log("markdown-admin: overlay dblclick - enabled editor");
+            } catch (err) {
+              console.error(
+                "markdown-admin: overlay dblclick handler error",
+                err
+              );
             }
           });
 
@@ -116,41 +120,36 @@
       });
     };
 
-    if (!cb) {
-      console.warn("markdown-admin: checkbox not found, aborting");
-      return;
-    }
-    try {
-      console.log("markdown-admin: preparing checkbox for interaction");
-      cb.removeAttribute("disabled");
-      cb.removeAttribute("readonly");
-      cb.tabIndex = 0;
-    } catch (e) {
-      console.error("markdown-admin: error prepping checkbox", e);
-    }
-
-    var setVal = function () {
-      var val = cb.checked ? "1" : "0";
-      hidden = hidden || ensureHidden(cb);
-      if (hidden) hidden.value = val;
-      console.log("markdown-admin: setVal hidden set to", val);
-    };
-    cb.addEventListener("change", function () {
-      console.log("markdown-admin: checkbox changed to", cb.checked);
-      setDisabled(cb.checked);
-      setVal();
+    // Initialization: ensure hidden inputs exist in each form with md_markdown fields and default to 0
+    document.querySelectorAll('[name^="md_markdown"]').forEach(function (el) {
+      try {
+        var form = el.closest("form");
+        if (form) ensureHiddenInForm(form);
+      } catch (e) {}
     });
-    console.log("markdown-admin: initial setDisabled call with", cb.checked);
-    setDisabled(cb.checked);
-    setVal();
 
-    var f = cb.closest("form");
-    if (f) {
-      f.addEventListener("submit", function () {
-        console.log("markdown-admin: form submit - setting hidden value");
-        setVal();
-      });
-    }
+    // Start with editors disabled by default (overlay will enable when double-clicked)
+    console.log(
+      "markdown-admin: initial setDisabled call (disabled by default)"
+    );
+    setDisabled(false);
+
+    // Ensure each form with an md_markdown field sets the hidden transient value on submit (safety)
+    document.querySelectorAll("form").forEach(function (form) {
+      try {
+        if (!form.querySelector('[name^="md_markdown"]')) return;
+        form.addEventListener("submit", function () {
+          var h = ensureHiddenInForm(form);
+          if (h && h.value !== "1") h.value = "0";
+          console.log(
+            "markdown-admin: form submit - transient value",
+            h ? h.value : "(none)"
+          );
+        });
+      } catch (e) {
+        // ignore
+      }
+    });
   };
 
   if (document.readyState === "loading") {

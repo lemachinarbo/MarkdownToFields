@@ -40,7 +40,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     'md_markdown_source' => ['FieldtypeText', 'Source file path'],
     'md_markdown' => ['FieldtypeTextarea', 'Markdown editor'],
     'md_markdown_hash' => ['FieldtypeText', 'Markdown hash'],
-    'md_markdown_lock' => ['FieldtypeCheckbox', 'Enable Markdown editor'],
     'md_markdown_tab_END' => ['FieldtypeFieldsetClose', 'Close Markdown tab'],
     'md_editor' => ['FieldtypeTextarea', 'Content editor'],
   ];
@@ -134,60 +133,10 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
 
         // Locate lock and markdown inputs in the form (they are added via field groups)
         if (method_exists($form, 'get')) {
-          $lockInput = $form->get('md_markdown_lock');
           $mdInput = $form->get('md_markdown');
           $mdEditorInput = $form->get('md_editor');
 
-          if ($lockInput) {
-            // set explicit description text (transient control)
-            $lockInput->description = 'Enable Markdown editor for this save only.';
 
-            // Add a short explanatory note (appears under the checkbox)
-            $lockInput->notes = 'Checking this enables editing raw Markdown for this save only (it is not persisted).';
-
-            // Ensure checkbox value attribute is set; start UNCHECKED by default (transient)
-            $lockInput->attr('value', '1');
-
-            // Ensure the checkbox is interactive (remove any accidental disabled/readonly attrs)
-            try {
-              if (method_exists($lockInput, 'removeAttr')) {
-                $lockInput->removeAttr('disabled');
-                $lockInput->removeAttr('readonly');
-                $lockInput->attr('tabindex', '0');
-                $lockInput->attr('value', '1');
-              }
-            } catch (\Throwable $_e) {
-              // ignore
-            }
-
-            // Use a transient POST name so ProcessWire does not persist this checkbox value
-            $lockInput->attr('name', 'md_markdown_lock_transient');
-            $lockInput->attr('id', 'md_markdown_lock_transient_cb');
-
-            // NOTE: do not inject a server-side InputfieldHidden here (it renders as a visible container in some admin themes).
-            // Instead, the admin JS will create a plain <input type="hidden"> next to the checkbox (client-side) so nothing visible is rendered.
-
-            // Debug log: record the final names and attrs we set so we can diagnose admin render
-            try {
-              $lname = method_exists($lockInput, 'attr') ? ($lockInput->attr('name') ?? '(none)') : '(no-attr)';
-              $lockDisabled = (method_exists($lockInput, 'attr') && $lockInput->attr('disabled')) ? '1' : '0';
-              $mdDisabled = method_exists($mdInput ?? null, 'attr') && ($mdInput->attr('disabled') ? '1' : '0');
-              wire('log')->save('markdown-sync', sprintf('prepareEditForm lockInputName=%s lockDisabled=%s mdDisabled=%s', (string)$lname, (string)$lockDisabled, (string)$mdDisabled));
-
-              // Remove any inline onchange handler — behavior is handled by external admin script
-              try {
-                if (method_exists($lockInput, 'removeAttr')) {
-                  $lockInput->removeAttr('onchange');
-                }
-              } catch (\Throwable $_e2) {
-                // ignore
-              }
-            } catch (\Throwable $_e) {
-              // ignore logging errors
-            }
-
-            // Inline script injection removed; admin JS loads from assets to avoid visible Inputfield containers.
-          }
 
           if ($mdInput) {
             // Start with the raw markdown textarea disabled by default (unchecked transient)
@@ -199,29 +148,10 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
 
           }
 
-          // Move the lock checkbox above the editor (server-side) and add a small onchange handler to toggle raw textarea immediately
-          if ($lockInput && ($mdInput || $mdEditorInput)) {
-            try {
-              // Prefer inserting the lock before the raw markdown textarea so order is:
-              // md_markdown_lock, md_markdown
-              $before = $mdInput ?: $mdEditorInput;
-              $form->insertBefore($lockInput, $before);
-            } catch (\Throwable $e) {
-              // ignore if insert fails
-            }
-
-            // Ensure raw textarea starts disabled by default (unchecked transient)
+            // Ensure raw textarea starts disabled by default (overlay will enable editing)
             if ($mdInput) {
-              // Set disabled attribute server-side (attempt, may not reach inner localized inputs)
               $mdInput->attr('disabled', 'disabled');
             }
-
-          } else {
-            // If lock input not positioned, ensure we at least set onchange so toggling still works
-            if ($lockInput) {
-              // Inline fallback removed; external admin script `assets/markdown-admin.js` handles behavior.
-            }
-          }
         }
       } catch (\Throwable $e) {
         // be defensive; do not break form rendering
@@ -561,11 +491,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
           $f->rows = 40;
         }
 
-        if ($name === 'md_markdown_lock') {
-          $f->description = 'Enable the Markdown editor for this page.';
-          // Default to unchecked (editor disabled)
-          $f->defaultValue = 0;
-        }
+
         
         // Configure md_editor field authoritatively
         if ($name === 'md_editor') {

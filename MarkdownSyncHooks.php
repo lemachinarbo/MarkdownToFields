@@ -351,7 +351,7 @@ class MarkdownSyncHooks
         $mdLens = [];
       }
 
-      wire('log')->save('markdown-sync', sprintf('handleSaveReady page=%s lock_persisted=%d lock_transient=%s rawPost=%s postedKeys=%s postedMdLens=%s', (string)$page->path, (int)($page->md_markdown_lock ?? 0), $rawPriorityOverride ? '1' : '0', json_encode($rawPostDebug), json_encode($postedKeys), json_encode($mdLens)));
+      wire('log')->save('markdown-sync', sprintf('handleSaveReady page=%s lock_transient=%s rawPost=%s postedKeys=%s postedMdLens=%s', (string)$page->path, $rawPriorityOverride ? '1' : '0', json_encode($rawPostDebug), json_encode($postedKeys), json_encode($mdLens)));
 
       MarkdownSyncer::syncToMarkdown(
         $page,

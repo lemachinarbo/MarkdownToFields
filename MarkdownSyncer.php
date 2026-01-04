@@ -711,7 +711,7 @@ class MarkdownSyncer
     // If page indicates raw markdown should be authoritative (checkbox checked),
     // write any posted markdown content now (one central place) and update hashes.
     try {
-      $rawPriority = $rawPriorityOverride ?? (bool) ($page->md_markdown_lock ?? false);
+      $rawPriority = $rawPriorityOverride ?? false;
       if ($rawPriorityOverride !== null) {
         self::logInfo($page, 'rawPriorityOverrideUsed', ['value' => $rawPriorityOverride ? 1 : 0]);
       }
@@ -973,7 +973,7 @@ class MarkdownSyncer
       // If raw priority is enabled and the user posted raw markdown for this
       // language, prefer that posted markdown and do not let the HTML editor
       // override it during the same save.
-      $rawPriority = $rawPriorityOverride ?? (bool) ($page->md_markdown_lock ?? false);
+      $rawPriority = $rawPriorityOverride ?? false;
 
       if ($postedHtml !== null) {
         $normalizedHtml = (string) $postedHtml;
