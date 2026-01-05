@@ -81,9 +81,10 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       'height' => 1000,
       'rows' => 40,
       'features' => ['toolbar', 'stickybars', 'purifier', 'imgResize', 'pasteFilter'],
-      'plugins' => ['anchor', 'code', 'link', 'lists', 'pwlink', 'table', 'noneditable'],
+      'plugins' => ['anchor', 'code', 'link', 'lists', 'pwlink', 'table'],
       'toolbar' => 'styles bold italic pwlink blockquote bullist numlist anchor code',
       'settingsJSON' => json_encode([
+        // Mark elements with this class as non-editable (via data-mce-noneditable attribute)
         'noneditable_class' => 'md-comment-placeholder',
         'content_style' => $contentStyle,
         'object_resizing' => false,
@@ -173,7 +174,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $setupCheckbox = $modules->get('InputfieldCheckbox');
     $setupCheckbox->name = 'configure_editor_field';
     $setupCheckbox->label = 'Apply default settings to ' . htmlspecialchars($currentField) . '?';
-    $setupCheckbox->description = 'Applies required TinyMCE settings: noneditable plugin, disabled image interaction, and custom CSS.';
+    $setupCheckbox->description = 'Applies required TinyMCE settings: protected content markers (via contenteditable), disabled image interaction, and custom CSS.';
     $setupCheckbox->attr('value', 1);
     $configFieldset->add($setupCheckbox);
     
