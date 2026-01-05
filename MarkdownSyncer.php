@@ -45,6 +45,39 @@ class MarkdownSyncer
     return null;
   }
 
+  protected static function defaultSourceForPage(Page $page): string
+  {
+    $pageName = trim((string) $page->name);
+    return $pageName !== '' ? ($pageName . '.md') : 'index.md';
+  }
+
+  /**
+   * Check if a relative markdown source looks valid: non-empty basename and ends with .md.
+   */
+  protected static function isValidSource(?string $source): bool
+  {
+    if (!is_string($source)) {
+      return false;
+    }
+
+    $trimmed = trim($source);
+    if ($trimmed === '') {
+      return false;
+    }
+
+    $ext = strtolower(pathinfo($trimmed, PATHINFO_EXTENSION));
+    if ($ext !== 'md') {
+      return false;
+    }
+
+    $basename = pathinfo($trimmed, PATHINFO_FILENAME);
+    if ($basename === '' || self::startsWith($basename, '.')) {
+      return false;
+    }
+
+    return true;
+  }
+
   public static function contentSource(Page $page): string
   {
     // Prevent infinite recursion
@@ -83,9 +116,24 @@ class MarkdownSyncer
       $fieldName = $source['pageField'];
       if ($fieldName && $page->hasField($fieldName)) {
         $document = trim((string) $page->get($fieldName));
-        if ($document !== '') {
+        if (self::isValidSource($document)) {
           return $document;
         }
+
+        // Invalid value present in field; reset to default name-based source
+        $defaultSource = self::defaultSourceForPage($page);
+        self::logInfo($page, 'reset invalid source field', [
+          'field' => $fieldName,
+          'was' => $document,
+          'now' => $defaultSource,
+        ]);
+        self::saveField(
+          $page,
+          $fieldName,
+          $defaultSource,
+          'reset invalid source to default',
+        );
+        return $defaultSource;
       }
 
       // Try frontmatter 'name' field in case page name was changed via markdown
@@ -105,13 +153,17 @@ class MarkdownSyncer
       }
 
       $fallback = trim((string) $source['fallback']);
-      if ($fallback !== '') {
+      if (self::isValidSource($fallback)) {
         return $fallback;
       }
 
       // Default: use page name with .md extension
       $pageName = trim((string) $page->name);
       if ($pageName !== '') {
+        self::logInfo($page, 'contentSource: using page name default', [
+          'pageName' => $pageName,
+          'source' => $pageName . '.md',
+        ]);
         return $pageName . '.md';
       }
 
@@ -125,22 +177,11 @@ class MarkdownSyncer
 
   public static function getLanguageCode(Page $page, $language = null): string
   {
-    $fallback = self::getDefaultLanguageCode($page);
-
-    if ($language instanceof Language) {
-      return self::languageCodeFromLanguage($language, $fallback);
-    }
-
-    if (is_string($language) && $language !== '') {
-      return $language === 'default' ? $fallback : $language;
-    }
-
-    $current = $page->wire('user')->language ?? null;
-    if ($current instanceof Language) {
-      return self::languageCodeFromLanguage($current, $fallback);
-    }
-
-    return $fallback;
+    return self::resolveLanguageIdentifier(
+      $page,
+      $language,
+      self::getDefaultLanguageCode($page),
+    );
   }
 
   protected static function resolveLanguage(Page $page, $language): ?Language
@@ -167,7 +208,23 @@ class MarkdownSyncer
         : trim((string) $language);
 
       if ($selectorValue !== '') {
-        $resolved = $languages->get('code=' . $selectorValue);
+        // Prefer explicit code field when present, then name, then title.
+        foreach ($languages as $lang) {
+          if (!$lang instanceof Language) {
+            continue;
+          }
+          $langCode = trim((string) $lang->get('code'));
+          if ($langCode !== '' && $langCode === $selectorValue) {
+            $resolved = $lang;
+            break;
+          }
+        }
+        if (!$resolved instanceof Language) {
+          $resolved = $languages->get('name=' . $selectorValue);
+        }
+        if (!$resolved instanceof Language) {
+          $resolved = $languages->get('title=' . $selectorValue);
+        }
       }
     }
 
@@ -176,16 +233,13 @@ class MarkdownSyncer
 
   protected static function determineLanguageCode(Page $page, $language): string
   {
+    $fallback = self::getDefaultLanguageCode($page);
     $resolved = self::resolveLanguage($page, $language);
     if ($resolved instanceof Language) {
-      return self::languageCodeFromLanguage($resolved, self::FALLBACK_LANGUAGE);
+      return self::languageCodeFromLanguage($resolved, $fallback);
     }
 
-    if (is_string($language) && $language !== '') {
-      return self::getLanguageCode($page, $language);
-    }
-
-    return self::getDefaultLanguageCode($page);
+    return self::resolveLanguageIdentifier($page, $language, $fallback);
   }
 
   public static function getMarkdownFilePath(
@@ -225,10 +279,17 @@ class MarkdownSyncer
 
     $languageCode = self::getLanguageCode($page, $language);
     $source ??= self::contentSource($page);
+    $path = self::getMarkdownFilePath($page, $languageCode, $source);
 
     self::redirectToDefaultLanguage($page, $languageCode);
     throw new WireException(
-      sprintf('Markdown file not found for %s (%s).', $page->path, $source),
+      sprintf(
+        'Markdown file not found for %s (source=%s, language=%s, path=%s).',
+        $page->path,
+        $source,
+        $languageCode,
+        $path,
+      ),
     );
   }
 
@@ -245,7 +306,13 @@ class MarkdownSyncer
       self::logDebug(
         $page,
         sprintf('markdown file not found for language %s', $languageCode),
-        ['path' => $path, 'source' => $source, 'exists' => file_exists($path) ? 'yes' : 'no'],
+        [
+          'path' => $path,
+          'source' => $source,
+          'language' => $languageCode,
+          'pageName' => (string) $page->name,
+          'exists' => file_exists($path) ? 'yes' : 'no',
+        ],
       );
       return null;
     }
@@ -2237,12 +2304,17 @@ class MarkdownSyncer
         : $languageKey;
 
       if ($selectorValue !== '') {
-        $language = $languages->get('code=' . $selectorValue);
-        if ($language instanceof Language) {
-          return self::languageCodeFromLanguage(
-            $language,
-            self::FALLBACK_LANGUAGE,
-          );
+        foreach ($languages as $lang) {
+          if (!$lang instanceof Language) {
+            continue;
+          }
+          $langCode = trim((string) $lang->get('code'));
+          if ($langCode !== '' && $langCode === $selectorValue) {
+            return self::languageCodeFromLanguage(
+              $lang,
+              self::FALLBACK_LANGUAGE,
+            );
+          }
         }
       }
     }
@@ -2750,19 +2822,35 @@ class MarkdownSyncer
     Language $language,
     string $fallback,
   ): string {
-    $locale = $language->getLocale();
-    if ($locale) {
-      return strtolower(substr($locale, 0, 2));
-    }
-
-    $code = (string) ($language->code ?? '');
-    if ($code !== '' && $code !== 'default') {
+    $code = trim((string) ($language->get('code') ?? ''));
+    if ($code !== '') {
       return $code;
     }
 
-    $name = (string) ($language->name ?? '');
-    if ($name !== '' && $name !== 'default') {
-      return $name;
+    $name = trim((string) ($language->name ?? ''));
+    return $name !== '' ? $name : $fallback;
+  }
+
+  /**
+   * Resolve language identifier from provided input, using a single decision point.
+   * Priority: explicit Language object (code field if present, else name), explicit string, user language, fallback.
+   */
+  protected static function resolveLanguageIdentifier(
+    Page $page,
+    $language,
+    string $fallback,
+  ): string {
+    if ($language instanceof Language) {
+      return self::languageCodeFromLanguage($language, $fallback);
+    }
+
+    if (is_string($language) && $language !== '') {
+      return $language === 'default' ? $fallback : trim($language);
+    }
+
+    $current = $page->wire('user')->language ?? null;
+    if ($current instanceof Language) {
+      return self::languageCodeFromLanguage($current, $fallback);
     }
 
     return $fallback;

@@ -134,9 +134,15 @@ trait MarkdownContent {
    * Override in your page class to customize
    */
   public function contentSource(): string {
-    // Sensible default: use page name
-    // Override in a Page class if needed.
-    return $this->name . '.md';
+    $name = trim((string) $this->name);
+    
+    // If name is empty (database state before frontmatter sync), derive from path
+    if ($name === '') {
+      // Root page → 'home', others → last path segment
+      $name = $this->path === '/' ? 'home' : basename(rtrim($this->path, '/'));
+    }
+    
+    return $name . '.md';
   }
 
   /**

@@ -461,10 +461,37 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $fields = $this->wire('fields');
     $modules = $this->wire('modules');
 
+    $hasLanguages = $modules->isInstalled('LanguageSupport');
+
+    $resolveType = function (string $name, string $defaultType) use ($hasLanguages, $modules) {
+      // md_markdown and md_editor should be language-aware when languages are installed
+      if ($hasLanguages && in_array($name, ['md_markdown', 'md_editor'], true)) {
+        if ($defaultType === 'FieldtypeTextarea') {
+          return $modules->get('FieldtypeTextareaLanguage');
+        }
+      }
+
+      // md_markdown_hash should remain single-language (hash map stored as JSON)
+      if ($name === 'md_markdown_hash') {
+        return $modules->get($defaultType);
+      }
+
+      // md_markdown_source: keep single value unless we later support per-language filenames
+      if ($name === 'md_markdown_source') {
+        return $modules->get($defaultType);
+      }
+
+      if ($hasLanguages && $defaultType === 'FieldtypeText') {
+        return $modules->get('FieldtypeTextLanguage');
+      }
+
+      return $modules->get($defaultType);
+    };
+
     foreach ($this->fieldDefs as $name => [$type, $label]) {
       if (!$fields->get($name)) {
         $f = new Field();
-        $f->type = $modules->get($type);
+        $f->type = $resolveType($name, $type);
         $f->name = $name;
         $f->label = $label;
         $f->tags = 'markdown';
