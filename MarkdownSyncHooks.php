@@ -77,13 +77,13 @@ class MarkdownSyncHooks
       return;
     }
 
-    if (!MarkdownSyncer::supportsPage($page)) {
+    if (!MarkdownConfig::supportsPage($page)) {
       return;
     }
 
     // Ensure the page's selected editor field exists and is attached to the template
     try {
-      $htmlFieldName = MarkdownSyncer::getHtmlField($page);
+      $htmlFieldName = MarkdownConfig::getHtmlField($page);
       if ($htmlFieldName) {
         $fields = wire('fields');
         $modules = wire('modules');
@@ -121,7 +121,7 @@ class MarkdownSyncHooks
       wire('log')->save('markdown-sync', 'Editor ensure failed: ' . $e->getMessage());
     }
 
-    $documentField = MarkdownSyncer::getMarkdownField($page);
+    $documentField = MarkdownConfig::getMarkdownField($page);
     if (!$documentField) {
       return;
     }
@@ -131,12 +131,12 @@ class MarkdownSyncHooks
       return;
     }
 
-    $pendingBody = MarkdownSyncer::consumePendingBody($page, $documentField);
-    $pendingFields = MarkdownSyncer::consumePendingFields($page);
+    $pendingBody = MarkdownSessionManager::consumePendingBody($page, $documentField);
+    $pendingFields = MarkdownSessionManager::consumePendingFields($page);
 
     if ($pendingBody !== null || $pendingFields) {
       $page->of(false);
-      $defaultCode = MarkdownSyncer::getDefaultLanguageCode($page);
+      $defaultCode = MarkdownLanguageResolver::getDefaultLanguageCode($page);
 
       if ($pendingBody !== null) {
         $values = $pendingBody;
@@ -144,7 +144,7 @@ class MarkdownSyncHooks
           $values = [$defaultCode => (string) $pendingBody];
         }
 
-        MarkdownSyncer::applyLanguageValues($page, $documentField, $values);
+        MarkdownFieldSync::applyLanguageValues($page, $documentField, $values);
       }
 
       foreach ($pendingFields as $field => $value) {
@@ -157,14 +157,14 @@ class MarkdownSyncHooks
           $values = [$defaultCode => (string) $value];
         }
 
-        MarkdownSyncer::applyLanguageValues($page, $field, $values);
+        MarkdownFieldSync::applyLanguageValues($page, $field, $values);
       }
 
       return;
     }
 
     try {
-      $changedFields = MarkdownSyncer::syncFromMarkdown($page);
+      $changedFields = MarkdownSyncEngine::syncFromMarkdown($page);
       if (!empty($changedFields)) {
         wire('log')->save(
           'markdown-sync',
@@ -196,11 +196,11 @@ class MarkdownSyncHooks
       return;
     }
 
-    $htmlField = MarkdownSyncer::getHtmlField($page);
+    $htmlField = MarkdownConfig::getHtmlField($page);
     if ($htmlField) {
       $inputfield = $form->get($htmlField);
       if ($inputfield) {
-        MarkdownSyncer::applyEditorPlaceholdersToInputfield($inputfield);
+        MarkdownHtmlConverter::applyEditorPlaceholdersToInputfield($inputfield);
       }
     }
 
@@ -217,8 +217,8 @@ class MarkdownSyncHooks
     $hidden->attr('name', $field);
     $hidden->attr(
       'value',
-      MarkdownSyncer::recallFileHash($page) ??
-        MarkdownSyncer::buildHashPayload($page),
+      MarkdownHashTracker::recallFileHash($page) ??
+        MarkdownHashTracker::buildHashPayload($page),
     );
 
     $form->add($hidden);
@@ -241,11 +241,11 @@ class MarkdownSyncHooks
       return;
     }
 
-    if (!MarkdownSyncer::supportsPage($page)) {
+    if (!MarkdownConfig::supportsPage($page)) {
       return;
     }
 
-    $documentField = MarkdownSyncer::getMarkdownField($page);
+    $documentField = MarkdownConfig::getMarkdownField($page);
     if (!$documentField) {
       return;
     }
@@ -253,11 +253,11 @@ class MarkdownSyncHooks
     $input = $event->wire('input');
     $hashFieldName = MarkdownEditor::hashField($page);
     $expectedHash =
-      $input->post($hashFieldName) ?? MarkdownSyncer::recallFileHash($page);
+      $input->post($hashFieldName) ?? MarkdownHashTracker::recallFileHash($page);
     $postedLanguageValues = [];
 
     $bodyPost = $input->post($documentField);
-    $bodyValues = MarkdownSyncer::collectSubmittedLanguageValues(
+    $bodyValues = MarkdownInputCollector::collectSubmittedLanguageValues(
       $page,
       $documentField,
       $input,
@@ -267,9 +267,9 @@ class MarkdownSyncHooks
       $postedLanguageValues[$documentField] = $bodyValues;
     }
 
-    $htmlField = MarkdownSyncer::getHtmlField($page);
+    $htmlField = MarkdownConfig::getHtmlField($page);
     if ($htmlField && $page->hasField($htmlField)) {
-      $htmlValues = MarkdownSyncer::collectSubmittedLanguageValues(
+      $htmlValues = MarkdownInputCollector::collectSubmittedLanguageValues(
         $page,
         $htmlField,
         $input,
@@ -278,7 +278,7 @@ class MarkdownSyncHooks
       if ($htmlValues) {
         $sanitized = [];
         foreach ($htmlValues as $code => $value) {
-          $sanitized[$code] = MarkdownSyncer::editorPlaceholdersToComments(
+          $sanitized[$code] = MarkdownHtmlConverter::editorPlaceholdersToComments(
             $value,
           );
         }
@@ -287,7 +287,7 @@ class MarkdownSyncHooks
       }
     }
 
-    $titleValues = MarkdownSyncer::collectSubmittedLanguageValues(
+    $titleValues = MarkdownInputCollector::collectSubmittedLanguageValues(
       $page,
       'title',
       $input,
@@ -298,7 +298,7 @@ class MarkdownSyncHooks
     }
 
     foreach (
-      MarkdownSyncer::getFrontmatterMap($page)
+      MarkdownConfig::getFrontmatterMap($page)
       as $fieldName => $_frontKey
     ) {
       if ($fieldName === '' || $fieldName === 'title') {
@@ -309,7 +309,7 @@ class MarkdownSyncHooks
         continue;
       }
 
-      $values = MarkdownSyncer::collectSubmittedLanguageValues(
+      $values = MarkdownInputCollector::collectSubmittedLanguageValues(
         $page,
         $fieldName,
         $input,
@@ -322,13 +322,13 @@ class MarkdownSyncHooks
       $postedLanguageValues[$fieldName] = $values;
     }
 
-    $languageScope = MarkdownSyncer::detectEditedLanguages(
+    $languageScope = MarkdownInputCollector::detectEditedLanguages(
       $page,
       $postedLanguageValues,
     );
 
     foreach ($postedLanguageValues as $fieldName => $languageValues) {
-      MarkdownSyncer::applyLanguageValues($page, $fieldName, $languageValues);
+      MarkdownFieldSync::applyLanguageValues($page, $fieldName, $languageValues);
     }
 
     $raw = wire('input')->post('md_markdown_lock_transient_value');
@@ -342,7 +342,7 @@ class MarkdownSyncHooks
       $rawPriorityOverride = in_array($normalized, ['1', 'true', 'on'], true);
     }
 
-    MarkdownSyncer::syncToMarkdown(
+    MarkdownSyncEngine::syncToMarkdown(
       $page,
       $expectedHash,
       $languageScope ?: null,
@@ -352,10 +352,10 @@ class MarkdownSyncHooks
     
     MarkdownEditor::rememberHash($page);
 
-    $hashField = MarkdownSyncer::getHashField($page);
+    $hashField = MarkdownConfig::getHashField($page);
     if ($hashField && $page->hasField($hashField)) {
       $page->of(false);
-      $page->set($hashField, MarkdownSyncer::buildHashPayload($page));
+      $page->set($hashField, MarkdownHashTracker::buildHashPayload($page));
       $page->save($hashField);
     }
   }
@@ -372,9 +372,9 @@ class MarkdownSyncHooks
       sprintf('Modules::refresh hook invoked: user=%s request=%s', $userName, $url),
     );
 
-    // Delegates TTL, locking and logging logic to the MarkdownSyncer helper
+    // Delegates TTL, locking and logging logic to the batch sync helper
     try {
-      $result = MarkdownSyncer::syncAllManagedPages(
+      $result = MarkdownBatchSync::syncAllManagedPages(
         10000,
         'md_markdown_hash',
         'markdown-sync',

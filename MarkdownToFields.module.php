@@ -3,7 +3,6 @@
 namespace ProcessWire;
 
 use LetMeDown\ContentData;
-use ProcessWire\MarkdownSyncer;
 use ProcessWire\MarkdownSyncHooks;
 
 // Load dependencies and module classes early so they are available before init hooks run
@@ -12,7 +11,18 @@ if (is_file($__moduleVendor)) {
   require_once $__moduleVendor;
 }
 require_once __DIR__ . '/MarkdownContent.php';
-require_once __DIR__ . '/MarkdownSyncer.php';
+require_once __DIR__ . '/MarkdownUtilities.php';
+require_once __DIR__ . '/MarkdownDocumentParser.php';
+require_once __DIR__ . '/MarkdownLanguageResolver.php';
+require_once __DIR__ . '/MarkdownConfig.php';
+require_once __DIR__ . '/MarkdownFileIO.php';
+require_once __DIR__ . '/MarkdownHtmlConverter.php';
+require_once __DIR__ . '/MarkdownHashTracker.php';
+require_once __DIR__ . '/MarkdownFieldSync.php';
+require_once __DIR__ . '/MarkdownInputCollector.php';
+require_once __DIR__ . '/MarkdownSessionManager.php';
+require_once __DIR__ . '/MarkdownSyncEngine.php';
+require_once __DIR__ . '/MarkdownBatchSync.php';
 require_once __DIR__ . '/MarkdownEditor.php';
 require_once __DIR__ . '/MarkdownSyncHooks.php';
 
@@ -296,19 +306,19 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   /** Sync page fields from markdown files. */
   public static function sync(Page $page): array
   {
-    return MarkdownSyncer::syncFromMarkdown($page);
+    return MarkdownSyncEngine::syncFromMarkdown($page);
   }
 
   /** Load parsed markdown content for a page. */
   public static function load(Page $page, $language = null): ?ContentData
   {
-    return MarkdownSyncer::loadMarkdown($page, $language);
+    return MarkdownFileIO::loadMarkdown($page, $language);
   }
 
   /** Save page fields to markdown files. */
   public static function save(Page $page, $language = null): void
   {
-    MarkdownSyncer::syncToMarkdown($page, null, null);
+    MarkdownSyncEngine::syncToMarkdown($page, null, null);
   }
 
   /** Checks if the field uses a TinyMCE textarea editor. */

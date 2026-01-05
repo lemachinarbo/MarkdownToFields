@@ -67,24 +67,6 @@ use LetMeDown\ContentData;
  */
 trait MarkdownContent {
   
-  /**
-   * Ensure MarkdownSyncer class is loaded
-   */
-
-  // TODO: Consider moving MarkdownSyncer loading to module bootstrap.
-  // This trait currently guards against load-order issues in PW.
-
-  protected static function ensureMarkdownSyncer(): void {
-    if (class_exists('\\ProcessWire\\MarkdownSyncer', false)) {
-      return;
-    }
-    $config = wire('config');
-    $path = $config->paths->siteModules . 'MarkdownToFields/MarkdownSyncer.php';
-    if (is_file($path)) {
-      require_once $path;
-    }
-  }
-
   /** Returns the markdown sync configuration for this page. */
   public function getMarkdownSyncMap(): array {
     $config = $this->wire('config');
@@ -111,10 +93,9 @@ trait MarkdownContent {
 
   /** Loads markdown content for the given source and language. */
   public function loadContent(?string $source = null, ?string $language = null): ContentData {
-    self::ensureMarkdownSyncer();
     $source = $source ?? $this->contentSource();
-    $syncerClass = '\\ProcessWire\\MarkdownSyncer';
-    $lang = $language ?? $syncerClass::getLanguageCode($this);
+    $syncerClass = '\\ProcessWire\\MarkdownFileIO';
+    $lang = $language ?? MarkdownLanguageResolver::getLanguageCode($this);
     return $syncerClass::loadMarkdown($this, $source, $lang);
   }
 

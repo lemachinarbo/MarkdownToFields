@@ -23,14 +23,14 @@ class MarkdownEditor
   /** Get hash field name for the page. */
   public static function hashField(Page $page): string
   {
-    return MarkdownSyncer::getHashFieldName($page);
+    return MarkdownHashTracker::getHashFieldName($page);
   }
 
   /** Store current file hashes in session. */
   public static function rememberHash(Page $page): void
   {
-    $hashes = MarkdownSyncer::languageFileHashes($page);
-    MarkdownSyncer::rememberFileHash($page, $hashes);
+    $hashes = MarkdownHashTracker::languageFileHashes($page);
+    MarkdownHashTracker::rememberFileHash($page, $hashes);
   }
 
   protected static function page($page): ?Page
@@ -39,7 +39,7 @@ class MarkdownEditor
       return null;
     }
 
-    if (!MarkdownSyncer::supportsPage($page)) {
+    if (!MarkdownConfig::supportsPage($page)) {
       return null;
     }
 
