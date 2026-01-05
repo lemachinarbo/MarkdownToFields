@@ -6,6 +6,7 @@ use ProcessWire\MarkdownEditor;
 
 class MarkdownSyncHooks
 {
+  /** Enqueue markdown editor asset files. */
   public static function enqueueAssets(HookEvent $event): void
   {
     $config = $event->wire('config');
@@ -17,6 +18,7 @@ class MarkdownSyncHooks
     $config->scripts->add($url . 'assets/markdown-editor.js');
   }
 
+  /** Disable raw markdown field in edit form. */
   public static function lockRawMarkdownField(HookEvent $event): void
   {
     $form = $event->return;
@@ -34,6 +36,7 @@ class MarkdownSyncHooks
     While editing Markdown, do not modify the same content in other fields (such as the title or content editor) to avoid losing changes.';
   }
 
+  /** Sync template fields after module config save. */
   public static function handleSaveConfig(HookEvent $event): void
   {
     $moduleArg = $event->arguments(0);
@@ -61,6 +64,7 @@ class MarkdownSyncHooks
     $module->wire('log')->save('markdown-sync', 'Template field sync complete.');
   }
 
+  /** Prepare edit form with markdown field data and sync. */
   public static function prepareEditForm(HookEvent $event): void
   {
     wire('log')->save('markdown-sync', 'Hook: prepareEditForm triggered');
@@ -69,7 +73,6 @@ class MarkdownSyncHooks
       return;
     }
 
-    // Skip markdown sync for pages in trash
     if ($page->isTrash()) {
       return;
     }
@@ -179,6 +182,7 @@ class MarkdownSyncHooks
     }
   }
 
+  /** Append hidden hash field to edit form. */
   public static function appendHashField(HookEvent $event): void
   {
     wire('log')->save('markdown-sync', 'Hook: appendHashField triggered');
@@ -220,6 +224,7 @@ class MarkdownSyncHooks
     $form->add($hidden);
   }
 
+  /** Handle page save: sync markdown to fields if needed. */
   public static function handleSaveReady(HookEvent $event): void
   {
     $page = MarkdownEditor::pageFromArgs($event);
@@ -355,6 +360,7 @@ class MarkdownSyncHooks
     }
   }
 
+  /** Refresh module auto-discovery when modules are loaded. */
   public static function handleModulesRefresh(HookEvent $event): void
   {
     wire('log')->save('markdown-sync', 'Hook: handleModulesRefresh triggered - starting sync');

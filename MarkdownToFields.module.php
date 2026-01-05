@@ -42,16 +42,17 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     'md_editor' => ['FieldtypeTextarea', 'Content editor'],
   ];
 
+  /** Provide module metadata to ProcessWire. */
   public static function getModuleInfo()
   {
     return [
       'title' => 'Markdown to fields',
-      'version' => '1.0.3',
+      'version' => '1.1.0',
       'summary' => 'Markdown files as your content source of truth',
       'description' =>
         'Parse markdown into structured content API, sync bidirectionally with fields.',
       'author' => 'Lemachi Narbo',
-      'icon' => 'pencil',
+      'icon' => 'pencil-square-o',
       'requires' => 'PHP>=8.0',
       'autoload' => true,
       'singular' => true,
@@ -59,9 +60,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     ];
   }
 
-  /**
-   * Single source of truth for required md_editor configuration.
-   */
+  /** Single source of truth for required md_editor configuration. */
   protected function getRequiredMarkdownEditorConfig(): array
   {
     $contentStyle = '.md-comment-placeholder{display:inline-block;padding:2px 6px;border-radius:4px;font-family:monospace;opacity:.9;} .md-comment-placeholder--section{display:block;width:100%;text-align:center;background:#ececec;color:#555;font-size:12px;font-weight:600;} .md-comment-placeholder--sub{display:block;width:100%;background:#f2f2f2;color:#666;font-size:11px;font-weight:500;} .md-comment-placeholder--field{background:#f7f7f7;color:#666;font-size:10px;border-left:4px solid #d0d0d0;padding-left:6px;} .md-comment-placeholder--close{background:#e8e8e8;color:#888;font-size:10px;font-style:italic;} img{pointer-events:none;}';
@@ -83,9 +82,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     ];
   }
 
-  /**
-   * Apply required config wholesale to a field (authoritative setup).
-   */
+  /** Apply required config wholesale to a field. */
   protected function applyMarkdownEditorConfig(Field $field, array $cfg): void
   {
     foreach ($cfg as $key => $val) {
@@ -97,6 +94,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     }
   }
 
+  /** Register hooks and sync template fields. */
   public function init()
   {
     $this->syncTemplateFields();
@@ -110,17 +108,17 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $this->addHookAfter('Modules::saveConfig', MarkdownSyncHooks::class . '::handleSaveConfig');
   }
 
+  /** Create required fields and set default configuration. */
   public function install()
   {
     $this->syncTemplateFields();
-    
-    // Set default config
     $this->wire('modules')->saveConfig($this, [
       'htmlField' => 'md_editor',
       'templates' => [],
     ]);
   }
 
+  /** Build module configuration form. */
   public function getModuleConfigInputfields(array $data): InputfieldWrapper
   {
     $defaults = [
@@ -216,6 +214,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     return $wrapper;
   }
 
+  /** Remove module fields and clean up configuration. */
   public function uninstall()
   {
     self::$uninstalling = true;
@@ -294,39 +293,30 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     }
   }
 
-  /**
-   * Static shortcut to MarkdownSyncer methods
-   */
+  /** Sync page fields from markdown files. */
   public static function sync(Page $page): array
   {
     return MarkdownSyncer::syncFromMarkdown($page);
   }
 
+  /** Load parsed markdown content for a page. */
   public static function load(Page $page, $language = null): ?ContentData
   {
     return MarkdownSyncer::loadMarkdown($page, $language);
   }
 
+  /** Save page fields to markdown files. */
   public static function save(Page $page, $language = null): void
   {
     MarkdownSyncer::syncToMarkdown($page, null, null);
   }
 
-  /**
-   * Check if a field can be used as a markdown editor surface.
-   * Shallow check: just textarea + TinyMCE. Auto-repair on save adds required config.
-   *
-   * @param Field $field The field to check
-   * @return bool True if field is textarea + TinyMCE
-   */
+  /** Checks if the field uses a TinyMCE textarea editor. */
   public function isMarkdownEditorCompatible(Field $field): bool
   {
-    // Must be textarea type
     if ($field->type->name !== 'FieldtypeTextarea') {
       return false;
     }
-    
-    // Must use TinyMCE inputfield
     if ($field->inputfieldClass !== 'InputfieldTinyMCE') {
       return false;
     }
@@ -334,15 +324,14 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     return true;
   }
 
+  /** Sync template field associations for configured templates. */
   public function syncTemplateFields(): void
   {
-    // Skip field operations during uninstall
     if (self::$uninstalling) {
       $this->wire('log')->save('markdown-sync', 'Template field sync skipped (uninstalling)');
       return;
     }
     
-    // Create missing fields only; authoritative repair is explicit
     $this->createFields();
 
     $enabled = (array) ($this->templates ?? []);
@@ -356,7 +345,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       if ($this->isTemplateExcluded($tmpl)) continue;
       if (!in_array($tmpl->name, $enabled, true)) continue;
 
-      // Try to get page class: first from template->pageClass, then from first page using template
       $pageClass = $tmpl->pageClass;
       if (!$pageClass) {
         try {
@@ -415,7 +403,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       $shouldHaveFields = in_array($template->name, $enabled, true);
       $fieldgroup = $template->fieldgroup;
 
-      // Manage all markdown-sync fields except the editor field (handled separately)
       foreach (array_keys($this->fieldDefs) as $name) {
         if ($name === 'md_editor') continue;
         $field = $fields->get($name);
@@ -429,21 +416,17 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
         }
       }
 
-      // Editor field management: ensure only the selected editor is attached
       $mdEditorField = $fields->get('md_editor');
       $selectedEditorField = $fields->get($currentEditorField);
       
       if ($shouldHaveFields) {
-        // Add selected editor if missing
         if ($selectedEditorField && !$fieldgroup->has($selectedEditorField)) {
           $fieldgroup->add($selectedEditorField);
         }
-        // Remove md_editor if it's present but not the selected editor
         if ($mdEditorField && $currentEditorField !== 'md_editor' && $fieldgroup->has($mdEditorField)) {
           $fieldgroup->remove($mdEditorField);
         }
       } else {
-        // If template disabled, remove both possible editor fields
         if ($mdEditorField && $fieldgroup->has($mdEditorField)) {
           $fieldgroup->remove($mdEditorField);
         }
@@ -520,16 +503,12 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     }
   }
 
-  // ensureMdEditorConfigured removed: authoritative setup via Repair action only
-
   private function isTemplateExcluded(Template $template): bool
   {
     return $template->name === 'admin' || (($template->flags ?? 0) & Template::flagSystem);
   }
 
-  /**
-   * Repair action: replace config wholesale for selected editor field or create md_editor.
-   */
+  /** Applies the required TinyMCE configuration to the editor field. */
   public function repairMarkdownEditor(?string $fieldName = null): void
   {
     $fieldName = $fieldName ?: 'md_editor';

@@ -4,6 +4,7 @@ namespace ProcessWire;
 
 class MarkdownEditor
 {
+  /** Extract page from process object if available. */
   public static function pageFromProcess(HookEvent $event): ?Page
   {
     if (!method_exists($event->object, 'getPage')) {
@@ -13,16 +14,19 @@ class MarkdownEditor
     return self::page($event->object->getPage());
   }
 
+  /** Extract page from event arguments. */
   public static function pageFromArgs(HookEvent $event): ?Page
   {
     return self::page($event->arguments(0));
   }
 
+  /** Get hash field name for the page. */
   public static function hashField(Page $page): string
   {
     return MarkdownSyncer::getHashFieldName($page);
   }
 
+  /** Store current file hashes in session. */
   public static function rememberHash(Page $page): void
   {
     $hashes = MarkdownSyncer::languageFileHashes($page);

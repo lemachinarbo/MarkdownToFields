@@ -85,10 +85,7 @@ trait MarkdownContent {
     }
   }
 
-  /**
-   * Get markdown sync configuration
-   * Reads from $config->MarkdownToFields, falls back to defaults
-   */
+  /** Returns the markdown sync configuration for this page. */
   public function getMarkdownSyncMap(): array {
     $config = $this->wire('config');
     $mdConfig = $config->MarkdownToFields ?? [];
@@ -112,15 +109,7 @@ trait MarkdownContent {
     ];
   }
 
-  /**
-   * Low-level markdown loader.
-   * Do not call from templates—use content() instead.
-   * 
-   * @param string|null $source The markdown file source (relative to content path)
-   * @param string|null $language Language code to load (defaults to current language)
-   * @return ContentData The parsed markdown content
-   * @internal For advanced use cases only
-   */
+  /** Loads markdown content for the given source and language. */
   public function loadContent(?string $source = null, ?string $language = null): ContentData {
     self::ensureMarkdownSyncer();
     $source = $source ?? $this->contentSource();
@@ -129,10 +118,7 @@ trait MarkdownContent {
     return $syncerClass::loadMarkdown($this, $source, $lang);
   }
 
-  /**
-   * Default markdown source: page name + .md
-   * Override in your page class to customize
-   */
+  /** Returns the default markdown filename for this page. */
   public function contentSource(): string {
     $name = trim((string) $this->name);
     
@@ -145,27 +131,12 @@ trait MarkdownContent {
     return $name . '.md';
   }
 
-  /**
-   * Canonical content access point.
-   * Safe place to add caching, pre-processing, and other optimizations later.
-   * Always call this from templates and page logic.
-   * 
-   * @return ContentData The parsed and ready-to-use markdown content
-   */
+  /** Loads parsed markdown content using the default source. */
   public function content(): ContentData {
     return $this->loadContent($this->contentSource());
   }
 
-  /**
-   * Template data boundary - the canonical view contract
-   * Default: return loaded content
-   * Override in your page class to shape/normalize data for templates
-   * 
-   * This is the only method templates should call.
-   * Subclasses transform raw content into view-ready structure here.
-   * 
-   * @return ContentData The content prepared for template rendering
-   */
+  /** Provides view-ready content data for templates. */
   public function templateData(): ContentData {
     return $this->content();
   }
