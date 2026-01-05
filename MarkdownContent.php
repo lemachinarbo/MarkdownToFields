@@ -40,7 +40,6 @@ use LetMeDown\ContentData;
  * class CustomPage extends Page {
  *   use MarkdownContent;
  *   protected string $sourcePath = '/var/markdown/';  // path to markdown files
- *   protected string $sourcePageField = 'md_ref';     // page reference field name
  *   protected string $markdownField = 'md_content';   // markdown content field
  *   protected string $htmlField = 'html';             // rendered HTML field
  *   protected string $hashField = 'md_hash';          // hash tracking field
@@ -78,7 +77,6 @@ trait MarkdownContent {
     return [
       'source' => [
         'path' => $path,
-        'pageField' => $mdConfig['sourcePageField'] ?? 'md_markdown_source',
         'fallback' => $this->contentSource(),
       ],
       'markdownField' => $mdConfig['markdownField'] ?? 'md_markdown',

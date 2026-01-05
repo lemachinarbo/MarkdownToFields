@@ -2,6 +2,8 @@
 
 namespace ProcessWire;
 
+use LetMeDown\ContentData;
+
 /**
  * MarkdownSyncEngine - Core bidirectional synchronization orchestration
  *
@@ -19,11 +21,15 @@ class MarkdownSyncEngine extends MarkdownSessionManager
   /** Syncs page fields from markdown files. */
   public static function syncFromMarkdown(Page $page): array
   {
+    self::logInfo($page, 'syncFromMarkdown: starting sync', ['pageName' => $page->name, 'pagePath' => $page->path]);
+    
     $config = self::config($page);
     if ($config === null) {
+      self::logInfo($page, 'syncFromMarkdown: no config found, returning empty');
       return [];
     }
 
+    self::logInfo($page, 'syncFromMarkdown: config found', ['markdownField' => $config['markdownField'] ?? '?']);
     self::$syncingFromMarkdown[$page->id] = true;
 
     try {
@@ -37,6 +43,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
   {
     $config = self::config($page);
     if ($config === null) {
+      self::logInfo($page, 'doSyncFromMarkdown: no config found');
       return [];
     }
 
@@ -44,33 +51,9 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
     $markdownField = $config['markdownField'];
     $htmlField = $config['htmlField'] ?? null;
-    $sourcePageField = $config['source']['pageField'] ?? null;
+    self::logInfo($page, 'doSyncFromMarkdown: fields to sync', ['markdownField' => $markdownField, 'htmlField' => $htmlField]);
 
     $dirtyFields = [];
-
-    if ($sourcePageField && $page->hasField($sourcePageField)) {
-      $effectiveSource = self::contentSource($page);
-      $currentSource = trim((string) $page->get($sourcePageField));
-      $hasOverride = self::hasContentSourceOverride($page);
-
-      if ($hasOverride && $currentSource !== $effectiveSource) {
-        self::saveField(
-          $page,
-          $sourcePageField,
-          $effectiveSource,
-          'synced programmatic source to field',
-        );
-      } elseif (!$hasOverride && $currentSource === '') {
-        if ($effectiveSource !== '') {
-          self::saveField(
-            $page,
-            $sourcePageField,
-            $effectiveSource,
-            'populated source field with default',
-          );
-        }
-      }
-    }
 
     $languageCodes = self::availableLanguageCodes($page);
     $defaultCode = self::getDefaultLanguageCode($page);
@@ -80,7 +63,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
       $isDefaultLanguage = $languageCode === $defaultCode;
 
       if (!$isDefaultLanguage && !$language instanceof Language) {
-        self::logDebug(
+        self::logInfo(
           $page,
           sprintf(
             'skip language %s: not configured in ProcessWire',
@@ -90,13 +73,15 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         continue;
       }
 
+      self::logInfo($page, 'doSyncFromMarkdown: loading content for language', ['language' => $languageCode, 'isDefault' => $isDefaultLanguage]);
+      
       $content = $isDefaultLanguage
         ? self::loadMarkdown($page)
         : self::loadLanguageMarkdown($page, $language);
 
       if (!$content instanceof ContentData) {
         if (!$isDefaultLanguage) {
-          self::logDebug(
+          self::logInfo(
             $page,
             sprintf('missing markdown file for language %s', $languageCode),
             ['field' => $markdownField],
@@ -224,6 +209,16 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         self::logInfo($page, $errorMsg);
         throw new WireException($errorMsg);
       }
+    }
+
+    if ($savedFields) {
+      self::logDebug(
+        $page,
+        sprintf('synced %d fields from markdown', count($savedFields)),
+        ['fields' => $savedFields],
+      );
+    } else {
+      self::logDebug($page, 'no fields changed from markdown sync');
     }
 
     return $savedFields;
@@ -393,7 +388,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         }
 
         if ($hasMarkdownPost) {
-          self::logDebug(
+          self::logInfo(
             $page,
             'skip hash mismatch: markdown posted for language',
             ['language' => $mismatch],
@@ -498,7 +493,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         ) {
           $markdownValue = $storedLanguageMarkdown;
         } else {
-          self::logDebug(
+          self::logInfo(
             $page,
             sprintf(
               'skip sync for %s: no markdown input available',
@@ -546,19 +541,19 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         $trimmedHtml = trim($normalizedHtml);
 
         if (self::shouldPreferMarkdownForSync($rawPriorityOverride, $postedMarkdown)) {
-          self::logDebug(
+          self::logInfo(
             $page,
             'skip html override: raw priority and posted markdown present',
             ['language' => self::languageLogLabel($page, $language)],
           );
         } elseif ($trimmedHtml === '' && $postedMarkdown !== null) {
-          self::logDebug(
+          self::logInfo(
             $page,
             'skip html fallback: empty submission with markdown input',
             ['language' => self::languageLogLabel($page, $language)],
           );
         } else {
-          self::logDebug($page, 'syncToMarkdown html input', [
+          self::logInfo($page, 'syncToMarkdown html input', [
             'language' => self::languageLogLabel($page, $language),
             'len' => strlen($normalizedHtml),
             'preview' => substr(strip_tags($normalizedHtml), 0, 80),
@@ -566,7 +561,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
           $convertedMarkdown = self::htmlToMarkdown($normalizedHtml, $page);
 
-          self::logDebug($page, 'syncToMarkdown html converted', [
+          self::logInfo($page, 'syncToMarkdown html converted', [
             'language' => self::languageLogLabel($page, $language),
             'len' => strlen($convertedMarkdown),
             'preview' => substr($convertedMarkdown, 0, 80),
@@ -679,7 +674,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
             : false;
 
         if ($field === 'name') {
-          self::logDebug($page, 'syncToMarkdown name state', [
+          self::logInfo($page, 'syncToMarkdown name state', [
             'language' => $languageCode,
             'postedRaw' => $postedFrontRaw,
             'normalizedPosted' => $normalizedPosted,
@@ -781,7 +776,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         }
 
         if ($field === 'name') {
-          self::logDebug($page, 'syncToMarkdown name decision', [
+          self::logInfo($page, 'syncToMarkdown name decision', [
             'language' => $languageCode,
             'finalValue' => $finalValue,
             'source' => $fieldChanged

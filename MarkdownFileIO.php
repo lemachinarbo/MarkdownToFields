@@ -43,6 +43,8 @@ class MarkdownFileIO extends MarkdownConfig
   public static function contentSource(Page $page): string
   {
     $pageId = $page->id;
+    self::logDebug($page, 'contentSource: resolving for page', ['pageName' => $page->name, 'pagePath' => $page->path]);
+    
     if (isset(self::$gettingContentSource[$pageId])) {
       $config = self::requireConfig($page);
       $source = $config['source'];
@@ -66,35 +68,12 @@ class MarkdownFileIO extends MarkdownConfig
             return $override;
           }
         } catch (\Throwable $e) {
-          // Override exists but implementation failed; fall through to field/default
+          // Override exists but implementation failed; fall through to frontmatter/default
         }
       }
 
       $config = self::requireConfig($page);
       $source = $config['source'];
-
-      $fieldName = $source['pageField'];
-      if ($fieldName && $page->hasField($fieldName)) {
-        $document = trim((string) $page->get($fieldName));
-        if (self::isValidSource($document)) {
-          return $document;
-        }
-
-        // Invalid value present in field; reset to default name-based source
-        $defaultSource = self::defaultSourceForPage($page);
-        self::logInfo($page, 'reset invalid source field', [
-          'field' => $fieldName,
-          'was' => $document,
-          'now' => $defaultSource,
-        ]);
-        self::saveField(
-          $page,
-          $fieldName,
-          $defaultSource,
-          'reset invalid source to default',
-        );
-        return $defaultSource;
-      }
 
       // Try frontmatter 'name' field in case page name was changed via markdown
       try {
@@ -232,7 +211,13 @@ class MarkdownFileIO extends MarkdownConfig
     }
 
     $parser = new LetMeDown();
-    return $parser->load($path);
+    $content = $parser->load($path);
+    self::logInfo(
+      $page,
+      sprintf('loaded markdown [%s]: %s', $languageCode, $path),
+      ['language' => $languageCode],
+    );
+    return $content;
   }
 
   /** Saves markdown document to the filesystem for a page and language. */

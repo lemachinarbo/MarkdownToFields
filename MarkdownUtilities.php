@@ -16,10 +16,9 @@ class MarkdownUtilities
     $enabled = false;
 
     if ($config) {
-      $flag = self::DEBUG_CONFIG_FLAG;
-      if (isset($config->$flag)) {
-        $enabled = (bool) $config->$flag;
-      }
+      // Check module config first (MarkdownToFields.debug)
+      $moduleConfig = $config->MarkdownToFields ?? [];
+      $enabled = (bool) ($moduleConfig['debug'] ?? false);
     }
 
     if (!$enabled) {

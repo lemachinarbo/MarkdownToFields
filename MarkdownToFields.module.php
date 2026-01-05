@@ -45,7 +45,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   
   private array $fieldDefs = [
     'md_markdown_tab' => ['FieldtypeFieldsetTabOpen', 'Markdown'],
-    'md_markdown_source' => ['FieldtypeText', 'Source file path'],
     'md_markdown' => ['FieldtypeTextarea', 'Markdown editor'],
     'md_markdown_hash' => ['FieldtypeText', 'Markdown hash'],
     'md_markdown_tab_END' => ['FieldtypeFieldsetClose', 'Close Markdown tab'],
@@ -192,7 +191,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $html .= '  \'htmlField\' => \'md_editor\',           // Editor field' . "\n";
     $html .= '  \'markdownField\' => \'md_markdown\',     // Raw markdown' . "\n";
     $html .= '  \'hashField\' => \'md_markdown_hash\',    // Sync state' . "\n";
-    $html .= '  \'sourcePageField\' => \'md_markdown_source\', // File ref' . "\n";
     $html .= '  \'sourcePath\' => \'content/\',           // Markdown location' . "\n";
     $html .= '];' . "\n</pre>";
     
@@ -207,7 +205,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       'htmlField' => $mdConfig['htmlField'] ?? 'md_editor',
       'markdownField' => $mdConfig['markdownField'] ?? 'md_markdown',
       'hashField' => $mdConfig['hashField'] ?? 'md_markdown_hash',
-      'sourcePageField' => $mdConfig['sourcePageField'] ?? 'md_markdown_source',
       'sourcePath' => $mdConfig['sourcePath'] ?? 'content/',
     ];
     
@@ -469,11 +466,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
         return $modules->get($defaultType);
       }
 
-      // md_markdown_source: keep single value unless we later support per-language filenames
-      if ($name === 'md_markdown_source') {
-        return $modules->get($defaultType);
-      }
-
       if ($hasLanguages && $defaultType === 'FieldtypeText') {
         return $modules->get('FieldtypeTextLanguage');
       }
@@ -488,13 +480,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
         $f->name = $name;
         $f->label = $label;
         $f->tags = 'markdown';
-        
-        // Configure source field with validation pattern
-        if ($name === 'md_markdown_source') {
-          $f->description = 'Relative path to markdown file (e.g., home.md, book/chapter.md). Must end with .md. Leave empty to use page name.';
-          $f->pattern = '^(([a-zA-Z0-9_-]+\\/)*)?[a-zA-Z0-9_-]+\\.md$';
-          $f->size = 255;
-        }
         
         // Configure markdown textarea with larger editor
         if ($name === 'md_markdown') {
