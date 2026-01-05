@@ -73,7 +73,7 @@
   function setEnabled(enabled) {
     document.querySelectorAll('[name^="md_markdown"]').forEach(function (el) {
       const n = el.name || "";
-      if (!/^md_markdown($|\[)/.test(n)) return;
+      if (!/^md_markdown($|\[|__)/.test(n)) return;
       const overlay = ensureOverlayFor(el);
       if (enabled) {
         el.removeAttribute("disabled");
@@ -93,7 +93,7 @@
     // create hidden fields for forms that contain markdown textareas (exact md_markdown only)
     document.querySelectorAll('[name^="md_markdown"]').forEach(function (el) {
       const n = el.name || "";
-      if (!/^md_markdown($|\[)/.test(n)) return;
+      if (!/^md_markdown($|\[|__)/.test(n)) return;
       const form = el.closest("form");
       if (form) ensureHiddenInForm(form);
     });
@@ -107,7 +107,7 @@
       let hasMd = false;
       form.querySelectorAll('[name^="md_markdown"]').forEach(function (el) {
         const n = el.name || "";
-        if (/^md_markdown($|\[)/.test(n)) hasMd = true;
+        if (/^md_markdown($|\[|__)/.test(n)) hasMd = true;
       });
       if (!hasMd) return;
       form.addEventListener("submit", function () {
