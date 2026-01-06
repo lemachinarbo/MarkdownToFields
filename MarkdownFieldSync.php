@@ -466,13 +466,43 @@ class MarkdownFieldSync extends MarkdownHashTracker
       return [];
     }
 
-    return self::applyFrontmatterFields(
+    $updated = self::applyFrontmatterFields(
       $page,
       $frontmatter,
       false,
       null,
       $language,
     );
+
+    // Also sync field bindings in the markdown body
+    // This should run whenever bindings differ from frontmatter, not just when fields change
+    $isAdminContext = wire('page') && wire('page')->template == 'admin';
+    if (!$isAdminContext) {
+      try {
+        $markdownContent = $page->get(self::getMarkdownField($page));
+        if ($markdownContent) {
+          $bindings = self::extractBindingsFromMarkdown($markdownContent);
+          if (!empty($bindings)) {
+            // Check if any bindings differ from frontmatter
+            $bindingsDiffer = false;
+            foreach ($bindings as $fieldName => $bindingValue) {
+              if (isset($frontmatter[$fieldName]) && (string)$frontmatter[$fieldName] !== (string)$bindingValue) {
+                $bindingsDiffer = true;
+                break;
+              }
+            }
+            
+            if ($bindingsDiffer) {
+              self::updateBindingsInMarkdown($page, $markdownContent, $frontmatter, $bindings);
+            }
+          }
+        }
+      } catch (\Throwable $e) {
+        self::logDebug($page, 'applyFrontmatter binding sync failed', ['error' => $e->getMessage()]);
+      }
+    }
+
+    return $updated;
   }
 
   /** Syncs page fields from a markdown document string. */
@@ -643,5 +673,75 @@ class MarkdownFieldSync extends MarkdownHashTracker
     }
 
     return false;
+  }
+
+  protected static function extractBindingsFromMarkdown(string $markdown): array
+  {
+    $bindings = [];
+    $pattern = '/<!--\\s+field:(\\w+)\\s+-->.*?(\\*|__)([^*_]+)\\2/s';
+    if (preg_match_all($pattern, $markdown, $matches, PREG_SET_ORDER)) {
+      foreach ($matches as $match) {
+        $bindings[$match[1]] = $match[3];
+      }
+    }
+    return $bindings;
+  }
+
+  protected static function updateBindingsInMarkdown(
+    Page $page,
+    string $fileContent,
+    array $updatedBindings,
+    array $oldBindings,
+  ): void {
+    if (empty($updatedBindings)) {
+      return;
+    }
+
+    $markdownPath = $page->contentSource();
+    if (!$markdownPath) {
+      return;
+    }
+
+    $config = wire('config');
+    $absolutePath = $config->paths->site . 'content/' . $markdownPath;
+    if (!file_exists($absolutePath)) {
+      return;
+    }
+
+    $fileContent = file_get_contents($absolutePath);
+    if ($fileContent === false) {
+      return;
+    }
+
+    $modified = false;
+    foreach ($updatedBindings as $fieldName => $newValue) {
+      // Match ANY emphasized value in field bindings, not just extracted one
+      // Pattern: <!-- field:NAME -->...*(ANY_VALUE)*
+      $pattern = '/(<!--\\s+field:' . preg_quote($fieldName, '/') . '\\s+-->.*?)(\\*|__)([^*_]+)(\\2)/s';
+      $replacement = '$1$2' . $newValue . '$4';
+      
+      $beforeReplace = $fileContent;
+      $fileContent = preg_replace($pattern, $replacement, $fileContent);
+      
+      if ($fileContent !== $beforeReplace) {
+        $modified = true;
+        self::logDebug($page, 'updateBindingsInMarkdown: replaced', ['field' => $fieldName, 'to' => $newValue]);
+      }
+    }
+
+    if ($modified) {
+      file_put_contents($absolutePath, $fileContent);
+      $markdownField = self::getMarkdownField($page);
+      if ($markdownField) {
+        $page->of(false);
+        $page->set($markdownField, $fileContent);
+        
+        // If in admin context, don't call save - let the normal save handle it
+        if (!(wire('page') && wire('page')->template == 'admin')) {
+          $page->save($markdownField);
+        }
+      }
+      self::logDebug($page, 'updateBindingsInMarkdown: synced', ['updated' => count(array_keys($updatedBindings))]);
+    }
   }
 }

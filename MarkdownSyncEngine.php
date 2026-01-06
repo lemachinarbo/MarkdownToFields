@@ -788,6 +788,19 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         }
       }
 
+      // Sync field binding values to match frontmatter
+      $bindingSyncCount = 0;
+      foreach ($frontmatter as $fieldName => $frontValue) {
+        $pattern = "/(<!--\s+field:" . preg_quote($fieldName, "/") . "\s+-->.*?)(\*|__)([^*_]+)\\2/s";
+        $bodyContent = preg_replace_callback($pattern, function($matches) use ($frontValue, &$bindingSyncCount) {
+          $bindingSyncCount++;
+          return $matches[1] . $matches[2] . $frontValue . $matches[2];
+        }, $bodyContent ?? '');
+      }
+      if ($bindingSyncCount > 0) {
+        self::logInfo($page, "syncToMarkdown bindings total synced", ["count" => $bindingSyncCount]);
+      }
+
       if ($frontmatterUpdates) {
         foreach ($frontmatterUpdates as $field => $value) {
           if ($field === 'title') {
