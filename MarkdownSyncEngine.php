@@ -95,7 +95,25 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         $dirtyFields = array_merge($dirtyFields, $applied);
       }
 
+      // Sync field bindings in the markdown to match frontmatter values
+      // This ensures all instances of a field binding display the current frontmatter value
+      $frontmatter = $content->getFrontmatter() ?: [];
       $document = $content->getRawDocument();
+      if (!empty($frontmatter)) {
+        $bodyContent = $content->getMarkdown();
+        $syncedBodyContent = self::syncBindingsToFrontmatter($bodyContent, $frontmatter, $page);
+        if ($syncedBodyContent !== $bodyContent) {
+          // Body content changed - compose new document with updated body
+          self::logDebug($page, 'syncFromMarkdown: binding sync changed body content', [
+            'bodyLengthBefore' => strlen($bodyContent),
+            'bodyLengthAfter' => strlen($syncedBodyContent),
+          ]);
+          $document = self::composeDocument($frontmatter, $syncedBodyContent);
+          
+          // Write synced content back to the markdown file (source)
+          self::saveLanguageMarkdown($page, $document, $language);
+        }
+      }
       $storedMarkdown = (string) self::getFieldValueForLanguage(
         $page,
         $markdownField,
@@ -788,18 +806,9 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         }
       }
 
-      // Sync field binding values to match frontmatter
-      $bindingSyncCount = 0;
-      foreach ($frontmatter as $fieldName => $frontValue) {
-        $pattern = "/(<!--\s+field:" . preg_quote($fieldName, "/") . "\s+-->.*?)(\*|__)([^*_]+)\\2/s";
-        $bodyContent = preg_replace_callback($pattern, function($matches) use ($frontValue, &$bindingSyncCount) {
-          $bindingSyncCount++;
-          return $matches[1] . $matches[2] . $frontValue . $matches[2];
-        }, $bodyContent ?? '');
-      }
-      if ($bindingSyncCount > 0) {
-        self::logInfo($page, "syncToMarkdown bindings total synced", ["count" => $bindingSyncCount]);
-      }
+      // Sync field binding values in markdown body to match frontmatter values
+      // This ensures all instances of a field binding display the current frontmatter value
+      $bodyContent = self::syncBindingsToFrontmatter($bodyContent, $frontmatter, $page);
 
       if ($frontmatterUpdates) {
         foreach ($frontmatterUpdates as $field => $value) {
@@ -921,5 +930,51 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     string $languageCode,
   ) {
     return $languageMap[$languageCode] ?? null;
+  }
+
+  /**
+   * Syncs field binding values in markdown body to match frontmatter.
+   * 
+   * Updates all occurrences of <!-- field:name -->*value* to match the
+   * corresponding frontmatter value. This is the only binding sync direction—
+   * frontmatter is the source of truth.
+   * 
+   * @param string|null $bodyContent The markdown body content
+   * @param array $frontmatter The frontmatter values
+   * @param Page $page The page being synced (for logging)
+   * @return string|null The updated body content
+   */
+  protected static function syncBindingsToFrontmatter(
+    ?string $bodyContent,
+    array $frontmatter,
+    Page $page,
+  ): ?string {
+    if (!$bodyContent || empty($frontmatter)) {
+      return $bodyContent;
+    }
+
+    $bindingSyncCount = 0;
+    foreach ($frontmatter as $fieldName => $frontValue) {
+      $pattern = "/(<!--\s+field:" . preg_quote($fieldName, "/") . "\s+-->.*?)(\*|__)([^*_]+)\\2/s";
+      $beforeSync = $bodyContent;
+      $bodyContent = preg_replace_callback($pattern, function($matches) use ($frontValue, &$bindingSyncCount) {
+        $bindingSyncCount++;
+        return $matches[1] . $matches[2] . $frontValue . $matches[2];
+      }, $bodyContent);
+      
+      if ($bodyContent !== $beforeSync) {
+        self::logDebug($page, "syncBindingsToFrontmatter field synced", [
+          "field" => $fieldName,
+          "value" => $frontValue,
+          "occurrences" => $bindingSyncCount,
+        ]);
+      }
+    }
+
+    if ($bindingSyncCount > 0) {
+      self::logInfo($page, "syncToMarkdown field bindings updated", ["count" => $bindingSyncCount]);
+    }
+
+    return $bodyContent;
   }
 }
