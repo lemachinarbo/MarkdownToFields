@@ -125,6 +125,10 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $this->wire('modules')->saveConfig($this, [
       'htmlField' => 'md_editor',
       'templates' => [],
+      // Global frontmatter auto-sync defaults (opt-out only)
+      'autoSyncFrontmatter' => true,
+      'excludeFrontmatterFields' => ['name'],
+      'includeFrontmatterFields' => [],
     ]);
   }
 
@@ -185,41 +189,66 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $refFieldset->name = 'configuration_reference';
     $refFieldset->label = 'Configuration Reference';
     $refFieldset->description = 'All settings are managed in /site/config.php';
-    
+
     $refMarkup = $modules->get('InputfieldMarkup');
+    $settings = $this->getNormalizedSettings();
+    $refMarkup->value = $this->renderConfigurationReference($settings);
+    $refFieldset->add($refMarkup);
+    $wrapper->add($refFieldset);
+
+    return $wrapper;
+  }
+
+  /** Normalize module settings from site config to typed values for display/use. */
+  private function getNormalizedSettings(): array {
+    $mdConfig = $this->wire('config')->MarkdownToFields ?? [];
+    return [
+      'htmlField' => $mdConfig['htmlField'] ?? 'md_editor',
+      'markdownField' => $mdConfig['markdownField'] ?? 'md_markdown',
+      'hashField' => $mdConfig['hashField'] ?? 'md_markdown_hash',
+      'sourcePath' => $mdConfig['sourcePath'] ?? 'content/',
+      'autoSyncFrontmatter' => $mdConfig['autoSyncFrontmatter'] ?? true,
+      'excludeFrontmatterFields' => $mdConfig['excludeFrontmatterFields'] ?? ['name'],
+      'includeFrontmatterFields' => $mdConfig['includeFrontmatterFields'] ?? [],
+    ];
+  }
+
+  /** Render-only HTML for the configuration reference and current typed values. */
+  private function renderConfigurationReference(array $settings): string {
     $html = '<p>To customize field names and paths, add to <code>/site/config.php:</code></p>';
-    $html .= '<pre style="background:#f0f0f0; padding:12px; border-radius:4px; overflow-x:auto; font-size:11px;">$config->MarkdownToFields = [' . "\n";
-    $html .= '  \'htmlField\' => \'md_editor\',           // Editor field' . "\n";
-    $html .= '  \'markdownField\' => \'md_markdown\',     // Raw markdown' . "\n";
-    $html .= '  \'hashField\' => \'md_markdown_hash\',    // Sync state' . "\n";
-    $html .= '  \'sourcePath\' => \'content/\',           // Markdown location' . "\n";
-    $html .= '];' . "\n</pre>";
-    
+    $html .= '<pre style="background:#f0f0f0; padding:12px; border-radius:4px; overflow-x:auto; font-size:11px;">';
+    $html .= "\$config->MarkdownToFields = [\n";
+    $html .= "  'htmlField' => 'md_editor',\n";
+    $html .= "  'markdownField' => 'md_markdown',\n";
+    $html .= "  'hashField' => 'md_markdown_hash',\n";
+    $html .= "  'sourcePath' => 'content/',\n";
+    $html .= "  'autoSyncFrontmatter' => true,\n";
+    $html .= "  'excludeFrontmatterFields' => ['name'],\n";
+    $html .= "  'includeFrontmatterFields' => [],\n";
+    $html .= "];\n</pre>";
+
     $html .= '<h4>Current values:</h4>';
     $html .= '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
     $html .= '<tr style="background:#f5f5f5;">';
     $html .= '<th style="text-align:left; padding:8px; border:1px solid #ddd;">Setting</th>';
     $html .= '<th style="text-align:left; padding:8px; border:1px solid #ddd;">Value</th>';
     $html .= '</tr>';
-    
-    $settings = [
-      'htmlField' => $mdConfig['htmlField'] ?? 'md_editor',
-      'markdownField' => $mdConfig['markdownField'] ?? 'md_markdown',
-      'hashField' => $mdConfig['hashField'] ?? 'md_markdown_hash',
-      'sourcePath' => $mdConfig['sourcePath'] ?? 'content/',
-    ];
-    
-    foreach ($settings as $key => $value) {
-      $html .= '<tr><td style="padding:8px; border:1px solid #ddd;"><code>' . htmlspecialchars($key) . '</code></td>';
-      $html .= '<td style="padding:8px; border:1px solid #ddd;"><code>' . htmlspecialchars($value) . '</code></td></tr>';
-    }
-    $html .= '</table>';
-    
-    $refMarkup->value = $html;
-    $refFieldset->add($refMarkup);
-    $wrapper->add($refFieldset);
 
-    return $wrapper;
+    foreach ($settings as $key => $value) {
+      if (is_bool($value)) {
+        $display = $value ? 'true' : 'false';
+      } elseif (is_array($value)) {
+        $display = '[' . implode(', ', array_map('strval', $value)) . ']';
+      } else {
+        $display = (string) $value;
+      }
+      $html .= '<tr>';
+      $html .= '<td style="padding:8px; border:1px solid #ddd;"><code>' . htmlspecialchars($key) . '</code></td>';
+      $html .= '<td style="padding:8px; border:1px solid #ddd;"><code>' . htmlspecialchars($display) . '</code></td>';
+      $html .= '</tr>';
+    }
+
+    return $html . '</table>';
   }
 
   /** Remove module fields and clean up configuration. */
@@ -341,110 +370,142 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     }
     
     $this->createFields();
-
     $enabled = (array) ($this->templates ?? []);
-    $fields = $this->wire('fields');
     $templates = $this->wire('templates');
-    $currentEditorField = $this->htmlField ?? 'md_editor';
 
-    // Detect programmatic overrides: scan enabled template page classes for htmlField
-    $pageClassOverride = null;
-    foreach ($templates as $tmpl) {
-      if ($this->isTemplateExcluded($tmpl)) continue;
-      if (!in_array($tmpl->name, $enabled, true)) continue;
-
-      $pageClass = $tmpl->pageClass;
-      if (!$pageClass) {
-        try {
-          $pages = $this->wire('pages');
-          $firstPage = $pages->findOne("template={$tmpl->id}");
-          if ($firstPage) {
-            $pageClass = get_class($firstPage);
-          }
-        } catch (\Throwable $e) {
-          // skip
-        }
-      }
-
-      if ($pageClass && class_exists($pageClass)) {
-        try {
-          $refl = new \ReflectionClass($pageClass);
-          if ($refl->hasProperty('htmlField')) {
-            $prop = $refl->getProperty('htmlField');
-            if ($prop->hasDefaultValue()) {
-              $val = $prop->getDefaultValue();
-              $this->wire('log')->save('markdown-sync', "Reflection: found htmlField in {$pageClass} with default={$val}");
-              if (is_string($val) && $val !== '') {
-                $pageClassOverride = $val;
-                $this->wire('log')->save('markdown-sync', "Programmatic override detected: htmlField={$val}");
-                break;
-              }
-            }
-          }
-        } catch (\Throwable $e) {
-          $this->wire('log')->save('markdown-sync', "Reflection error: " . $e->getMessage());
-        }
-      } else {
-        $this->wire('log')->save('markdown-sync', "No page class found for template {$tmpl->name}");
-      }
-    }
-
-    // If override found and valid, use it and update module config (preserving templates)
-    if ($pageClassOverride) {
-      $overrideField = $fields->get($pageClassOverride);
-      if ($overrideField && $this->isMarkdownEditorCompatible($overrideField)) {
-        $currentEditorField = $pageClassOverride;
-        if ($this->htmlField !== $pageClassOverride) {
-          $this->htmlField = $pageClassOverride;
-          // Preserve existing config (especially templates) when updating htmlField
-          $currentConfig = $this->wire('modules')->getConfig($this) ?? [];
-          $currentConfig['htmlField'] = $pageClassOverride;
-          $this->wire('modules')->saveConfig($this, $currentConfig);
-          $this->wire('log')->save('markdown-sync', "Programmatic override detected: htmlField={$pageClassOverride}");
-        }
-      }
-    }
+    $resolvedEditorField = $this->resolveEditorField();
+    $this->persistEditorFieldIfChanged($resolvedEditorField);
 
     foreach ($templates as $template) {
       if ($this->isTemplateExcluded($template)) continue;
 
       $shouldHaveFields = in_array($template->name, $enabled, true);
-      $fieldgroup = $template->fieldgroup;
-
-      foreach (array_keys($this->fieldDefs) as $name) {
-        if ($name === 'md_editor') continue;
-        $field = $fields->get($name);
-        if (!$field) continue;
-
-        $has = $fieldgroup->has($field);
-        if ($shouldHaveFields && !$has) {
-          $fieldgroup->add($field);
-        } elseif (!$shouldHaveFields && $has) {
-          $fieldgroup->remove($field);
-        }
-      }
-
-      $mdEditorField = $fields->get('md_editor');
-      $selectedEditorField = $fields->get($currentEditorField);
-      
-      if ($shouldHaveFields) {
-        if ($selectedEditorField && !$fieldgroup->has($selectedEditorField)) {
-          $fieldgroup->add($selectedEditorField);
-        }
-        if ($mdEditorField && $currentEditorField !== 'md_editor' && $fieldgroup->has($mdEditorField)) {
-          $fieldgroup->remove($mdEditorField);
-        }
-      } else {
-        if ($mdEditorField && $fieldgroup->has($mdEditorField)) {
-          $fieldgroup->remove($mdEditorField);
-        }
-        if ($selectedEditorField && $fieldgroup->has($selectedEditorField)) {
-          $fieldgroup->remove($selectedEditorField);
-        }
-      }
-
-      $fieldgroup->save();
+      $this->syncTemplateFieldgroup($template, $shouldHaveFields, $resolvedEditorField);
     }
+  }
+
+  /** Decide which editor field to use (config first, then page-class override). */
+  private function resolveEditorField(): string
+  {
+    $fields = $this->wire('fields');
+    $templates = $this->wire('templates');
+    $enabled = (array) ($this->templates ?? []);
+
+    $current = $this->htmlField ?? 'md_editor';
+
+    foreach ($templates as $tmpl) {
+      if ($this->isTemplateExcluded($tmpl)) continue;
+      if (!in_array($tmpl->name, $enabled, true)) continue;
+
+      $pageClass = $this->resolveTemplatePageClass($tmpl);
+      if (!$pageClass) continue;
+
+      $override = $this->extractHtmlFieldOverride($pageClass);
+      if (!$override) continue;
+
+      $overrideField = $fields->get($override);
+      if ($overrideField && $this->isMarkdownEditorCompatible($overrideField)) {
+        return $override;
+      }
+    }
+
+    return $current;
+  }
+
+  /** Resolve page class for a template (config or first page instance). */
+  private function resolveTemplatePageClass(Template $template): ?string
+  {
+    if ($template->pageClass) {
+      return $template->pageClass;
+    }
+
+    $pages = $this->wire('pages');
+    $firstPage = $pages->findOne("template={$template->id}");
+    if ($firstPage) {
+      return get_class($firstPage);
+    }
+
+    return null;
+  }
+
+  /** Extract default htmlField property from a page class if present. */
+  private function extractHtmlFieldOverride(string $pageClass): ?string
+  {
+    if (!class_exists($pageClass)) {
+      return null;
+    }
+
+    try {
+      $refl = new \ReflectionClass($pageClass);
+      if (!$refl->hasProperty('htmlField')) {
+        return null;
+      }
+
+      $prop = $refl->getProperty('htmlField');
+      if (!$prop->hasDefaultValue()) {
+        return null;
+      }
+
+      $val = $prop->getDefaultValue();
+      return is_string($val) && $val !== '' ? $val : null;
+    } catch (\Throwable $e) {
+      return null;
+    }
+  }
+
+  /** Persist editor field choice if it differs from current module config. */
+  private function persistEditorFieldIfChanged(string $field): void
+  {
+    if ($this->htmlField === $field) {
+      return;
+    }
+
+    $this->htmlField = $field;
+    $currentConfig = $this->wire('modules')->getConfig($this) ?? [];
+    $currentConfig['htmlField'] = $field;
+    $this->wire('modules')->saveConfig($this, $currentConfig);
+    $this->wire('log')->save('markdown-sync', "Editor field set to {$field} via resolveEditorField");
+  }
+
+  /** Sync a single template's fieldgroup for Markdown fields and editor field. */
+  private function syncTemplateFieldgroup(Template $template, bool $enabled, string $editorField): void
+  {
+    $fields = $this->wire('fields');
+    $fieldgroup = $template->fieldgroup;
+
+    foreach (array_keys($this->fieldDefs) as $name) {
+      if ($name === 'md_editor') continue;
+      $field = $fields->get($name);
+      if (!$field) continue;
+
+      $has = $fieldgroup->has($field);
+      if ($enabled && !$has) {
+        $fieldgroup->add($field);
+      } elseif (!$enabled && $has) {
+        $fieldgroup->remove($field);
+      }
+    }
+
+    $mdEditorField = $fields->get('md_editor');
+    $selectedEditorField = $fields->get($editorField);
+
+    if ($enabled) {
+      if ($selectedEditorField && !$fieldgroup->has($selectedEditorField)) {
+        $fieldgroup->add($selectedEditorField);
+      }
+      if ($mdEditorField && $editorField !== 'md_editor' && $fieldgroup->has($mdEditorField)) {
+        $fieldgroup->remove($mdEditorField);
+      }
+    } else {
+      if ($mdEditorField && $fieldgroup->has($mdEditorField)) {
+        $fieldgroup->remove($mdEditorField);
+      }
+      if ($selectedEditorField && $fieldgroup->has($selectedEditorField)) {
+        $fieldgroup->remove($selectedEditorField);
+      }
+    }
+
+    $fieldgroup->save();
   }
 
   private function createFields(): void

@@ -19,8 +19,9 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     if ($markdown === '') {
       return '';
     }
-
-    $html = self::parsedown()->text($markdown);
+    // Keep original markdown format intact; only adjust for render.
+    $renderMarkdown = self::ensureStructuralBreaksForRender($markdown);
+    $html = self::parsedown()->text($renderMarkdown);
 
     if ($page) {
       $config = self::config($page);
@@ -217,7 +218,10 @@ class MarkdownHtmlConverter extends MarkdownFileIO
           return '';
         }
 
-        return "\n" . trim($comment) . "\n";
+        // Ensure comments remain on their own lines in markdown output
+        // to avoid merging with adjacent content. Use single newlines only.
+        $c = trim($comment);
+        return "\n" . $c . "\n";
       },
       $markdown,
     );
@@ -232,17 +236,26 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     $markdown = str_replace(["\r\n", "\r"], "\n", $markdown);
     $markdown = str_replace('&nbsp;', "\n\n", $markdown);
     $markdown = str_replace("\xc2\xa0", "\n\n", $markdown);
-    $markdown = preg_replace('/(<!--.*?-->)/s', "\n$1\n", $markdown);
-    $markdown = preg_replace('/([^\n])\n<!--/s', "$1\n\n<!--", $markdown);
-    $markdown = preg_replace(
-      '/(<!--.*?-->)\n(?!\n|<!--)/s',
-      "$1\n\n",
-      $markdown,
-    );
 
     $markdown = self::tidyMarkdownSpacing($markdown);
 
     return trim($markdown, "\n");
+  }
+
+  /**
+   * Rendering-only normalization: ensure comments are on their own blocks
+   * so adjacent headings/lists parse correctly. Does not persist to storage.
+   */
+  protected static function ensureStructuralBreaksForRender(string $markdown): string
+  {
+    if ($markdown === '') {
+      return '';
+    }
+
+    $s = str_replace(["\r\n", "\r"], "\n", $markdown);
+    // Place comments on their own blocks for parsedown rendering
+    $s = preg_replace('/\s*<!--([\s\S]*?)-->\s*/', "\n\n<!--$1-->\n\n", $s);
+    return $s ?? $markdown;
   }
 
   protected static function tidyMarkdownSpacing(string $markdown): string
@@ -253,8 +266,6 @@ class MarkdownHtmlConverter extends MarkdownFileIO
 
     $markdown = preg_replace('/^[ \t]+$/m', '', $markdown);
     $markdown = preg_replace("/\n{3,}/", "\n\n", $markdown);
-    $markdown = preg_replace("/\n{2,}(<!--.*?-->)/s", "\n\n$1", $markdown);
-    $markdown = preg_replace("/(<!--.*?-->)\n{2,}/s", "$1\n\n", $markdown);
 
     return $markdown;
   }

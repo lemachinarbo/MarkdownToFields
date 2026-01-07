@@ -73,7 +73,37 @@ trait MarkdownContent {
     
     $sourcePath = $mdConfig['sourcePath'] ?? 'content/';
     $path = $sourcePath[0] === '/' ? $sourcePath : $config->paths->site . $sourcePath;
-    
+
+    // Global auto-sync controls (opt-out by design)
+    $autoSync = $mdConfig['autoSyncFrontmatter'] ?? true;
+    $exclude  = $mdConfig['excludeFrontmatterFields'] ?? ['name'];
+    $include  = $mdConfig['includeFrontmatterFields'] ?? [];
+    $hasInclude = !empty($include);
+
+    // Always support core fields explicitly
+    $frontmatterMap = [
+      'title' => 'title',
+      'name'  => 'name',
+    ];
+
+    if ($autoSync && $this->template) {
+      $excludeNames = [
+        (string)($mdConfig['markdownField'] ?? 'md_markdown'),
+        (string)($mdConfig['htmlField'] ?? 'md_editor'),
+        (string)($mdConfig['hashField'] ?? 'md_markdown_hash'),
+        'md_markdown_tab',
+        'md_markdown_tab_END',
+      ];
+      foreach ($this->template->fieldgroup as $field) {
+        $name = (string) $field->name;
+        if ($name === '') continue;
+        if (in_array($name, $excludeNames, true)) continue;
+        if (in_array($name, $exclude, true)) continue;
+        if ($hasInclude && !in_array($name, $include, true)) continue;
+        $frontmatterMap[$name] = $name;
+      }
+    }
+
     return [
       'source' => [
         'path' => $path,
@@ -82,10 +112,7 @@ trait MarkdownContent {
       'markdownField' => $mdConfig['markdownField'] ?? 'md_markdown',
       'htmlField' => $mdConfig['htmlField'] ?? 'md_editor',
       'hashField' => $mdConfig['hashField'] ?? 'md_markdown_hash',
-      'frontmatter' => [
-        'title' => 'title',
-        'name' => 'name',
-      ],
+      'frontmatter' => $frontmatterMap,
     ];
   }
 

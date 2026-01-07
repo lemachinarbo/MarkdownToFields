@@ -120,22 +120,12 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         $language,
       );
 
-      $normalizedDocument = self::normalizeDocumentForComparison(
-        $page,
-        $document,
-      );
-      $normalizedStored = self::normalizeDocumentForComparison(
-        $page,
-        $storedMarkdown,
-      );
-
-      if ($normalizedStored !== $normalizedDocument) {
-        // Persist the canonical normalized representation to avoid
-        // toggling content differences due to whitespace or formatting.
+      // Preserve authoring style: only write when actual content changes.
+      if ((string) $storedMarkdown !== (string) $document) {
         self::setFieldValueForLanguage(
           $page,
           $markdownField,
-          $normalizedDocument,
+          $document,
           $language,
         );
         $dirtyFields[] = $markdownField;
@@ -822,6 +812,9 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         }
       }
 
+      // Remove module-managed keys from frontmatter so we don't leak md_* entries
+      $frontmatter = self::filterOutModuleFrontmatterKeys($page, $frontmatter);
+
       $hasDocumentContent = self::documentHasContent(
         $frontmatter,
         $bodyContent,
@@ -976,5 +969,28 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     }
 
     return $bodyContent;
+  }
+
+  /** Remove module-managed keys (markdown/html/hash + tab sentinels) from frontmatter. */
+  protected static function filterOutModuleFrontmatterKeys(Page $page, array $frontmatter): array
+  {
+    $config = self::config($page) ?? [];
+    $exclude = [];
+    if (!empty($config['markdownField'])) $exclude[] = (string) $config['markdownField'];
+    if (!empty($config['htmlField'])) $exclude[] = (string) $config['htmlField'];
+    if (!empty($config['hashField'])) $exclude[] = (string) $config['hashField'];
+    // Internal fieldset wrappers used by this module
+    $exclude[] = 'md_markdown_tab';
+    $exclude[] = 'md_markdown_tab_END';
+
+    if (!$exclude) return $frontmatter;
+
+    foreach ($exclude as $key) {
+      if (array_key_exists($key, $frontmatter)) {
+        unset($frontmatter[$key]);
+      }
+    }
+
+    return $frontmatter;
   }
 }

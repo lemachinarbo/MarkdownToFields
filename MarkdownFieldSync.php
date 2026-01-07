@@ -541,6 +541,20 @@ class MarkdownFieldSync extends MarkdownHashTracker
         }
       }
 
+      // Skip empty frontmatter assignments to preserve existing field values.
+      // For `name`, require an explicit non-empty value to rename.
+      if (!is_array($pageValue) && trim((string) $pageValue) === '') {
+        self::logDebug(
+          $page,
+          sprintf(
+            'skip field %s for %s: empty frontmatter value',
+            $field,
+            self::languageLogLabel($page, $language),
+          ),
+        );
+        continue;
+      }
+
       $changedViaForm =
         $respectChanges && self::fieldChangedViaForm($page, $field);
 
