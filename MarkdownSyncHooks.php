@@ -81,6 +81,12 @@ class MarkdownSyncHooks
       return;
     }
 
+    // Double-check: template must be explicitly enabled in module config
+    $templates = wire('modules')->getConfig('MarkdownToFields')['templates'] ?? [];
+    if (!is_array($templates) || !in_array($page->template->name, $templates, true)) {
+      return;
+    }
+
     // Ensure the page's selected editor field exists and is attached to the template
     try {
       $htmlFieldName = MarkdownConfig::getHtmlField($page);
@@ -160,6 +166,11 @@ class MarkdownSyncHooks
         MarkdownFieldSync::applyLanguageValues($page, $field, $values);
       }
 
+      return;
+    }
+
+    // Skip initial markdown pull when no file exists yet (new pages)
+    if (!MarkdownFileIO::hasLanguageMarkdown($page)) {
       return;
     }
 
@@ -245,10 +256,19 @@ class MarkdownSyncHooks
       return;
     }
 
+    // Double-check: template must be explicitly enabled in module config
+    $templates = wire('modules')->getConfig('MarkdownToFields')['templates'] ?? [];
+    if (!is_array($templates) || !in_array($page->template->name, $templates, true)) {
+      return;
+    }
+
     $documentField = MarkdownConfig::getMarkdownField($page);
     if (!$documentField) {
       return;
     }
+
+    // Auto-create markdown file on first save if it doesn't exist
+    self::ensureMarkdownFileExists($page, $event);
 
     $input = $event->wire('input');
     $hashFieldName = MarkdownEditor::hashField($page);
@@ -353,7 +373,8 @@ class MarkdownSyncHooks
     MarkdownEditor::rememberHash($page);
 
     $hashField = MarkdownConfig::getHashField($page);
-    if ($hashField && $page->hasField($hashField)) {
+    // Skip hash persistence until the page has an ID (new pages can't save individual fields yet)
+    if ($page->id && $hashField && $page->hasField($hashField)) {
       $page->of(false);
       $page->set($hashField, MarkdownHashTracker::buildHashPayload($page));
       $page->save($hashField);
@@ -390,6 +411,74 @@ class MarkdownSyncHooks
       wire('log')->save(
         'markdown-sync',
         'syncAllManagedPages error: ' . $e->getMessage(),
+      );
+    }
+  }
+
+  /**
+   * Auto-create markdown file on first page save if it doesn't exist.
+   * Creates minimal frontmatter with title and name fields.
+   * Only applies to selected templates.
+   */
+  private static function ensureMarkdownFileExists(Page $page, HookEvent $event): void
+  {
+    try {
+      // Check if file already exists in all languages
+      $languages = $page->wire('languages');
+      $isMultilingual = $languages && count($languages) > 1;
+
+      $fileExists = false;
+      if ($isMultilingual) {
+        foreach ($languages as $lang) {
+          $path = MarkdownFileIO::getMarkdownFilePath($page, $lang->name);
+          if (is_file($path)) {
+            $fileExists = true;
+            break;
+          }
+        }
+      } else {
+        $path = MarkdownFileIO::getMarkdownFilePath($page);
+        if (is_file($path)) {
+          $fileExists = true;
+        }
+      }
+
+      // File exists, nothing to do
+      if ($fileExists) {
+        return;
+      }
+
+      // Create minimal frontmatter with title and name
+      $frontmatter = [
+        'title' => (string) $page->get('title'),
+        'name' => (string) $page->get('name'),
+      ];
+
+      // Build minimal document (frontmatter only)
+      $frontRaw = "---\n";
+      foreach ($frontmatter as $key => $value) {
+        $frontRaw .= $key . ': ' . $value . "\n";
+      }
+      $frontRaw .= "---\n\n";
+      $document = $frontRaw;
+
+      // Write to file
+      $defaultPath = MarkdownFileIO::getMarkdownFilePath($page);
+      MarkdownFileIO::saveLanguageMarkdown($page, $document);
+
+      // Notify user
+      $event->wire('session')->message(
+        sprintf('Created markdown file: %s', $defaultPath)
+      );
+      wire('log')->save(
+        'markdown-sync',
+        sprintf('Auto-created markdown file for page "%s" (%s)', $page->title, $defaultPath),
+      );
+    } catch (\Throwable $e) {
+      // Non-fatal: log the error but don't block page save
+      wire('log')->save(
+        'markdown-sync',
+        'ensureMarkdownFileExists error: ' . $e->getMessage(),
       );
     }
   }

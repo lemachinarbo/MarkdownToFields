@@ -353,7 +353,8 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
     // Skip hash mismatch check if we're currently syncing FROM markdown
     // (the sync operation itself updates both content and hash atomically)
-    $skipHashCheck = isset(self::$syncingFromMarkdown[$page->id]);
+    // Also skip on new pages (no ID yet) where no prior hash can exist.
+    $skipHashCheck = !$page->id || isset(self::$syncingFromMarkdown[$page->id]);
 
     if ($expectedSubset && !$skipHashCheck) {
       $mismatch = self::detectHashMismatchLanguage(
