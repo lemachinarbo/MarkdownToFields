@@ -135,37 +135,23 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   /** Build module configuration form. */
   public function getModuleConfigInputfields(array $data): InputfieldWrapper
   {
-    $defaults = [
-      'templates' => (array) ($this->templates ?? []),
-    ];
+    $effectiveTemplates = $this->getEffectiveEnabledTemplates();
+
+    $defaults = ['templates' => $effectiveTemplates];
     $data = array_merge($defaults, $data);
 
     $modules = $this->wire('modules');
     $templates = $this->wire('templates');
     $wrapper = new InputfieldWrapper();
-    $config = $this->wire('config');
-    $mdConfig = $config->MarkdownToFields ?? [];
+    $mdConfig = $this->wire('config')->MarkdownToFields ?? [];
 
-    // Template selection only
-    $options = [];
-    foreach ($templates as $template) {
-      if ($this->isTemplateExcluded($template)) {
-        continue;
-      }
-      $label = $template->label
-        ? "{$template->label} ({$template->name})"
-        : $template->name;
-      $options[$template->name] = $label;
+    $options = $this->buildTemplateOptions($templates);
+
+    if ($this->isTemplateConfigLocked($mdConfig)) {
+      $this->renderReadOnlyTemplates($wrapper, $modules, $options, $effectiveTemplates);
+    } else {
+      $this->renderTemplateCheckboxes($wrapper, $modules, $options, $data['templates']);
     }
-    ksort($options);
-
-    $checkboxes = $modules->get('InputfieldCheckboxes');
-    $checkboxes->attr('name', 'templates');
-    $checkboxes->label = 'Enabled templates';
-    $checkboxes->description = 'Enable Markdown sync for these templates. System and admin templates are ignored.';
-    $checkboxes->addOptions($options);
-    $checkboxes->attr('value', $data['templates']);
-    $wrapper->add($checkboxes);
 
     // Configuration and editor field setup
     $configFieldset = $modules->get('InputfieldFieldset');
@@ -199,10 +185,75 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     return $wrapper;
   }
 
+  /** Determine enabled templates from site config or module state. */
+  private function getEffectiveEnabledTemplates(): array
+  {
+    $mdConfig = $this->wire('config')->MarkdownToFields ?? [];
+    if (isset($mdConfig['enabledTemplates'])) {
+      return (array) $mdConfig['enabledTemplates'];
+    }
+    return (array) ($this->templates ?? []);
+  }
+
+  /** True when site config defines enabledTemplates (UI read-only). */
+  private function isTemplateConfigLocked(array $mdConfig): bool
+  {
+    return array_key_exists('enabledTemplates', $mdConfig);
+  }
+
+  /** Render read-only template list controlled by config.php. */
+  private function renderReadOnlyTemplates(InputfieldWrapper $wrapper, Modules $modules, array $options, array $templates): void
+  {
+    $markup = $modules->get('InputfieldMarkup');
+    $markup->label = 'Enabled templates';
+    $markup->description = 'Templates are controlled by $config->MarkdownToFields["enabledTemplates"].';
+    if (empty($templates)) {
+      $markup->value = '<em>None</em>';
+    } else {
+      $items = [];
+      foreach ($templates as $tpl) {
+        $label = $options[$tpl] ?? $tpl;
+        $items[] = '<li><code>' . htmlspecialchars($label) . '</code></li>';
+      }
+      $markup->value = '<ul>' . implode('', $items) . '</ul>';
+    }
+    $wrapper->add($markup);
+  }
+
+  /** Render editable template checkboxes. */
+  private function renderTemplateCheckboxes(InputfieldWrapper $wrapper, Modules $modules, array $options, array $value): void
+  {
+    $checkboxes = $modules->get('InputfieldCheckboxes');
+    $checkboxes->attr('name', 'templates');
+    $checkboxes->label = 'Enabled templates';
+    $checkboxes->description = 'Enable Markdown sync for these templates. System and admin templates are ignored.';
+    $checkboxes->addOptions($options);
+    $checkboxes->value = $value;
+    $wrapper->add($checkboxes);
+  }
+
+  /** Build selectable template labels (excludes system/admin). */
+  private function buildTemplateOptions(Templates $templates): array
+  {
+    $options = [];
+    foreach ($templates as $template) {
+      if ($this->isTemplateExcluded($template)) {
+        continue;
+      }
+      $label = $template->label
+        ? "{$template->label} ({$template->name})"
+        : $template->name;
+      $options[$template->name] = $label;
+    }
+    ksort($options);
+    return $options;
+  }
+
   /** Normalize module settings from site config to typed values for display/use. */
   private function getNormalizedSettings(): array {
     $mdConfig = $this->wire('config')->MarkdownToFields ?? [];
     return [
+      'enabledTemplates' => $mdConfig['enabledTemplates'] ?? [],
       'htmlField' => $mdConfig['htmlField'] ?? 'md_editor',
       'markdownField' => $mdConfig['markdownField'] ?? 'md_markdown',
       'hashField' => $mdConfig['hashField'] ?? 'md_markdown_hash',
@@ -215,9 +266,10 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
 
   /** Render-only HTML for the configuration reference and current typed values. */
   private function renderConfigurationReference(array $settings): string {
-    $html = '<p>To customize field names and paths, add to <code>/site/config.php:</code></p>';
+    $html = '<p>All settings are managed in <code>/site/config.php</code>. Add or adjust:</p>';
     $html .= '<pre style="background:#f0f0f0; padding:12px; border-radius:4px; overflow-x:auto; font-size:11px;">';
     $html .= "\$config->MarkdownToFields = [\n";
+    $html .= "  'enabledTemplates' => ['home'],\n";
     $html .= "  'htmlField' => 'md_editor',\n";
     $html .= "  'markdownField' => 'md_markdown',\n";
     $html .= "  'hashField' => 'md_markdown_hash',\n";
