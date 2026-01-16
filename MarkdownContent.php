@@ -104,7 +104,16 @@ trait MarkdownContent {
       }
     }
 
-    return [
+    // Handle imageBaseUrl from config with {pageId} placeholder support
+    $assets = [];
+    if (isset($mdConfig['imageBaseUrl'])) {
+      $imageBaseUrl = $mdConfig['imageBaseUrl'];
+      // Replace {pageId} placeholder with actual page ID
+      $imageBaseUrl = str_replace('{pageId}', (string)$this->id, $imageBaseUrl);
+      $assets['imageBaseUrl'] = $imageBaseUrl;
+    }
+
+    $map = [
       'source' => [
         'path' => $path,
         'fallback' => $this->contentSource(),
@@ -114,6 +123,13 @@ trait MarkdownContent {
       'hashField' => $mdConfig['hashField'] ?? 'md_markdown_hash',
       'frontmatter' => $frontmatterMap,
     ];
+
+    // Only add assets if imageBaseUrl was configured
+    if (!empty($assets)) {
+      $map['assets'] = $assets;
+    }
+
+    return $map;
   }
 
   /** Loads markdown content for the given source and language. */
