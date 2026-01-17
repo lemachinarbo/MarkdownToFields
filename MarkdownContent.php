@@ -109,8 +109,12 @@ trait MarkdownContent {
     if (isset($mdConfig['imageBaseUrl'])) {
       $imageBaseUrl = $mdConfig['imageBaseUrl'];
       // Replace {pageId} placeholder with actual page ID
-      $imageBaseUrl = str_replace('{pageId}', (string)$this->id, $imageBaseUrl);
+      $imageBaseUrl = str_replace('{pageId}', (string) $this->id, $imageBaseUrl);
       $assets['imageBaseUrl'] = $imageBaseUrl;
+    }
+
+    if (!empty($mdConfig['imageSourcePaths'])) {
+      $assets['imageSourcePaths'] = (array) $mdConfig['imageSourcePaths'];
     }
 
     $map = [

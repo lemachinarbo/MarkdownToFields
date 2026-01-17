@@ -217,6 +217,10 @@ class MarkdownFileIO extends MarkdownConfig
       sprintf('loaded markdown [%s]: %s', $languageCode, $path),
       ['language' => $languageCode],
     );
+    
+    // Post-process ContentData to handle image URLs
+    self::processContentImages($page, $content);
+    
     return $content;
   }
 
@@ -327,6 +331,63 @@ class MarkdownFileIO extends MarkdownConfig
       ]);
 
       return false;
+    }
+  }
+  
+  /**
+   * Process images in ContentData HTML properties.
+   * Recursively walks through sections, subsections, and fields to rewrite image URLs.
+   */
+  protected static function processContentImages(Page $page, ContentData $content): void
+  {
+    // Process top-level HTML
+    if (isset($content->html) && is_string($content->html)) {
+      $content->html = MarkdownHtmlConverter::processImagesToPageAssets($page, $content->html);
+    }
+    
+    // Process sections
+    if (isset($content->sections) && is_array($content->sections)) {
+      foreach ($content->sections as $section) {
+        self::processSectionImages($page, $section);
+      }
+    }
+  }
+  
+  /**
+   * Process images in a Section object.
+   */
+  protected static function processSectionImages(Page $page, $section): void
+  {
+    if (!is_object($section)) {
+      return;
+    }
+    
+    // Process section HTML
+    if (isset($section->html) && is_string($section->html)) {
+      $section->html = MarkdownHtmlConverter::processImagesToPageAssets($page, $section->html);
+    }
+    
+    // Process section heading HTML if it has one
+    if (isset($section->heading) && is_object($section->heading)) {
+      if (isset($section->heading->html) && is_string($section->heading->html)) {
+        $section->heading->html = MarkdownHtmlConverter::processImagesToPageAssets($page, $section->heading->html);
+      }
+    }
+    
+    // Process fields
+    if (isset($section->fields) && is_array($section->fields)) {
+      foreach ($section->fields as $field) {
+        if (is_object($field) && isset($field->html) && is_string($field->html)) {
+          $field->html = MarkdownHtmlConverter::processImagesToPageAssets($page, $field->html);
+        }
+      }
+    }
+    
+    // Process subsections
+    if (isset($section->subsections) && is_array($section->subsections)) {
+      foreach ($section->subsections as $subsection) {
+        self::processSectionImages($page, $subsection);
+      }
     }
   }
 }

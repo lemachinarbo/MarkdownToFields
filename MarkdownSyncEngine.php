@@ -99,9 +99,14 @@ class MarkdownSyncEngine extends MarkdownSessionManager
       // This ensures all instances of a field binding display the current frontmatter value
       $frontmatter = $content->getFrontmatter() ?: [];
       $document = $content->getRawDocument();
+      $bodyContent = $content->getMarkdown();
+
       if (!empty($frontmatter)) {
-        $bodyContent = $content->getMarkdown();
-        $syncedBodyContent = self::syncBindingsToFrontmatter($bodyContent, $frontmatter, $page);
+        $syncedBodyContent = self::syncBindingsToFrontmatter(
+          $bodyContent,
+          $frontmatter,
+          $page,
+        );
         if ($syncedBodyContent !== $bodyContent) {
           // Body content changed - compose new document with updated body
           self::logDebug($page, 'syncFromMarkdown: binding sync changed body content', [
@@ -109,6 +114,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
             'bodyLengthAfter' => strlen($syncedBodyContent),
           ]);
           $document = self::composeDocument($frontmatter, $syncedBodyContent);
+          $bodyContent = $syncedBodyContent;
           
           // Write synced content back to the markdown file (source)
           self::saveLanguageMarkdown($page, $document, $language);
@@ -132,7 +138,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
       }
 
       if ($htmlField && $page->hasField($htmlField)) {
-        $htmlDocument = self::markdownToHtml($content->getMarkdown(), $page);
+        $htmlDocument = self::markdownToHtml($bodyContent, $page);
         $preparedHtml = self::commentsToEditorPlaceholders($htmlDocument);
         $storedHtml = (string) self::getFieldValueForLanguage(
           $page,

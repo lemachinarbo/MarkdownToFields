@@ -51,6 +51,9 @@ class MarkdownConfig extends MarkdownLanguageResolver
         'imageBaseUrl' => self::normalizeUrlBase(
           $assets['imageBaseUrl'] ?? null,
         ),
+        'imageSourcePaths' => self::normalizeSourcePaths(
+          $assets['imageSourcePaths'] ?? null,
+        ),
       ],
     ];
   }
@@ -89,6 +92,36 @@ class MarkdownConfig extends MarkdownLanguageResolver
     }
 
     return rtrim($url, '/') . '/';
+  }
+
+  protected static function normalizeSourcePaths($paths): array
+  {
+    if (!is_array($paths)) {
+      if (!is_string($paths)) {
+        return [];
+      }
+
+      $paths = [$paths];
+    }
+
+    $config = wire('config');
+    $normalized = [];
+
+    foreach ($paths as $path) {
+      $p = trim((string) $path);
+      if ($p === '') {
+        continue;
+      }
+
+      // Convert relative paths to absolute using site root when possible
+      if ($p[0] !== '/' && $config && isset($config->paths->site)) {
+        $p = $config->paths->site . ltrim($p, '/');
+      }
+
+      $normalized[] = self::withTrailingSlash($p);
+    }
+
+    return array_values(array_unique($normalized));
   }
 
   protected static function normalizeFrontmatter($frontmatter): array

@@ -24,6 +24,11 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     $html = self::parsedown()->text($renderMarkdown);
 
     if ($page) {
+      self::logInfo($page, 'markdownToHtml: about to process images', [
+        'htmlLength' => strlen($html),
+        'pageId' => $page->id,
+      ]);
+      $html = self::processImagesToPageAssets($page, $html);
       $config = self::config($page);
       $baseUrl = is_array($config)
         ? $config['assets']['imageBaseUrl'] ?? null
@@ -562,5 +567,171 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     }
 
     return '[' . $label . ']';
+  }
+
+  /** Copy referenced images into the page assets folder and rewrite src URLs. */
+  public static function processImagesToPageAssets(Page $page, string $html): string
+  {
+    self::logInfo($page, 'processImagesToPageAssets: called', [
+      'htmlLength' => strlen($html),
+      'pageId' => $page->id,
+    ]);
+
+    if ($html === '' || !$page->id) {
+      self::logInfo($page, 'processImagesToPageAssets: early exit', [
+        'emptyHtml' => $html === '',
+        'noPageId' => !$page->id,
+      ]);
+      return $html;
+    }
+
+    $config = self::config($page) ?? [];
+    $assets = $config['assets'] ?? [];
+
+    $sourcePaths = self::normalizeSourcePaths($assets['imageSourcePaths'] ?? []);
+    if (!$sourcePaths) {
+      $sitePath = $page->wire('config')->paths->site ?? null;
+      if ($sitePath) {
+        $sourcePaths[] = self::withTrailingSlash($sitePath . 'images');
+      }
+    }
+
+    self::logInfo($page, 'processImagesToPageAssets: config loaded', [
+      'sourcePaths' => implode(', ', $sourcePaths),
+      'imageBaseUrl' => $assets['imageBaseUrl'] ?? 'none',
+    ]);
+
+    $filesManager = $page->filesManager();
+    if (!$filesManager) {
+      self::logInfo($page, 'processImagesToPageAssets: no filesManager');
+      return $html;
+    }
+
+    $destBasePath = $filesManager->path();
+    $destBaseUrl = $assets['imageBaseUrl'] ?? $filesManager->url();
+
+    if (!$destBasePath || !$destBaseUrl || !$sourcePaths) {
+      self::logInfo($page, 'processImagesToPageAssets: missing paths', [
+        'destBasePath' => $destBasePath ?: 'empty',
+        'destBaseUrl' => $destBaseUrl ?: 'empty',
+        'hasSourcePaths' => !empty($sourcePaths),
+      ]);
+      return $html;
+    }
+
+    $pattern = '/<img\b[^>]*\bsrc\s*=\s*(["' . "'" . '])\s*([^"' . "'" . '>]+)\s*\1[^>]*>/i';
+    
+    $matchCount = 0;
+    $result = preg_replace_callback(
+      $pattern,
+      function (array $match) use ($page, $sourcePaths, $destBasePath, $destBaseUrl, &$matchCount) {
+        $matchCount++;
+        $quote = $match[1];
+        $src = trim((string) $match[2]);
+
+        self::logInfo($page, 'processImagesToPageAssets: img match', [
+          'matchNum' => $matchCount,
+          'src' => $src,
+          'quote' => $quote,
+        ]);
+
+        $resolved = self::resolveImageForPage(
+          $page,
+          $src,
+          $sourcePaths,
+          $destBasePath,
+          $destBaseUrl,
+        );
+
+        self::logInfo($page, 'processImagesToPageAssets: resolved', [
+          'src' => $src,
+          'resolved' => $resolved ?? 'null',
+        ]);
+
+        if ($resolved === null) {
+          return $match[0];
+        }
+
+        return str_replace($quote . $src . $quote, $quote . $resolved . $quote, $match[0]);
+      },
+      $html,
+    );
+
+    self::logInfo($page, 'processImagesToPageAssets: complete', [
+      'matchCount' => $matchCount,
+      'resultLength' => strlen($result ?? $html),
+    ]);
+
+    return $result ?? $html;
+  }
+
+  /** Copy an image into page assets and return its served URL. */
+  protected static function resolveImageForPage(
+    Page $page,
+    string $src,
+    array $sourcePaths,
+    string $destBasePath,
+    string $destBaseUrl,
+  ): ?string {
+    $trimmed = trim($src);
+
+    if (
+      $trimmed === '' ||
+      preg_match('#^(?:[a-z][a-z0-9+.-]*:|//|data:|/)#i', $trimmed) ||
+      strpos($trimmed, '..') !== false
+    ) {
+      return null;
+    }
+
+    $relative = ltrim(preg_replace('#^\.?/#', '', $trimmed) ?? $trimmed, '/');
+    if ($relative === '') {
+      return null;
+    }
+
+    $candidates = [$relative];
+
+    $clean = preg_replace(
+      '/(\.[0-9]+x[0-9]+(?:-[a-z0-9]+)?)+(?=\.[^.]+$)/i',
+      '',
+      $relative,
+    );
+    if ($clean && $clean !== $relative) {
+      $candidates[] = $clean;
+    }
+
+    $destBasePath = self::withTrailingSlash($destBasePath);
+    $destBaseUrl = self::normalizeUrlBase($destBaseUrl) ?? $destBaseUrl;
+
+    foreach ($candidates as $candidate) {
+      foreach ($sourcePaths as $sourceBase) {
+        $sourceBase = self::withTrailingSlash($sourceBase);
+        $sourceFile = $sourceBase . $candidate;
+
+        if (!is_file($sourceFile)) {
+          continue;
+        }
+
+        $destPath = $destBasePath . $candidate;
+        $destDir = dirname($destPath);
+
+        if (!is_dir($destDir)) {
+          wire('files')?->mkdir($destDir, true);
+        }
+
+        if (!is_file($destPath) || filemtime($sourceFile) > @filemtime($destPath)) {
+          @copy($sourceFile, $destPath);
+        }
+
+        try {
+          $wrapper = new Pageimages($page);
+          $img = new Pageimage($wrapper, $destPath);
+          return $img->url();
+        } catch (\Throwable) {
+          return $destBaseUrl . ltrim($candidate, '/');
+        }
+      }
+    }
+
+    return null;
   }
 }

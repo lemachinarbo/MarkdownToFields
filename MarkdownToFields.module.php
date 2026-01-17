@@ -258,9 +258,12 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       'markdownField' => $mdConfig['markdownField'] ?? 'md_markdown',
       'hashField' => $mdConfig['hashField'] ?? 'md_markdown_hash',
       'sourcePath' => $mdConfig['sourcePath'] ?? 'content/',
+      'imageBaseUrl' => $mdConfig['imageBaseUrl'] ?? null,
+      'imageSourcePaths' => $mdConfig['imageSourcePaths'] ?? [],
       'autoSyncFrontmatter' => $mdConfig['autoSyncFrontmatter'] ?? true,
       'excludeFrontmatterFields' => $mdConfig['excludeFrontmatterFields'] ?? ['name'],
       'includeFrontmatterFields' => $mdConfig['includeFrontmatterFields'] ?? [],
+      'debug' => $mdConfig['debug'] ?? false,
     ];
   }
 
@@ -274,6 +277,8 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $html .= "  'markdownField' => 'md_markdown',\n";
     $html .= "  'hashField' => 'md_markdown_hash',\n";
     $html .= "  'sourcePath' => 'content/',\n";
+    $html .= "  'imageBaseUrl' => \$config->urls->files . '{pageId}/',\n";
+    $html .= "  'imageSourcePaths' => [\n    \$config->paths->site . 'images/',\n  ],\n";
     $html .= "  'autoSyncFrontmatter' => true,\n";
     $html .= "  'excludeFrontmatterFields' => ['name'],\n";
     $html .= "  'includeFrontmatterFields' => [],\n";
@@ -284,6 +289,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $html .= '<tr style="background:#f5f5f5;">';
     $html .= '<th style="text-align:left; padding:8px; border:1px solid #ddd;">Setting</th>';
     $html .= '<th style="text-align:left; padding:8px; border:1px solid #ddd;">Value</th>';
+    $html .= '<th style="text-align:center; padding:8px; border:1px solid #ddd; width:100px;">Status</th>';
     $html .= '</tr>';
 
     foreach ($settings as $key => $value) {
@@ -294,9 +300,45 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       } else {
         $display = (string) $value;
       }
+      
+      // Determine if setting is custom or default
+      $isDefault = false;
+      
+      // Check all defaults against module's getNormalizedSettings defaults
+      if ($key === 'htmlField' && $display === 'md_editor') {
+        $isDefault = true;
+      } elseif ($key === 'markdownField' && $display === 'md_markdown') {
+        $isDefault = true;
+      } elseif ($key === 'hashField' && $display === 'md_markdown_hash') {
+        $isDefault = true;
+      } elseif ($key === 'sourcePath' && $display === 'content/') {
+        $isDefault = true;
+      } elseif ($key === 'autoSyncFrontmatter' && $display === 'true') {
+        $isDefault = true;
+      } elseif ($key === 'excludeFrontmatterFields' && $display === '[name]') {
+        $isDefault = true;
+      } elseif ($key === 'enabledTemplates' && $display === '[]') {
+        $isDefault = true;
+      } elseif ($key === 'includeFrontmatterFields' && $display === '[]') {
+        $isDefault = true;
+      } elseif ($key === 'imageBaseUrl' && $display === '') {
+        $display = $this->wire('config')->urls->files . '{pageId}/';
+        $isDefault = true;
+      } elseif ($key === 'imageSourcePaths' && $display === '[]') {
+        $display = $this->wire('config')->paths->site . 'images/';
+        $isDefault = true;
+      } elseif ($key === 'debug' && $display === 'false') {
+        $isDefault = true;
+      }
+      
+      $status = $isDefault ? 'Default' : 'Custom';
+      $statusBg = $isDefault ? '#e8f5e9' : '#fff3e0';
+      $statusColor = $isDefault ? '#2e7d32' : '#e65100';
+      
       $html .= '<tr>';
       $html .= '<td style="padding:8px; border:1px solid #ddd;"><code>' . htmlspecialchars($key) . '</code></td>';
       $html .= '<td style="padding:8px; border:1px solid #ddd;"><code>' . htmlspecialchars($display) . '</code></td>';
+      $html .= '<td style="padding:8px; border:1px solid #ddd; text-align:center; background:' . $statusBg . '; color:' . $statusColor . '; font-weight:500;">' . $status . '</td>';
       $html .= '</tr>';
     }
 
