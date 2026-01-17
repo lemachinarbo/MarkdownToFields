@@ -106,15 +106,13 @@ trait MarkdownContent {
 
     // Handle imageBaseUrl from config with {pageId} placeholder support
     $assets = [];
-    if (isset($mdConfig['imageBaseUrl'])) {
-      $imageBaseUrl = $mdConfig['imageBaseUrl'];
-      // Replace {pageId} placeholder with actual page ID
-      $imageBaseUrl = str_replace('{pageId}', (string) $this->id, $imageBaseUrl);
-      $assets['imageBaseUrl'] = $imageBaseUrl;
+    $assetsConfig = $mdConfig['assets'] ?? [];
+    
+    if (isset($assetsConfig['imageBaseUrl'])) {
+      $assets['imageBaseUrl'] = str_replace('{pageId}', (string) $this->id, $assetsConfig['imageBaseUrl']);
     }
-
-    if (!empty($mdConfig['imageSourcePaths'])) {
-      $assets['imageSourcePaths'] = (array) $mdConfig['imageSourcePaths'];
+    if (!empty($assetsConfig['imageSourcePaths'])) {
+      $assets['imageSourcePaths'] = (array) $assetsConfig['imageSourcePaths'];
     }
 
     $map = [
@@ -158,8 +156,13 @@ trait MarkdownContent {
   }
 
   /** Loads parsed markdown content using the default source. */
+  private $cachedContent = null;
+
   public function content(): ContentData {
-    return $this->loadContent($this->contentSource());
+    if ($this->cachedContent === null) {
+      $this->cachedContent = $this->loadContent($this->contentSource());
+    }
+    return $this->cachedContent;
   }
 
   /** Provides view-ready content data for templates. */

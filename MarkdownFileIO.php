@@ -210,6 +210,13 @@ class MarkdownFileIO extends MarkdownConfig
       return null;
     }
 
+    // Read and process markdown before parsing
+    $markdown = @file_get_contents($path);
+    if ($markdown === false) {
+      return null;
+    }
+    $markdown = self::processImagesInMarkdown($page, $markdown);
+
     $parser = new LetMeDown();
     $content = $parser->load($path);
     self::logInfo(
@@ -218,10 +225,60 @@ class MarkdownFileIO extends MarkdownConfig
       ['language' => $languageCode],
     );
     
-    // Post-process ContentData to handle image URLs
-    self::processContentImages($page, $content);
+    // Post-process ContentData to handle image URLs in HTML properties
+    self::processContentDataImages($page, $content);
     
     return $content;
+  }
+
+  /**
+   * Process image references in markdown source before parsing.
+   * Converts ![](01.jpg) to ![](/site/assets/files/1/01.jpg)
+   */
+  protected static function processImagesInMarkdown(Page $page, string $markdown): string
+  {
+    $config = self::requireConfig($page);
+    $imageSources = $config['assets']['imageSourcePaths'];
+    $imageBaseUrl = $config['assets']['imageBaseUrl'];
+    
+    if (empty($imageSources) || !$imageBaseUrl) {
+      return $markdown;
+    }
+    
+    $imageBaseUrl = str_replace('{pageId}', $page->id, $imageBaseUrl);
+    $pagePath = $page->filesManager()->path();
+    
+    // Regex to find markdown image syntax: ![alt](src)
+    $pattern = '/!\[([^\]]*)\]\(([^)]+)\)/';
+    
+    $markdown = preg_replace_callback($pattern, function ($matches) use ($page, $imageSources, $imageBaseUrl, $pagePath) {
+      $alt = $matches[1];
+      $src = $matches[2];
+      
+      // Skip absolute URLs, data URIs, protocol-relative URLs, and already-processed paths
+      if (preg_match('~^(?:https?:|data:|//)~i', $src) || preg_match('~^/~', $src)) {
+        return $matches[0]; // Return unchanged
+      }
+      
+      // Search for image in source paths
+      foreach ($imageSources as $sourcePath) {
+        $fullPath = $sourcePath . $src;
+        if (file_exists($fullPath)) {
+          // Copy to page assets
+          $destPath = $pagePath . basename($src);
+          if (!file_exists($destPath)) {
+            @copy($fullPath, $destPath);
+          }
+          // Return processed URL
+          $processedUrl = $imageBaseUrl . basename($src);
+          return sprintf('![%s](%s)', $alt, $processedUrl);
+        }
+      }
+      
+      return $matches[0]; // Return unchanged if not found
+    }, $markdown);
+    
+    return $markdown;
   }
 
   /** Saves markdown document to the filesystem for a page and language. */
@@ -345,16 +402,96 @@ class MarkdownFileIO extends MarkdownConfig
       $content->html = MarkdownHtmlConverter::processImagesToPageAssets($page, $content->html);
     }
     
-    // Process sections
-    if (isset($content->sections) && is_array($content->sections)) {
-      foreach ($content->sections as $section) {
-        self::processSectionImages($page, $section);
+    // Process all properties on ContentData recursively
+    $reflection = new \ReflectionObject($content);
+    foreach ($reflection->getProperties() as $property) {
+      $property->setAccessible(true);
+      $value = $property->getValue($content);
+      
+      if ($value instanceof ContentData || is_object($value) || is_array($value)) {
+        self::processBlockImages($page, $value);
       }
     }
   }
   
   /**
-   * Process images in a Section object.
+   * List of LetMeDown object types that are readonly and should not be modified.
+   */
+  protected static array $readonlyLetMeDownTypes = [
+    'LetMeDown\\ContentElement',
+    'LetMeDown\\HeadingElement',
+  ];
+
+  /**
+   * Recursively process images in all objects and arrays.
+   * Skips readonly LetMeDown types, attempts to modify writable types.
+   */
+  protected static function processBlockImages(Page $page, $item): void
+  {
+    if (is_object($item)) {
+      $className = get_class($item);
+      
+      // Skip readonly LetMeDown types entirely
+      if (in_array($className, self::$readonlyLetMeDownTypes)) {
+        // Still recurse through their properties to find nested items
+        $reflection = new \ReflectionObject($item);
+        foreach ($reflection->getProperties() as $property) {
+          $property->setAccessible(true);
+          try {
+            $value = $property->getValue($item);
+            
+            if (is_array($value)) {
+              foreach ($value as $nested) {
+                self::processBlockImages($page, $nested);
+              }
+            } elseif (is_object($value)) {
+              self::processBlockImages($page, $value);
+            }
+          } catch (\Throwable $e) {
+            // Skip properties that can't be accessed
+          }
+        }
+        return;
+      }
+      
+      // Try to process html property on non-readonly objects
+      if (isset($item->html) && is_string($item->html)) {
+        $processedHtml = MarkdownHtmlConverter::processImagesToPageAssets($page, $item->html);
+        try {
+          $item->html = $processedHtml;
+        } catch (\Throwable $e) {
+          // Property is readonly, skip
+        }
+      }
+      
+      // Recursively process all properties that are arrays or objects
+      $reflection = new \ReflectionObject($item);
+      foreach ($reflection->getProperties() as $property) {
+        $property->setAccessible(true);
+        try {
+          $value = $property->getValue($item);
+          
+          if (is_array($value)) {
+            foreach ($value as $nested) {
+              self::processBlockImages($page, $nested);
+            }
+          } elseif (is_object($value)) {
+            self::processBlockImages($page, $value);
+          }
+        } catch (\Throwable $e) {
+          // Skip properties that can't be accessed
+        }
+      }
+    } elseif (is_array($item)) {
+      // Process arrays recursively
+      foreach ($item as $nested) {
+        self::processBlockImages($page, $nested);
+      }
+    }
+  }
+  
+  /**
+   * Process images in a Section object, including nested arrays and objects.
    */
   protected static function processSectionImages(Page $page, $section): void
   {
@@ -383,11 +520,101 @@ class MarkdownFileIO extends MarkdownConfig
       }
     }
     
+    // Process blocks array (and any other nested arrays)
+    if (isset($section->blocks) && is_array($section->blocks)) {
+      foreach ($section->blocks as $block) {
+        self::processBlockImages($page, $block);
+      }
+    }
+    
     // Process subsections
     if (isset($section->subsections) && is_array($section->subsections)) {
       foreach ($section->subsections as $subsection) {
         self::processSectionImages($page, $subsection);
       }
     }
+  }
+
+  /**
+   * Process images in ContentData after LetMeDown parsing.
+   * Replaces relative paths in html properties with ProcessWire asset URLs.
+   */
+  protected static function processContentDataImages(Page $page, $content): void
+  {
+    if (!$content) return;
+    
+    $config = self::requireConfig($page);
+    $imageSources = $config['assets']['imageSourcePaths'] ?? [];
+    $imageBaseUrl = $config['assets']['imageBaseUrl'] ?? '';
+    
+    if (!$imageSources || !$imageBaseUrl) return;
+    
+    $imageBaseUrl = str_replace('{pageId}', $page->id, $imageBaseUrl);
+    self::walkContent($page, $content, $imageSources, $imageBaseUrl);
+  }
+
+  /**
+   * Walk ContentData tree, processing html in each LetMeDown object.
+   */
+  private static function walkContent($page, $item, array $imageSources, string $imageBaseUrl): void
+  {
+    if (!is_object($item) && !is_array($item) && !($item instanceof \ArrayObject)) {
+      return;
+    }
+
+    // Process this item's html property if it exists
+    if (is_object($item) && isset($item->html) && is_string($item->html)) {
+      $item->html = self::processImageUrls($page, $item->html, $imageSources, $imageBaseUrl);
+    }
+
+    // Recursively walk children
+    if (is_array($item) || $item instanceof \ArrayObject) {
+      foreach ($item as $child) {
+        self::walkContent($page, $child, $imageSources, $imageBaseUrl);
+      }
+    } elseif (is_object($item)) {
+      // Cast object to array to get all public properties via __get
+      foreach ((array)$item as $key => $value) {
+        if (is_array($value) || $value instanceof \ArrayObject) {
+          foreach ($value as $child) {
+            self::walkContent($page, $child, $imageSources, $imageBaseUrl);
+          }
+        } elseif (is_object($value)) {
+          self::walkContent($page, $value, $imageSources, $imageBaseUrl);
+        }
+      }
+    }
+  }
+
+  /**
+   * Replace relative image URLs with ProcessWire asset URLs.
+   */
+  private static function processImageUrls(Page $page, string $html, array $imageSources, string $imageBaseUrl): string
+  {
+    return preg_replace_callback('/<img\s+[^>]*src=["\']([^"\']+)["\'][^>]*>/i', 
+      function($m) use ($page, $imageSources, $imageBaseUrl) {
+        $src = $m[1];
+        
+        // Skip absolute or external URLs
+        if (str_starts_with($src, '/') || str_starts_with($src, 'http') || str_starts_with($src, 'data:')) {
+          return $m[0];
+        }
+        
+        // Find and copy source file
+        foreach ($imageSources as $sourceDir) {
+          $sourcePath = $sourceDir . $src;
+          if (file_exists($sourcePath)) {
+            $destPath = $page->filesManager()->path() . basename($src);
+            if (!file_exists($destPath)) {
+              copy($sourcePath, $destPath);
+            }
+            return str_replace('src="' . $src . '"', 'src="' . $imageBaseUrl . basename($src) . '"', $m[0]);
+          }
+        }
+        
+        return $m[0];
+      },
+      $html
+    );
   }
 }
