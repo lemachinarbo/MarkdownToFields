@@ -294,4 +294,34 @@ class MarkdownUtilities
 
     return false;
   }
+
+  /**
+   * Resolve a ProcessWire Pageimage from a src string or image element.
+   * Creates a minimal Pageimage-compatible object if no managed field exists.
+   */
+  /**
+   * Create a Pageimage object from an image src string or element with data['src'].
+   * Uses native ProcessWire Pageimages/Pageimage classes.
+   */
+  public static function pageimage(Page $page, $srcOrElement): ?Pageimage
+  {
+    // Extract src from string or element.data['src']
+    $src = is_string($srcOrElement) ? $srcOrElement : null;
+    if (!$src && is_object($srcOrElement) && isset($srcOrElement->data['src'])) {
+      $src = $srcOrElement->data['src'];
+    }
+    if (!$src) {
+      return null;
+    }
+
+    // Build full path and verify file exists
+    $fullPath = $page->filesManager()->path() . basename($src);
+    if (!is_file($fullPath)) {
+      return null;
+    }
+
+    // Create Pageimage with Pageimages container
+    $pageimages = new Pageimages($page);
+    return new Pageimage($pageimages, $fullPath);
+  }
 }

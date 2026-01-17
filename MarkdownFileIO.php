@@ -537,7 +537,7 @@ class MarkdownFileIO extends MarkdownConfig
 
   /**
    * Process images in ContentData after LetMeDown parsing.
-   * Replaces relative paths in html properties with ProcessWire asset URLs.
+   * Attaches Pageimage objects and optionally rewrites HTML URLs.
    */
   protected static function processContentDataImages(Page $page, $content): void
   {
@@ -547,44 +547,99 @@ class MarkdownFileIO extends MarkdownConfig
     $imageSources = $config['assets']['imageSourcePaths'] ?? [];
     $imageBaseUrl = $config['assets']['imageBaseUrl'] ?? '';
     
-    if (!$imageSources || !$imageBaseUrl) return;
+    // Substitute pageId in URL if configured
+    if ($imageBaseUrl) {
+      $imageBaseUrl = str_replace('{pageId}', $page->id, $imageBaseUrl);
+    }
     
-    $imageBaseUrl = str_replace('{pageId}', $page->id, $imageBaseUrl);
+    self::logDebug($page, 'processContentDataImages: starting walk', [
+      'hasSources' => !empty($imageSources),
+      'hasUrl' => !empty($imageBaseUrl),
+    ]);
+    
+    // Always walk to attach Pageimage, regardless of URL rewriting config
     self::walkContent($page, $content, $imageSources, $imageBaseUrl);
   }
 
-  /**
-   * Walk ContentData tree, processing html in each LetMeDown object.
-   */
-  private static function walkContent($page, $item, array $imageSources, string $imageBaseUrl): void
-  {
-    if (!is_object($item) && !is_array($item) && !($item instanceof \ArrayObject)) {
-      return;
-    }
+ /**
+ * Get protected blocks array from Section object via Reflection.
+ * Falls back to magic property if Reflection fails, with debug logging.
+ */
+private static function getSectionBlocks($page, $item): ?array
+{
+    if (!($item instanceof \LetMeDown\Section)) return null;
 
-    // Process this item's html property if it exists
-    if (is_object($item) && isset($item->html) && is_string($item->html)) {
-      $item->html = self::processImageUrls($page, $item->html, $imageSources, $imageBaseUrl);
-    }
-
-    // Recursively walk children
-    if (is_array($item) || $item instanceof \ArrayObject) {
-      foreach ($item as $child) {
-        self::walkContent($page, $child, $imageSources, $imageBaseUrl);
-      }
-    } elseif (is_object($item)) {
-      // Cast object to array to get all public properties via __get
-      foreach ((array)$item as $key => $value) {
-        if (is_array($value) || $value instanceof \ArrayObject) {
-          foreach ($value as $child) {
-            self::walkContent($page, $child, $imageSources, $imageBaseUrl);
-          }
-        } elseif (is_object($value)) {
-          self::walkContent($page, $value, $imageSources, $imageBaseUrl);
+    try {
+        $reflection = new \ReflectionClass($item);
+        $blocksProperty = $reflection->getProperty('blocks');
+        $blocksProperty->setAccessible(true);
+        $blocks = $blocksProperty->getValue($item);
+        return (is_array($blocks) || $blocks instanceof \ArrayObject) ? $blocks : null;
+    } catch (\Exception $e) {
+        self::logDebug($page, "Reflection failed for Section::blocks, using magic fallback", [
+            'error' => $e->getMessage(),
+            'class' => get_class($item),
+        ]);
+        if (isset($item->blocks)) {
+            $blocks = $item->blocks;
+            return (is_array($blocks) || $blocks instanceof \ArrayObject) ? $blocks : null;
         }
-      }
     }
-  }
+
+    return null;
+}
+
+/**
+ * Walk ContentData tree, processing html in each LetMeDown object and attaching Pageimage.
+ */
+private static function walkContent($page, $item, array $imageSources, string $imageBaseUrl): void
+{
+    if (!is_object($item) && !is_array($item) && !($item instanceof \ArrayObject)) return;
+
+    // Process html
+    if (is_object($item) && isset($item->html) && is_string($item->html) && $imageSources && $imageBaseUrl) {
+        $item->html = self::processImageUrls($page, $item->html, $imageSources, $imageBaseUrl);
+    }
+
+    // Attach Pageimage if src exists
+    if (is_object($item) && isset($item->data['src']) && $item->data['src']) {
+        $img = MarkdownUtilities::pageimage($page, $item);
+        if ($img instanceof Pageimage) {
+            $item->data['img'] = $img;
+            self::logDebug($page, "Attached Pageimage to " . get_class($item), ['src' => $item->data['src']]);
+        }
+    }
+
+    // Recursively process arrays / ArrayObjects
+    if (is_array($item) || $item instanceof \ArrayObject) {
+        foreach ($item as $child) {
+            self::walkContent($page, $child, $imageSources, $imageBaseUrl);
+        }
+    }
+
+    // Recursively process object properties
+    if (is_object($item)) {
+        foreach (get_object_vars($item) as $value) {
+            if ($value !== null) {
+                self::walkContent($page, $value, $imageSources, $imageBaseUrl);
+            }
+        }
+
+        // Special handling for Section blocks
+        if ($item instanceof \LetMeDown\Section) {
+            $blocks = self::getSectionBlocks($page, $item);
+            if ($blocks !== null) {
+                self::walkContent($page, $blocks, $imageSources, $imageBaseUrl);
+            }
+        } elseif (isset($item->blocks)) {
+            $blocks = $item->blocks;
+            if ($blocks !== null) {
+                self::walkContent($page, $blocks, $imageSources, $imageBaseUrl);
+            }
+        }
+    }
+}
+
 
   /**
    * Replace relative image URLs with ProcessWire asset URLs.
