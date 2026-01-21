@@ -31,7 +31,7 @@ class MarkdownHtmlConverter extends MarkdownFileIO
       $html = self::processImagesToPageAssets($page, $html);
       $config = self::config($page);
       $baseUrl = is_array($config)
-        ? $config['assets']['imageBaseUrl'] ?? null
+        ? $config['imageBaseUrl'] ?? null
         : null;
       if ($baseUrl) {
         $html = self::applyImageBaseUrl($html, $baseUrl);
@@ -52,7 +52,7 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     if ($page) {
       $config = self::config($page);
       $baseUrl = is_array($config)
-        ? $config['assets']['imageBaseUrl'] ?? null
+        ? $config['imageBaseUrl'] ?? null
         : null;
       if ($baseUrl) {
         $html = self::stripImageBaseUrl($html, $baseUrl);
@@ -586,9 +586,8 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     }
 
     $config = self::config($page) ?? [];
-    $assets = $config['assets'] ?? [];
 
-    $sourcePaths = self::normalizeSourcePaths($assets['imageSourcePaths'] ?? []);
+    $sourcePaths = self::normalizeSourcePaths($config['imageSourcePaths'] ?? []);
     if (!$sourcePaths) {
       $sitePath = $page->wire('config')->paths->site ?? null;
       if ($sitePath) {
@@ -598,7 +597,7 @@ class MarkdownHtmlConverter extends MarkdownFileIO
 
     self::logInfo($page, 'processImagesToPageAssets: config loaded', [
       'sourcePaths' => implode(', ', $sourcePaths),
-      'imageBaseUrl' => $assets['imageBaseUrl'] ?? 'none',
+      'imageBaseUrl' => $config['imageBaseUrl'] ?? 'none',
     ]);
 
     $filesManager = $page->filesManager();
@@ -608,7 +607,7 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     }
 
     $destBasePath = $filesManager->path();
-    $destBaseUrl = $assets['imageBaseUrl'] ?? $filesManager->url();
+    $destBaseUrl = $config['imageBaseUrl'] ?? $filesManager->url();
 
     if (!$destBasePath || !$destBaseUrl || !$sourcePaths) {
       self::logInfo($page, 'processImagesToPageAssets: missing paths', [

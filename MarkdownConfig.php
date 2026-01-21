@@ -27,8 +27,6 @@ class MarkdownConfig extends MarkdownLanguageResolver
 
     $source =
       isset($map['source']) && is_array($map['source']) ? $map['source'] : [];
-    $assets =
-      isset($map['assets']) && is_array($map['assets']) ? $map['assets'] : [];
 
     $path = trim((string) ($source['path'] ?? ''));
     $markdownField = trim((string) ($map['markdownField'] ?? ''));
@@ -47,14 +45,8 @@ class MarkdownConfig extends MarkdownLanguageResolver
       'htmlField' => self::normalizeFieldName($map['htmlField'] ?? null),
       'hashField' => self::normalizeFieldName($map['hashField'] ?? null),
       'frontmatter' => self::normalizeFrontmatter($map['frontmatter'] ?? []),
-      'assets' => [
-        'imageBaseUrl' => self::normalizeUrlBase(
-          $assets['imageBaseUrl'] ?? null,
-        ),
-        'imageSourcePaths' => self::normalizeSourcePaths(
-          $assets['imageSourcePaths'] ?? null,
-        ),
-      ],
+      'imageBaseUrl' => self::normalizeUrlBase($map['imageBaseUrl'] ?? null),
+      'imageSourcePaths' => self::normalizeSourcePaths($map['imageSourcePaths'] ?? null),
     ];
   }
 

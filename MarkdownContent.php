@@ -76,14 +76,14 @@ trait MarkdownContent {
 
     // Global auto-sync controls (opt-out by design)
     $autoSync = $mdConfig['autoSyncFrontmatter'] ?? true;
-    $exclude  = $mdConfig['excludeFrontmatterFields'] ?? ['name'];
+    $exclude  = $mdConfig['excludeFrontmatterFields'] ?? [];
     $include  = $mdConfig['includeFrontmatterFields'] ?? [];
     $hasInclude = !empty($include);
 
     // Always support core fields explicitly
     $frontmatterMap = [
       'title' => 'title',
-      'name'  => 'name',
+      // 'name'  => 'name',
     ];
 
     if ($autoSync && $this->template) {
@@ -104,17 +104,6 @@ trait MarkdownContent {
       }
     }
 
-    // Handle imageBaseUrl from config with {pageId} placeholder support
-    $assets = [];
-    $assetsConfig = $mdConfig['assets'] ?? [];
-    
-    if (isset($assetsConfig['imageBaseUrl'])) {
-      $assets['imageBaseUrl'] = str_replace('{pageId}', (string) $this->id, $assetsConfig['imageBaseUrl']);
-    }
-    if (!empty($assetsConfig['imageSourcePaths'])) {
-      $assets['imageSourcePaths'] = (array) $assetsConfig['imageSourcePaths'];
-    }
-
     $map = [
       'source' => [
         'path' => $path,
@@ -126,9 +115,12 @@ trait MarkdownContent {
       'frontmatter' => $frontmatterMap,
     ];
 
-    // Only add assets if imageBaseUrl was configured
-    if (!empty($assets)) {
-      $map['assets'] = $assets;
+    // Handle imageBaseUrl and imageSourcePaths from top-level config with {pageId} placeholder support
+    if (isset($mdConfig['imageBaseUrl'])) {
+      $map['imageBaseUrl'] = str_replace('{pageId}', (string) $this->id, $mdConfig['imageBaseUrl']);
+    }
+    if (!empty($mdConfig['imageSourcePaths'])) {
+      $map['imageSourcePaths'] = (array) $mdConfig['imageSourcePaths'];
     }
 
     return $map;

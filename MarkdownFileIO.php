@@ -238,8 +238,8 @@ class MarkdownFileIO extends MarkdownConfig
   protected static function processImagesInMarkdown(Page $page, string $markdown): string
   {
     $config = self::requireConfig($page);
-    $imageSources = $config['assets']['imageSourcePaths'];
-    $imageBaseUrl = $config['assets']['imageBaseUrl'];
+    $imageSources = $config['imageSourcePaths'] ?? [];
+    $imageBaseUrl = $config['imageBaseUrl'] ?? null;
     
     if (empty($imageSources) || !$imageBaseUrl) {
       return $markdown;
@@ -544,8 +544,8 @@ class MarkdownFileIO extends MarkdownConfig
     if (!$content) return;
     
     $config = self::requireConfig($page);
-    $imageSources = $config['assets']['imageSourcePaths'] ?? [];
-    $imageBaseUrl = $config['assets']['imageBaseUrl'] ?? '';
+    $imageSources = $config['imageSourcePaths'] ?? [];
+    $imageBaseUrl = $config['imageBaseUrl'] ?? '';
     
     // Substitute pageId in URL if configured
     if ($imageBaseUrl) {
