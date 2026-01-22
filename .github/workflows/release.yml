@@ -48,9 +48,6 @@ jobs:
 
           rm -rf "$RELEASE_DIR"
 
-      - name: Show release zip contents
-        run: unzip -l "${RELEASE_NAME}.zip"
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
