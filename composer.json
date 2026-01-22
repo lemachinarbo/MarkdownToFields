@@ -2,7 +2,6 @@
   "name": "lemachinarbo/markdowntofields",
   "description": "Markdown files as source of truth in ProcessWire",
   "type": "processwire-module",
-  "license": "MIT",
   "authors": [
     {
       "name": "Lemachi Narbo"
