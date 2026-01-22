@@ -4,7 +4,7 @@ namespace ProcessWire;
 
 class MarkdownUtilities
 {
-  protected const DEBUG_CONFIG_FLAG = 'markdownSyncDebug';
+  protected const DEBUG_CONFIG_FLAG = 'debug';
   protected const LOG_CHANNEL = 'markdown-sync';
 
   protected static function logDebug(

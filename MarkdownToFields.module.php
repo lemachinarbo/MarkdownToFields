@@ -292,7 +292,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $html .= "  'excludeFrontmatterFields' => ['description'],\n";
     $html .= "\n";
     $html .= "  // debug\n";
-    $html .= "  'markdownSyncDebug' => true,\n";
+    $html .= "  'debug' => true,\n";
     $html .= "];\n</pre>";
 
     $html .= '<h4>Current values:</h4>';
