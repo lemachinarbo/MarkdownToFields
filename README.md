@@ -1,21 +1,25 @@
 # Markdown to fields
-*Parse markdown into a ProcessWire-style content API and sync it bidirectionally with ProcessWire fields.*
+Use markdown as your content. Structure it with simple tags, and enjoy the markdown <-> ProcessWire fields sync. That’s MarkdownToFields.
+
+Need help? See:
+
+- The [Why it's so long intro](#the-long-intro)
+- The [I'm lazy resume all to me, guide](#lazy-guide)
+- The [MarkdownToFields survival guide](./docs/guide.md) (aka The Docs)
 
 ## The Long intro
 
-The basic idea of this module is that you can convert any markdown file into a “structured content source” where content can be extracted via an API-style access, e.g. `$content->field->text`, by using the [LetMeDown parser](https://github.com/lemachinarbo/LetMeDown) (what’s in a name!).
+The basic idea of this module is that you can convert any markdown file into a “structured content source” where content can be extracted via an API-style access, e.g. `$content->field->text`. We use the [LetMeDown parser](https://github.com/lemachinarbo/LetMeDown) (what’s in a name!) to turn your file into a tree of sections, blocks, and elements.
 
-The markdown content gets synced into a single ProcessWire text field and we keep it in sync, no matter if content is edited in markdown or in the admin interface. Changes flow both ways with hash-based conflict detection.
+The markdown content can be edited in the Processwire admin or in your favorite editor, and you even can sync specific parts to Processwire fields (we only support text fields at the moment).
 
 So, basically, what you write in markdown stays in… markdown, but gets synced to some* ProcessWire fields, and vice versa. Cool, right? Unnecessarily… but cool, right?
 
-You can also use frontmatter as page metadata, so things like `title`, `name`, `description`, etc. get synced to their own fields.
+You can also use frontmatter as page metadata. So things like `title`, `name` can get synced to their respective fields.
 
 ### Quick FAQ
 
-**Q: Wait, what?**
-
-So you’re telling me that the whole markdown is synced to just ONE text field? And that you only support title, name, description and the most basic text fields in the world?
+**Q: Wait, what? So you’re telling me that the whole markdown is the content, not the Procewsswire Fields, and that you only support syncing of basic text fields?**
 
 **A:** Yes.
 
@@ -23,9 +27,9 @@ So you’re telling me that the whole markdown is synced to just ONE text field?
 
 **A:** Imagine this: you’re designing a website where each page has multiple blocks of content. Some blocks are text, some are images and text, some sliders, the whole marketing “I-want-a-page-like-an-Apple-website” package.
 
-You start planning fields, repeaters, combos, multipliers, page references, the whole shebang. You think about how to recycle them, how to make them flexible, how to make them fit into any design. You end up with an admin page with 15 fields, some repeaters inside multipliers with page references inside. It works, it’s cool, but somehow all those fields make every edit page look like the screen of the person who helps you at the bank.
+You start planning fields, repeaters, combos, multipliers, page references, the whole shebang. You think about how to recycle them, how to make them flexible, how to make them fit into any design. You end up with an admin page with 15 fields, some repeaters inside multipliers with page references inside. It works, it’s cool, but somehow all those fields make every edit page look like the screen of the person who helps you at the bank (whatever that means).
 
-One day, while reading the Latte docs (https://latte.nette.org/en/guide) I noticed this message:
+One day, while reading the [Latte docs](https://latte.nette.org/en/guide) I noticed this message:
 
 ```
 Found a problem with this page?
@@ -33,11 +37,12 @@ Show on GitHub (then press E to edit)
 ```
 
 The whole content of the page was text files. And I felt the darkest envy. 
+
 But from that evil envy, a question arose: Can I reduce all that PW multiple-field experience to a single field/text experience?
 
 So there I was, writing my page in markdown like the “first” human who ever had the idea:
 
-```
+```markdown
 ---
 title: I wasn’t copying the Apple page
 name: about-us
@@ -63,183 +68,83 @@ Some text…
 - Feature two
 ```
 
-**Q: Holy guacamole! Now I get your point. So what about the experience? Does it feel better? Do your clients love it? What does the content person say?**
+**Q: Now I get your point. But are you aware that by writing content in markdown files and skipping the “real” fields, you basically lose all the benefits of a database, right?**
 
-**A:** Well. The experience… is different. Whatever that means. And when you say “client”, what do you mean? Me? Yeah. I love it.
+**A:** Oh crap… I think, er, no, I mean, er, yes, but it's all wrong. That is, I think I disagree.
 
-**Q: So, are you aware that by writing content in markdown files and skipping the “real” fields, you basically lose all the benefits of a database, right?**
+## Lazy guide
 
-**A:** Oh crap… I basically neutered ProcessWire.
-
-
-## Quick Start
+Full docs live in [The MarkdownToFields survival guide](./docs/guide.md)
 
 ### 1. Install
 
-Copy module to `site/modules/MarkdownToFields/` and install via Admin → Modules → Refresh.
+Copy module to `site/modules/MarkdownToFields/` and install via Admin → Modules.
 
-**Dependencies:** The module bundles LetMeDown parser and its dependencies via Composer.
+### 2. Add the trait
 
-### 2. Set Up Content Directory
-
-Create a content folder structure (mine lokks like this, but do as you please):
-
-```
-src/site/content/
-  en/
-    about/
-      about.md
-    services/
-      sessions.md
-  it/
-    about/
-      about.md
-```
-
-### 3. Create a Page Class
+Add the trait to your Page class:
 
 ```php
-<?php
-namespace ProcessWire;
+<?php namespace ProcessWire;
 
-class AboutPage extends DefaultPage {
-  public function getContentSource(): string {
-    return 'about/about.md';
-  }
-
-  public function getTemplateParams(): array {
-    $content = $this->loadContent($this->getContentSource());
-    
-    return [
-      'title' => $content->hero->title->text,
-      'description' => $content->hero->description->html
-    ];
-  }
+class DefaultPage extends Page {
+  use MarkdownContent;
 }
 ```
 
-### 4. Write Structured Markdown
+Templates extending this class get `$page->content()`.
 
-**about/about.md:**
+### 3. Write markdown
+
+Create a markdown file for your page.
+
+Example: `site/content/about.md`
+
 ```markdown
 ---
 title: About Us
-name: about
-summary: Learn about our story
 ---
 
 <!-- section:hero -->
 
 <!-- title -->
-# Welcome to Our Company
+# Welcome
 
 <!-- description -->
-Our story begins in 2020 when we decided to make a difference...
+Our story begins in 2020…
 
-<!-- image -->
+<!-- team -->
 ![Team photo](team.jpg)
 ```
 
-### 5. Access in Templates
+### 4. Use it in templates
+
+Example: `about.php`
 
 ```php
-$content = $this->loadContent($this->getContentSource());
+<?php namespace ProcessWire;
 
-// Access structured content
-echo $content->hero->title->text;        // "Welcome to Our Company"
-echo $content->hero->description->html;  // <p>Our story begins...</p>
-echo $content->hero->image->src;         // "team.jpg"
+$content = $page->content();
+
+echo $content->hero->title->text;
+echo $content->hero->description->html;
+echo $content->hero->team->img->url;
 ```
 
-That's it! The module handles syncing between markdown and ProcessWire fields automatically.
-
-## How It Works
-
-### The Flow
-
-**On Page Edit (Opening the Edit Screen):**
-1. Module reads the markdown file
-2. Checks hash against last known state
-3. If file changed externally → syncs markdown → ProcessWire fields
-4. Displays fields in admin for editing
-
-**On Page Save:**
-1. Collects field values from the form
-2. Syncs ProcessWire fields → markdown file
-3. Updates frontmatter and content
-4. Stores new hash for conflict detection
-
-**Conflict Detection:**
-- If markdown file changes while you're editing in admin, you get a warning
-- Session storage preserves your unsaved admin changes
-- You choose: keep your changes or reload from file
-
-### Bidirectional Sync
-
-Edit in **markdown:**
-```markdown
-<!-- title -->
-# New Title
-```
-Save file → Open page in admin → Title field shows "New Title"
-
-Edit in **admin:**
-Change title field to "Admin Title" → Save page → Markdown file updates automatically
-
-### Multi-Language Support
-
-The module respects ProcessWire's language system:
-
-```
-content/
-  en/
-    about.md    → English content
-  it/
-    about.md    → Italian content
-  de/
-    about.md    → German content
-```
-
-Same API in templates, different content per language. Language switching happens automatically based on user language.
-
-## Markdown Format
-
-MarkdownToFields uses [LetMeDown](https://github.com/lemachinarbo/LetMeDown) for parsing, which provides:
-
-### Frontmatter → Page Fields
-
-```markdown
----
-title: About Us
-name: about
-shortname: About
-summary: Our story
-meta_image: hero.jpg
----
-```
-
-Maps directly to ProcessWire page fields (configurable via `getMarkdownSyncMap()`).
-
-**Important:** If you change the name, run a modules refresh.
-name isn’t treated as content in ProcessWire, it’s part of the page’s structure, so it needs a rebuild pass.
-## Debug Mode
-
-By default, the module logs only important events (errors, field updates, synced pages). For development and troubleshooting, you can enable verbose debug logging:
-
-**In `site/config-local.php` (development only):**
-```php
-$config->markdownSyncDebug = true;
-```
-
-**Important:** Don't enable this in `site/config.php` (production) as it generates 50-100 log lines per page update.
+That’s it.
 
 
 ## Requirements
 
 - ProcessWire 3.x
 - PHP >= 8.0
-- Composer (for installing module dependencies)
+
 
 ## License
 
-DAYP (Do as you please).
+UBC+P.
+
+Use it.
+Break it.
+Change it.
+And if you make money, buy us some pizza.

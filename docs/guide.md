@@ -1,9 +1,7 @@
-# MarkdownToFields, DOCS
+# The MarkdownToFields survival guide. V1.0
 
 Use markdown as your content. Structure it with simple tags, and enjoy the markdown <-> ProcessWire fields sync. That’s MarkdownToFields.
 For a more detailed explanation, check the [readme](../README.md)
-
-
 
 ## Why use this?
 
@@ -1215,7 +1213,7 @@ $config->MarkdownToFields = [
   // /var/www/html/myimages/
   // myimages/
   // ../../myimages
-  
+
   'imageSourcePaths' => 'myimages/'
 ];
 ```
@@ -1248,6 +1246,24 @@ ProcessWire field support is ~~lame~~ basic for now, and only text-based fields 
 We all have to start somewhere, right?
 
 
+### Multi-Language Support
+
+The module respects ProcessWire's language system:
+
+```
+content/
+  en/
+    about.md    → English content
+  it/
+    about.md    → Italian content
+  de/
+    about.md    → German content
+```
+
+Same API in templates, different content per language. Language switching happens automatically based on user language.
+
+
+
 ## Config reference
 
 This config goes in your `config.php` file. It controls how markdown is found, parsed, and synced.
@@ -1274,43 +1290,49 @@ $config->MarkdownToFields = [
   'autoSyncFrontmatter' => true,
   'includeFrontmatterFields' => ['name', 'summary', 'bio'],
   'excludeFrontmatterFields' => ['description'],
+
+  // debug
+  'debug' => true,
 ];
 ```
 
 
-* **enabledTemplates**
+- **enabledTemplates**
   Lets you define the active templates in code instead of clicking around in the 'Enable templates' section of modules UI.
 
-* **htmlField**
+- **htmlField**
   Field where rendered HTML is stored (your content editor).
 
-* **markdownField**
+- **markdownField**
   Field where raw markdown is stored (source of truth).
 
-* **hashField**
+- **hashField**
   Stores a hash for change detection.
 
-* **sourcePath**
+- **sourcePath**
   Folder (relative to `site/`) where markdown files live.
 
-* **imageBaseUrl**
+- **imageBaseUrl**
   URL prefix for images in markdown.
   `{pageId}` is replaced with the page ID.
 
-* **imageSourcePaths**
+- **imageSourcePaths**
   Folders to search for referenced images.
 
-* **autoSyncFrontmatter**
+- **autoSyncFrontmatter**
   If `true`, frontmatter keys are synced to page fields.
   If `false`, frontmatter keys are... not synced to page fields.
 
 
-* **includeFrontmatterFields**
+- **includeFrontmatterFields**
   Extra frontmatter keys to sync.
   Use this for fields like `name` if you *want* markdown to control them.
 
-* **excludeFrontmatterFields**
+- **excludeFrontmatterFields**
   Frontmatter keys to ignore.
+
+- **debug**
+  Enable debug mode if `true`
 
 
 
