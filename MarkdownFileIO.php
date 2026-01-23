@@ -537,28 +537,37 @@ class MarkdownFileIO extends MarkdownConfig
 
   /**
    * Process images in ContentData after LetMeDown parsing.
-   * Attaches Pageimage objects and optionally rewrites HTML URLs.
+   * Attaches Pageimage objects only; URL rewriting happens during final HTML render.
    */
   protected static function processContentDataImages(Page $page, $content): void
   {
     if (!$content) return;
-    
+
     $config = self::requireConfig($page);
     $imageSources = $config['imageSourcePaths'] ?? [];
     $imageBaseUrl = $config['imageBaseUrl'] ?? '';
-    
+
     // Substitute pageId in URL if configured
     if ($imageBaseUrl) {
       $imageBaseUrl = str_replace('{pageId}', $page->id, $imageBaseUrl);
     }
-    
-    self::logDebug($page, 'processContentDataImages: starting walk', [
+
+    self::logDebug($page, 'processContentDataImages: starting', [
       'hasSources' => !empty($imageSources),
       'hasUrl' => !empty($imageBaseUrl),
     ]);
-    
-    // Always walk to attach Pageimage, regardless of URL rewriting config
+
+    // Attach Pageimage objects (asset binding)
     self::walkContent($page, $content, $imageSources, $imageBaseUrl);
+
+    // Rewrite HTML properties so ->html is final and safe to echo.
+    // This operates on the rendered HTML produced by the parser (render phase)
+    // and mutates HTML properties in ContentData so templates can echo them
+    // without needing additional post-processing.
+    self::logDebug($page, 'processContentDataImages: rewriting HTML into content', [
+      'contentClass' => is_object($content) ? get_class($content) : gettype($content),
+    ]);
+    self::processContentImages($page, $content);
   }
 
  /**
@@ -601,10 +610,6 @@ private static function walkContent($page, $item, array $imageSources, string $i
         return;
     }
 
-    // Process html
-    if (is_object($item) && isset($item->html) && is_string($item->html) && $imageSources && $imageBaseUrl) {
-        $item->html = self::processImageUrls($page, $item->html, $imageSources, $imageBaseUrl);
-    }
 
     // Attach Pageimage if src exists
     if (is_object($item) && isset($item->data['src']) && $item->data['src']) {
@@ -646,35 +651,5 @@ private static function walkContent($page, $item, array $imageSources, string $i
 }
 
 
-  /**
-   * Replace relative image URLs with ProcessWire asset URLs.
-   */
-  private static function processImageUrls(Page $page, string $html, array $imageSources, string $imageBaseUrl): string
-  {
-    return preg_replace_callback('/<img\s+[^>]*src=["\']([^"\']+)["\'][^>]*>/i', 
-      function($m) use ($page, $imageSources, $imageBaseUrl) {
-        $src = $m[1];
-        
-        // Skip absolute or external URLs
-        if (str_starts_with($src, '/') || str_starts_with($src, 'http') || str_starts_with($src, 'data:')) {
-          return $m[0];
-        }
-        
-        // Find and copy source file
-        foreach ($imageSources as $sourceDir) {
-          $sourcePath = $sourceDir . $src;
-          if (file_exists($sourcePath)) {
-            $destPath = $page->filesManager()->path() . basename($src);
-            if (!file_exists($destPath)) {
-              copy($sourcePath, $destPath);
-            }
-            return str_replace('src="' . $src . '"', 'src="' . $imageBaseUrl . basename($src) . '"', $m[0]);
-          }
-        }
-        
-        return $m[0];
-      },
-      $html
-    );
-  }
 }
+

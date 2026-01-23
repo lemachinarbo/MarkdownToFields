@@ -161,4 +161,6 @@ trait MarkdownContent {
   public function templateData(): ContentData {
     return $this->content();
   }
+
 }
+
