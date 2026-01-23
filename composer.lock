@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "89bf87ebdaa2e38a4aa08f98a83eaf73",
+    "content-hash": "1c3d65c33cb223aafa8615ac651ba654",
     "packages": [
         {
             "name": "erusev/parsedown",
@@ -147,20 +147,23 @@
         },
         {
             "name": "lemachinarbo/letmedown",
-            "version": "v1.02",
+            "version": "v1.1.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/lemachinarbo/LetMeDown.git",
-                "reference": "7c8f1068698a74c45c5036ef49e5dd7929fa9384"
+                "reference": "84874a123838eb8939998b5b0504b69a35d25029"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/lemachinarbo/LetMeDown/zipball/7c8f1068698a74c45c5036ef49e5dd7929fa9384",
-                "reference": "7c8f1068698a74c45c5036ef49e5dd7929fa9384",
+                "url": "https://api.github.com/repos/lemachinarbo/LetMeDown/zipball/84874a123838eb8939998b5b0504b69a35d25029",
+                "reference": "84874a123838eb8939998b5b0504b69a35d25029",
                 "shasum": ""
             },
             "require": {
                 "erusev/parsedown": "^1.7"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^9"
             },
             "type": "library",
             "autoload": {
@@ -168,21 +171,23 @@
                     "LetMeDown\\": "src/"
                 }
             },
-            "license": [
-                "DoAsYouWish"
-            ],
+            "scripts": {
+                "test": [
+                    "phpunit --configuration phpunit.xml.dist"
+                ]
+            },
             "authors": [
                 {
                     "name": "lemachinarbo",
-                    "email": ""
+                    "email": "dev@example.com"
                 }
             ],
             "description": "A Markdown parser that probably will.",
             "support": {
-                "source": "https://github.com/lemachinarbo/LetMeDown/tree/v1.02",
+                "source": "https://github.com/lemachinarbo/LetMeDown/tree/v1.1.5",
                 "issues": "https://github.com/lemachinarbo/LetMeDown/issues"
             },
-            "time": "2025-11-07T02:14:49+00:00"
+            "time": "2026-01-23T21:14:09+00:00"
         }
     ],
     "packages-dev": [],

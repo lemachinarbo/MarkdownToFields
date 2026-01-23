@@ -7,6 +7,12 @@
       "name": "Lemachi Narbo"
     }
   ],
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/lemachinarbo/letmedown"
+    }
+  ],
   "require": {
     "php": ">=8.0",
     "lemachinarbo/letmedown": "^1.0",
