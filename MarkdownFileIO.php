@@ -416,9 +416,9 @@ class MarkdownFileIO extends MarkdownConfig
   
   /**
    * List of LetMeDown object types that are readonly and should not be modified.
+   * Currently only headings are immutable by design.
    */
   protected static array $readonlyLetMeDownTypes = [
-    'LetMeDown\\ContentElement',
     'LetMeDown\\HeadingElement',
   ];
 
@@ -595,6 +595,11 @@ private static function getSectionBlocks($page, $item): ?array
 private static function walkContent($page, $item, array $imageSources, string $imageBaseUrl): void
 {
     if (!is_object($item) && !is_array($item) && !($item instanceof \ArrayObject)) return;
+
+    // Skip HeadingElement (immutable structural node)
+    if (is_object($item) && $item instanceof \LetMeDown\HeadingElement) {
+        return;
+    }
 
     // Process html
     if (is_object($item) && isset($item->html) && is_string($item->html) && $imageSources && $imageBaseUrl) {
