@@ -572,16 +572,8 @@ class MarkdownHtmlConverter extends MarkdownFileIO
   /** Copy referenced images into the page assets folder and rewrite src URLs. */
   public static function processImagesToPageAssets(Page $page, string $html): string
   {
-    self::logInfo($page, 'processImagesToPageAssets: called', [
-      'htmlLength' => strlen($html),
-      'pageId' => $page->id,
-    ]);
-
+    // Skip processing early when there's no HTML or page id
     if ($html === '' || !$page->id) {
-      self::logInfo($page, 'processImagesToPageAssets: early exit', [
-        'emptyHtml' => $html === '',
-        'noPageId' => !$page->id,
-      ]);
       return $html;
     }
 
@@ -595,14 +587,8 @@ class MarkdownHtmlConverter extends MarkdownFileIO
       }
     }
 
-    self::logInfo($page, 'processImagesToPageAssets: config loaded', [
-      'sourcePaths' => implode(', ', $sourcePaths),
-      'imageBaseUrl' => $config['imageBaseUrl'] ?? 'none',
-    ]);
-
     $filesManager = $page->filesManager();
     if (!$filesManager) {
-      self::logInfo($page, 'processImagesToPageAssets: no filesManager');
       return $html;
     }
 
@@ -610,29 +596,25 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     $destBaseUrl = $config['imageBaseUrl'] ?? $filesManager->url();
 
     if (!$destBasePath || !$destBaseUrl || !$sourcePaths) {
-      self::logInfo($page, 'processImagesToPageAssets: missing paths', [
-        'destBasePath' => $destBasePath ?: 'empty',
-        'destBaseUrl' => $destBaseUrl ?: 'empty',
-        'hasSourcePaths' => !empty($sourcePaths),
-      ]);
+      return $html;
+    }
+
+    // Fast-path: if HTML contains no <img> tag, skip processing to avoid
+    // noisy per-element calls and logs when there are no images.
+    if (stripos($html, '<img') === false) {
       return $html;
     }
 
     $pattern = '/<img\b[^>]*\bsrc\s*=\s*(["' . "'" . '])\s*([^"' . "'" . '>]+)\s*\1[^>]*>/i';
     
     $matchCount = 0;
+    $rewrites = [];
     $result = preg_replace_callback(
       $pattern,
-      function (array $match) use ($page, $sourcePaths, $destBasePath, $destBaseUrl, &$matchCount) {
+      function (array $match) use ($page, $sourcePaths, $destBasePath, $destBaseUrl, &$matchCount, &$rewrites) {
         $matchCount++;
         $quote = $match[1];
         $src = trim((string) $match[2]);
-
-        self::logInfo($page, 'processImagesToPageAssets: img match', [
-          'matchNum' => $matchCount,
-          'src' => $src,
-          'quote' => $quote,
-        ]);
 
         $resolved = self::resolveImageForPage(
           $page,
@@ -642,24 +624,30 @@ class MarkdownHtmlConverter extends MarkdownFileIO
           $destBaseUrl,
         );
 
-        self::logInfo($page, 'processImagesToPageAssets: resolved', [
-          'src' => $src,
-          'resolved' => $resolved ?? 'null',
-        ]);
-
         if ($resolved === null) {
           return $match[0];
         }
+
+        // Record the rewrite and emit a single concise info-level log per rewrite
+        $rewrites[] = ['src' => $src, 'resolved' => $resolved];
+        self::logInfo($page, 'processImagesToPageAssets: rewrote', [
+          'pageId' => $page->id,
+          'src' => $src,
+          'resolved' => $resolved,
+        ]);
 
         return str_replace($quote . $src . $quote, $quote . $resolved . $quote, $match[0]);
       },
       $html,
     );
 
-    self::logInfo($page, 'processImagesToPageAssets: complete', [
-      'matchCount' => $matchCount,
-      'resultLength' => strlen($result ?? $html),
-    ]);
+    // Emit a single summary line per page when at least one image was rewritten.
+    if (!empty($rewrites)) {
+      self::logInfo($page, 'processImagesToPageAssets: summary', [
+        'pageId' => $page->id,
+        'rewrites' => count($rewrites),
+      ]);
+    }
 
     return $result ?? $html;
   }

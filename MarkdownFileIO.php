@@ -215,19 +215,27 @@ class MarkdownFileIO extends MarkdownConfig
     if ($markdown === false) {
       return null;
     }
-    $markdown = self::processImagesInMarkdown($page, $markdown);
+
+    // Rewrite markdown image references to page assets before parsing so
+    // readonly LetMeDown elements are created with final HTML already.
+    $processedMarkdown = self::processImagesInMarkdown($page, $markdown);
 
     $parser = new LetMeDown();
-    $content = $parser->load($path);
+
+    // Parse processed markdown directly in-memory so readonly elements are
+    // created with final HTML. Prefer in-memory over temp files for cleanliness.
+    $content = $parser->loadFromString($processedMarkdown);
+    self::logDebug($page, 'loaded processed markdown from memory', ['language' => $languageCode]);
+
     self::logInfo(
       $page,
       sprintf('loaded markdown [%s]: %s', $languageCode, $path),
       ['language' => $languageCode],
     );
-    
+
     // Post-process ContentData to handle image URLs in HTML properties
     self::processContentDataImages($page, $content);
-    
+
     return $content;
   }
 
@@ -400,14 +408,20 @@ class MarkdownFileIO extends MarkdownConfig
     // Process top-level HTML
     if (isset($content->html) && is_string($content->html)) {
       $content->html = MarkdownHtmlConverter::processImagesToPageAssets($page, $content->html);
+      self::logDebug($page, 'processContentImages: rewrote content->html', ['length' => strlen($content->html)]);
     }
-    
+
     // Process all properties on ContentData recursively
     $reflection = new \ReflectionObject($content);
     foreach ($reflection->getProperties() as $property) {
       $property->setAccessible(true);
-      $value = $property->getValue($content);
-      
+      try {
+        $value = $property->getValue($content);
+      } catch (\Throwable $e) {
+        // Skip inaccessible properties
+        continue;
+      }
+
       if ($value instanceof ContentData || is_object($value) || is_array($value)) {
         self::processBlockImages($page, $value);
       }
@@ -430,7 +444,7 @@ class MarkdownFileIO extends MarkdownConfig
   {
     if (is_object($item)) {
       $className = get_class($item);
-      
+
       // Skip readonly LetMeDown types entirely
       if (in_array($className, self::$readonlyLetMeDownTypes)) {
         // Still recurse through their properties to find nested items
@@ -439,7 +453,7 @@ class MarkdownFileIO extends MarkdownConfig
           $property->setAccessible(true);
           try {
             $value = $property->getValue($item);
-            
+
             if (is_array($value)) {
               foreach ($value as $nested) {
                 self::processBlockImages($page, $nested);
@@ -453,7 +467,7 @@ class MarkdownFileIO extends MarkdownConfig
         }
         return;
       }
-      
+
       // Try to process html property on non-readonly objects
       if (isset($item->html) && is_string($item->html)) {
         $processedHtml = MarkdownHtmlConverter::processImagesToPageAssets($page, $item->html);
@@ -463,14 +477,14 @@ class MarkdownFileIO extends MarkdownConfig
           // Property is readonly, skip
         }
       }
-      
+
       // Recursively process all properties that are arrays or objects
       $reflection = new \ReflectionObject($item);
       foreach ($reflection->getProperties() as $property) {
         $property->setAccessible(true);
         try {
           $value = $property->getValue($item);
-          
+
           if (is_array($value)) {
             foreach ($value as $nested) {
               self::processBlockImages($page, $nested);
@@ -498,19 +512,19 @@ class MarkdownFileIO extends MarkdownConfig
     if (!is_object($section)) {
       return;
     }
-    
+
     // Process section HTML
     if (isset($section->html) && is_string($section->html)) {
       $section->html = MarkdownHtmlConverter::processImagesToPageAssets($page, $section->html);
     }
-    
+
     // Process section heading HTML if it has one
     if (isset($section->heading) && is_object($section->heading)) {
       if (isset($section->heading->html) && is_string($section->heading->html)) {
         $section->heading->html = MarkdownHtmlConverter::processImagesToPageAssets($page, $section->heading->html);
       }
     }
-    
+
     // Process fields
     if (isset($section->fields) && is_array($section->fields)) {
       foreach ($section->fields as $field) {
@@ -519,14 +533,14 @@ class MarkdownFileIO extends MarkdownConfig
         }
       }
     }
-    
+
     // Process blocks array (and any other nested arrays)
     if (isset($section->blocks) && is_array($section->blocks)) {
       foreach ($section->blocks as $block) {
         self::processBlockImages($page, $block);
       }
     }
-    
+
     // Process subsections
     if (isset($section->subsections) && is_array($section->subsections)) {
       foreach ($section->subsections as $subsection) {
@@ -552,7 +566,7 @@ class MarkdownFileIO extends MarkdownConfig
       $imageBaseUrl = str_replace('{pageId}', $page->id, $imageBaseUrl);
     }
 
-    self::logDebug($page, 'processContentDataImages: starting', [
+    self::logInfo($page, 'processContentDataImages: starting', [
       'hasSources' => !empty($imageSources),
       'hasUrl' => !empty($imageBaseUrl),
     ]);
@@ -560,14 +574,14 @@ class MarkdownFileIO extends MarkdownConfig
     // Attach Pageimage objects (asset binding)
     self::walkContent($page, $content, $imageSources, $imageBaseUrl);
 
-    // Rewrite HTML properties so ->html is final and safe to echo.
-    // This operates on the rendered HTML produced by the parser (render phase)
-    // and mutates HTML properties in ContentData so templates can echo them
-    // without needing additional post-processing.
-    self::logDebug($page, 'processContentDataImages: rewriting HTML into content', [
-      'contentClass' => is_object($content) ? get_class($content) : gettype($content),
-    ]);
+    // Rewrite HTML properties for writable elements. Readonly elements are
+    // intentionally created with final HTML (see processing before parse).
     self::processContentImages($page, $content);
+
+    self::logInfo($page, 'processContentDataImages: complete', [
+      'pageId' => $page->id,
+    ]);
+
   }
 
  /**
@@ -649,7 +663,6 @@ private static function walkContent($page, $item, array $imageSources, string $i
         }
     }
 }
-
 
 }
 
