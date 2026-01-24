@@ -382,6 +382,16 @@ Short bye text.
 ?>
 ```
 
+##### Closing sections
+
+Starting a new `<!-- section:foo -->` implicitly closes the previous section. Also you can  close a section explicitly use the short marker `<!-- / -->`
+
+```markdown
+<!-- section:foo -->
+  Foo content
+<!-- / -->
+```
+
 ##### Orphan sections
 
 If content appears **before the first section tag**, it is collected into an **orphan section**.
@@ -533,6 +543,7 @@ LetMeDown\Section
   subsections: array (0)
 ```
 
+Note: using a sub removes that content from the section’s blocks. It does not become a child block; it becomes a named subsection.
 
 #### Blocks & children
 
