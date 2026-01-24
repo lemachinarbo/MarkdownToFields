@@ -631,6 +631,7 @@ LetMeDown\Block
   heading:
     LetMeDown\HeadingElement
       text: 'About Us'
+      innerHtml: 'About Us'
       html: '<h1>About Us</h1>'
       level: 1
   content:
@@ -746,11 +747,12 @@ You can also drill down to specific elements:
 Each block exposes **only one heading**: the first heading found in that block.
 This is the main heading that defines the block’s title and level.
 
-| Property | Type   | Description                                     |
-| -------- | ------ | ----------------------------------------------- |
-| `text`   | string | Plain text of the block’s main heading          |
-| `html`   | string | Rendered HTML of the heading                    |
-| `level`  | int    | Heading level (`1` for `#`, `2` for `##`, etc.) |
+| Property    | Type   | Description                                     |
+| ----------- | ------ | ----------------------------------------------- |
+| `text`      | string | Plain text of the block’s main heading          |
+| `innerHtml` | string | Rendered inner HTML of the heading              |
+| `html`      | string | Rendered HTML of the heading                    |
+| `level`     | int    | Heading level (`1` for `#`, `2` for `##`, etc.) |
 
 
 
@@ -758,6 +760,7 @@ This is the main heading that defines the block’s title and level.
 ```
 LetMeDown\HeadingElement
   text: 'Digital Studio'
+  innerHtml: '<h1>Digital Studio</h1>'
   html: '<h1>Digital Studio</h1>'
   level: 1
 ```
