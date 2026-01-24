@@ -10,7 +10,7 @@ class MarkdownFileIO extends MarkdownConfig
   protected static function defaultSourceForPage(Page $page): string
   {
     $pageName = trim((string) $page->name);
-    return $pageName !== '' ? ($pageName . '.md') : 'index.md';
+    return $pageName !== '' ? $pageName . '.md' : 'index.md';
   }
 
   protected static function isValidSource(?string $source): bool
@@ -43,8 +43,11 @@ class MarkdownFileIO extends MarkdownConfig
   public static function contentSource(Page $page): string
   {
     $pageId = $page->id;
-    self::logDebug($page, 'contentSource: resolving for page', ['pageName' => $page->name, 'pagePath' => $page->path]);
-    
+    self::logDebug($page, 'contentSource: resolving for page', [
+      'pageName' => $page->name,
+      'pagePath' => $page->path,
+    ]);
+
     if (isset(self::$gettingContentSource[$pageId])) {
       $config = self::requireConfig($page);
       $source = $config['source'];
@@ -150,7 +153,7 @@ class MarkdownFileIO extends MarkdownConfig
 
     $languages = $page->wire('languages');
     $isMultilingual = $languages && count($languages) > 1;
-    
+
     if ($isMultilingual) {
       return $root . $languageCode . '/' . $source;
     } else {
@@ -225,7 +228,9 @@ class MarkdownFileIO extends MarkdownConfig
     // Parse processed markdown directly in-memory so readonly elements are
     // created with final HTML. Prefer in-memory over temp files for cleanliness.
     $content = $parser->loadFromString($processedMarkdown);
-    self::logDebug($page, 'loaded processed markdown from memory', ['language' => $languageCode]);
+    self::logDebug($page, 'loaded processed markdown from memory', [
+      'language' => $languageCode,
+    ]);
 
     self::logInfo(
       $page,
@@ -243,49 +248,58 @@ class MarkdownFileIO extends MarkdownConfig
    * Process image references in markdown source before parsing.
    * Converts ![](01.jpg) to ![](/site/assets/files/1/01.jpg)
    */
-  protected static function processImagesInMarkdown(Page $page, string $markdown): string
-  {
+  protected static function processImagesInMarkdown(
+    Page $page,
+    string $markdown,
+  ): string {
     $config = self::requireConfig($page);
     $imageSources = $config['imageSourcePaths'] ?? [];
     $imageBaseUrl = $config['imageBaseUrl'] ?? null;
-    
+
     if (empty($imageSources) || !$imageBaseUrl) {
       return $markdown;
     }
-    
+
     $imageBaseUrl = str_replace('{pageId}', $page->id, $imageBaseUrl);
     $pagePath = $page->filesManager()->path();
-    
+
     // Regex to find markdown image syntax: ![alt](src)
     $pattern = '/!\[([^\]]*)\]\(([^)]+)\)/';
-    
-    $markdown = preg_replace_callback($pattern, function ($matches) use ($page, $imageSources, $imageBaseUrl, $pagePath) {
-      $alt = $matches[1];
-      $src = $matches[2];
-      
-      // Skip absolute URLs, data URIs, protocol-relative URLs, and already-processed paths
-      if (preg_match('~^(?:https?:|data:|//)~i', $src) || preg_match('~^/~', $src)) {
-        return $matches[0]; // Return unchanged
-      }
-      
-      // Search for image in source paths
-      foreach ($imageSources as $sourcePath) {
-        $fullPath = $sourcePath . $src;
-        if (file_exists($fullPath)) {
-          // Copy to page assets
-          $destPath = $pagePath . basename($src);
-          if (!file_exists($destPath)) {
-            @copy($fullPath, $destPath);
-          }
-          // Return processed URL
-          $processedUrl = $imageBaseUrl . basename($src);
-          return sprintf('![%s](%s)', $alt, $processedUrl);
+
+    $markdown = preg_replace_callback(
+      $pattern,
+      function ($matches) use ($page, $imageSources, $imageBaseUrl, $pagePath) {
+        $alt = $matches[1];
+        $src = $matches[2];
+
+        // Skip absolute URLs, data URIs, protocol-relative URLs, and already-processed paths
+        if (
+          preg_match('~^(?:https?:|data:|//)~i', $src) ||
+          preg_match('~^/~', $src)
+        ) {
+          return $matches[0]; // Return unchanged
         }
-      }
-      
-      return $matches[0]; // Return unchanged if not found
-    }, $markdown);
-    
+
+        // Search for image in source paths
+        foreach ($imageSources as $sourcePath) {
+          $fullPath = $sourcePath . $src;
+          if (file_exists($fullPath)) {
+            // Copy to page assets
+            $destPath = $pagePath . basename($src);
+            if (!file_exists($destPath)) {
+              @copy($fullPath, $destPath);
+            }
+            // Return processed URL
+            $processedUrl = $imageBaseUrl . basename($src);
+            return sprintf('![%s](%s)', $alt, $processedUrl);
+          }
+        }
+
+        return $matches[0]; // Return unchanged if not found
+      },
+      $markdown,
+    );
+
     return $markdown;
   }
 
@@ -398,21 +412,29 @@ class MarkdownFileIO extends MarkdownConfig
       return false;
     }
   }
-  
+
   /**
    * Process images in ContentData HTML properties.
    * Recursively walks through sections, subsections, and fields to rewrite image URLs.
    */
-  protected static function processContentImages(Page $page, ContentData $content): void
-  {
+  protected static function processContentImages(
+    Page $page,
+    ContentData $content,
+  ): void {
     // Process top-level HTML
     if (isset($content->html) && is_string($content->html)) {
-      $content->html = MarkdownHtmlConverter::processImagesToPageAssets($page, $content->html);
-      self::logDebug($page, 'processContentImages: rewrote content->html', ['length' => strlen($content->html)]);
+      $content->html = MarkdownHtmlConverter::processImagesToPageAssets(
+        $page,
+        $content->html,
+      );
+      self::logDebug($page, 'processContentImages: rewrote content->html', [
+        'length' => strlen($content->html),
+      ]);
     }
 
     // Process all properties on ContentData recursively
     $reflection = new \ReflectionObject($content);
+    $seen = [];
     foreach ($reflection->getProperties() as $property) {
       $property->setAccessible(true);
       try {
@@ -422,12 +444,16 @@ class MarkdownFileIO extends MarkdownConfig
         continue;
       }
 
-      if ($value instanceof ContentData || is_object($value) || is_array($value)) {
-        self::processBlockImages($page, $value);
+      if (
+        $value instanceof ContentData ||
+        is_object($value) ||
+        is_array($value)
+      ) {
+        self::processBlockImages($page, $value, $seen);
       }
     }
   }
-  
+
   /**
    * List of LetMeDown object types that are readonly and should not be modified.
    * Currently only headings are immutable by design.
@@ -440,9 +466,15 @@ class MarkdownFileIO extends MarkdownConfig
    * Recursively process images in all objects and arrays.
    * Skips readonly LetMeDown types, attempts to modify writable types.
    */
-  protected static function processBlockImages(Page $page, $item): void
+  protected static function processBlockImages(Page $page, $item, array &$seen = []): void
   {
+    // Prevent infinite recursion on cyclic object graphs
     if (is_object($item)) {
+      $oid = spl_object_id($item);
+      if (isset($seen[$oid])) {
+        return;
+      }
+      $seen[$oid] = true;
       $className = get_class($item);
 
       // Skip readonly LetMeDown types entirely
@@ -456,10 +488,10 @@ class MarkdownFileIO extends MarkdownConfig
 
             if (is_array($value)) {
               foreach ($value as $nested) {
-                self::processBlockImages($page, $nested);
+                self::processBlockImages($page, $nested, $seen);
               }
             } elseif (is_object($value)) {
-              self::processBlockImages($page, $value);
+              self::processBlockImages($page, $value, $seen);
             }
           } catch (\Throwable $e) {
             // Skip properties that can't be accessed
@@ -470,7 +502,10 @@ class MarkdownFileIO extends MarkdownConfig
 
       // Try to process html property on non-readonly objects
       if (isset($item->html) && is_string($item->html)) {
-        $processedHtml = MarkdownHtmlConverter::processImagesToPageAssets($page, $item->html);
+        $processedHtml = MarkdownHtmlConverter::processImagesToPageAssets(
+          $page,
+          $item->html,
+        );
         try {
           $item->html = $processedHtml;
         } catch (\Throwable $e) {
@@ -487,10 +522,10 @@ class MarkdownFileIO extends MarkdownConfig
 
           if (is_array($value)) {
             foreach ($value as $nested) {
-              self::processBlockImages($page, $nested);
+              self::processBlockImages($page, $nested, $seen);
             }
           } elseif (is_object($value)) {
-            self::processBlockImages($page, $value);
+            self::processBlockImages($page, $value, $seen);
           }
         } catch (\Throwable $e) {
           // Skip properties that can't be accessed
@@ -499,11 +534,11 @@ class MarkdownFileIO extends MarkdownConfig
     } elseif (is_array($item)) {
       // Process arrays recursively
       foreach ($item as $nested) {
-        self::processBlockImages($page, $nested);
+        self::processBlockImages($page, $nested, $seen);
       }
     }
   }
-  
+
   /**
    * Process images in a Section object, including nested arrays and objects.
    */
@@ -515,29 +550,46 @@ class MarkdownFileIO extends MarkdownConfig
 
     // Process section HTML
     if (isset($section->html) && is_string($section->html)) {
-      $section->html = MarkdownHtmlConverter::processImagesToPageAssets($page, $section->html);
+      $section->html = MarkdownHtmlConverter::processImagesToPageAssets(
+        $page,
+        $section->html,
+      );
     }
 
     // Process section heading HTML if it has one
     if (isset($section->heading) && is_object($section->heading)) {
-      if (isset($section->heading->html) && is_string($section->heading->html)) {
-        $section->heading->html = MarkdownHtmlConverter::processImagesToPageAssets($page, $section->heading->html);
+      if (
+        isset($section->heading->html) &&
+        is_string($section->heading->html)
+      ) {
+        $section->heading->html = MarkdownHtmlConverter::processImagesToPageAssets(
+          $page,
+          $section->heading->html,
+        );
       }
     }
 
     // Process fields
     if (isset($section->fields) && is_array($section->fields)) {
       foreach ($section->fields as $field) {
-        if (is_object($field) && isset($field->html) && is_string($field->html)) {
-          $field->html = MarkdownHtmlConverter::processImagesToPageAssets($page, $field->html);
+        if (
+          is_object($field) &&
+          isset($field->html) &&
+          is_string($field->html)
+        ) {
+          $field->html = MarkdownHtmlConverter::processImagesToPageAssets(
+            $page,
+            $field->html,
+          );
         }
       }
     }
 
     // Process blocks array (and any other nested arrays)
     if (isset($section->blocks) && is_array($section->blocks)) {
+      $seen = [];
       foreach ($section->blocks as $block) {
-        self::processBlockImages($page, $block);
+        self::processBlockImages($page, $block, $seen);
       }
     }
 
@@ -555,7 +607,9 @@ class MarkdownFileIO extends MarkdownConfig
    */
   protected static function processContentDataImages(Page $page, $content): void
   {
-    if (!$content) return;
+    if (!$content) {
+      return;
+    }
 
     $config = self::requireConfig($page);
     $imageSources = $config['imageSourcePaths'] ?? [];
@@ -581,88 +635,106 @@ class MarkdownFileIO extends MarkdownConfig
     self::logInfo($page, 'processContentDataImages: complete', [
       'pageId' => $page->id,
     ]);
-
   }
 
- /**
- * Get protected blocks array from Section object via Reflection.
- * Falls back to magic property if Reflection fails, with debug logging.
- */
-private static function getSectionBlocks($page, $item): ?array
-{
-    if (!($item instanceof \LetMeDown\Section)) return null;
+  /**
+   * Get protected blocks array from Section object via Reflection.
+   * Falls back to magic property if Reflection fails, with debug logging.
+   */
+  private static function getSectionBlocks($page, $item): ?array
+  {
+    if (!($item instanceof \LetMeDown\Section)) {
+      return null;
+    }
 
     try {
-        $reflection = new \ReflectionClass($item);
-        $blocksProperty = $reflection->getProperty('blocks');
-        $blocksProperty->setAccessible(true);
-        $blocks = $blocksProperty->getValue($item);
-        return (is_array($blocks) || $blocks instanceof \ArrayObject) ? $blocks : null;
+      $reflection = new \ReflectionClass($item);
+      $blocksProperty = $reflection->getProperty('blocks');
+      $blocksProperty->setAccessible(true);
+      $blocks = $blocksProperty->getValue($item);
+      return is_array($blocks) || $blocks instanceof \ArrayObject
+        ? $blocks
+        : null;
     } catch (\Exception $e) {
-        self::logDebug($page, "Reflection failed for Section::blocks, using magic fallback", [
-            'error' => $e->getMessage(),
-            'class' => get_class($item),
-        ]);
-        if (isset($item->blocks)) {
-            $blocks = $item->blocks;
-            return (is_array($blocks) || $blocks instanceof \ArrayObject) ? $blocks : null;
-        }
+      self::logDebug(
+        $page,
+        'Reflection failed for Section::blocks, using magic fallback',
+        [
+          'error' => $e->getMessage(),
+          'class' => get_class($item),
+        ],
+      );
+      if (isset($item->blocks)) {
+        $blocks = $item->blocks;
+        return is_array($blocks) || $blocks instanceof \ArrayObject
+          ? $blocks
+          : null;
+      }
     }
 
     return null;
-}
+  }
 
-/**
- * Walk ContentData tree, processing html in each LetMeDown object and attaching Pageimage.
- */
-private static function walkContent($page, $item, array $imageSources, string $imageBaseUrl): void
-{
-    if (!is_object($item) && !is_array($item) && !($item instanceof \ArrayObject)) return;
+  /**
+   * Walk ContentData tree, processing html in each LetMeDown object and attaching Pageimage.
+   */
+  private static function walkContent(
+    $page,
+    $item,
+    array $imageSources,
+    string $imageBaseUrl,
+  ): void {
+    if (
+      !is_object($item) &&
+      !is_array($item) &&
+      !($item instanceof \ArrayObject)
+    ) {
+      return;
+    }
 
     // Skip HeadingElement (immutable structural node)
     if (is_object($item) && $item instanceof \LetMeDown\HeadingElement) {
-        return;
+      return;
     }
-
 
     // Attach Pageimage if src exists
     if (is_object($item) && isset($item->data['src']) && $item->data['src']) {
-        $img = MarkdownUtilities::pageimage($page, $item);
-        if ($img instanceof Pageimage) {
-            $item->data['img'] = $img;
-            self::logDebug($page, "Attached Pageimage to " . get_class($item), ['src' => $item->data['src']]);
-        }
+      $img = MarkdownUtilities::pageimage($page, $item);
+      if ($img instanceof Pageimage) {
+        $item->data['img'] = $img;
+        self::logDebug($page, 'Attached Pageimage to ' . get_class($item), [
+          'src' => $item->data['src'],
+        ]);
+      }
     }
 
     // Recursively process arrays / ArrayObjects
     if (is_array($item) || $item instanceof \ArrayObject) {
-        foreach ($item as $child) {
-            self::walkContent($page, $child, $imageSources, $imageBaseUrl);
-        }
+      foreach ($item as $child) {
+        self::walkContent($page, $child, $imageSources, $imageBaseUrl);
+      }
     }
 
     // Recursively process object properties
     if (is_object($item)) {
-        foreach (get_object_vars($item) as $value) {
-            if ($value !== null) {
-                self::walkContent($page, $value, $imageSources, $imageBaseUrl);
-            }
+      foreach (get_object_vars($item) as $value) {
+        if ($value !== null) {
+          self::walkContent($page, $value, $imageSources, $imageBaseUrl);
         }
+      }
 
-        // Special handling for Section blocks
-        if ($item instanceof \LetMeDown\Section) {
-            $blocks = self::getSectionBlocks($page, $item);
-            if ($blocks !== null) {
-                self::walkContent($page, $blocks, $imageSources, $imageBaseUrl);
-            }
-        } elseif (isset($item->blocks)) {
-            $blocks = $item->blocks;
-            if ($blocks !== null) {
-                self::walkContent($page, $blocks, $imageSources, $imageBaseUrl);
-            }
+      // Special handling for Section blocks
+      if ($item instanceof \LetMeDown\Section) {
+        $blocks = self::getSectionBlocks($page, $item);
+        if ($blocks !== null) {
+          self::walkContent($page, $blocks, $imageSources, $imageBaseUrl);
         }
+      } elseif (isset($item->blocks)) {
+        $blocks = $item->blocks;
+        if ($blocks !== null) {
+          self::walkContent($page, $blocks, $imageSources, $imageBaseUrl);
+        }
+      }
     }
+  }
 }
-
-}
-
