@@ -56,7 +56,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   {
     return [
       'title' => 'Markdown to fields',
-      'version' => '1.2.6',
+      'version' => '1.2.7',
       'summary' => 'Markdown files as your content source of truth',
       'description' =>
         'Use markdown as your content. Structure it with simple tags, and enjoy the markdown <-> ProcessWire fields sync',
@@ -475,7 +475,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     }
     
     $this->createFields();
-    $enabled = (array) ($this->templates ?? []);
+    $enabled = $this->getEffectiveEnabledTemplates();
     $templates = $this->wire('templates');
 
     $resolvedEditorField = $this->resolveEditorField();
@@ -494,7 +494,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   {
     $fields = $this->wire('fields');
     $templates = $this->wire('templates');
-    $enabled = (array) ($this->templates ?? []);
+    $enabled = $this->getEffectiveEnabledTemplates();
 
     $current = $this->htmlField ?? 'md_editor';
 
