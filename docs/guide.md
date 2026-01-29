@@ -1242,10 +1242,9 @@ title: The Urban Farm Studio.
 name: our-studio
 ---
 
-By default, only the `title` field is synced.
-Other fields (like `name`) are supported, but **only if you explicitly include them** with `includeFrontmatterFields`.
+By default, only the `title` and `name` fields are synced.
 
-If you choose to sync `name`, keep in mind it changes the page URL.
+If you update the `name` attribute, keep in mind that it changes the page URL.
 You’ll need to run a [module refresh](#manual-syncing-markdown-files-to-processwire) (`Modules > Refresh`) to update routing.
 
 Frontmatter **does sync automatically** by default.

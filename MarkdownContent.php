@@ -83,7 +83,7 @@ trait MarkdownContent {
     // Always support core fields explicitly
     $frontmatterMap = [
       'title' => 'title',
-      // 'name'  => 'name',
+      'name'  => 'name',
     ];
 
     if ($autoSync && $this->template) {
