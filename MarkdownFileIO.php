@@ -466,8 +466,11 @@ class MarkdownFileIO extends MarkdownConfig
    * Recursively process images in all objects and arrays.
    * Skips readonly LetMeDown types, attempts to modify writable types.
    */
-  protected static function processBlockImages(Page $page, $item, array &$seen = []): void
-  {
+  protected static function processBlockImages(
+    Page $page,
+    $item,
+    array &$seen = [],
+  ): void {
     // Prevent infinite recursion on cyclic object graphs
     if (is_object($item)) {
       $oid = spl_object_id($item);
@@ -484,6 +487,12 @@ class MarkdownFileIO extends MarkdownConfig
         foreach ($reflection->getProperties() as $property) {
           $property->setAccessible(true);
           try {
+            if (
+              method_exists($property, 'isInitialized') &&
+              !$property->isInitialized($item)
+            ) {
+              continue;
+            }
             $value = $property->getValue($item);
 
             if (is_array($value)) {
@@ -518,6 +527,12 @@ class MarkdownFileIO extends MarkdownConfig
       foreach ($reflection->getProperties() as $property) {
         $property->setAccessible(true);
         try {
+          if (
+            method_exists($property, 'isInitialized') &&
+            !$property->isInitialized($item)
+          ) {
+            continue;
+          }
           $value = $property->getValue($item);
 
           if (is_array($value)) {
