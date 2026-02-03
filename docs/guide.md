@@ -1261,19 +1261,80 @@ We all have to start somewhere, right?
 
 ### Multi-Language Support
 
-The module respects ProcessWire's language system:
+The default ProcessWire installation with the module defaults will use a structure like this:
 
 ```
 content/
-  en/
-    about.md    → English content
-  it/
-    about.md    → Italian content
-  de/
-    about.md    → German content
+├── home.md        → Your home page content
 ```
 
-Same API in templates, different content per language. Language switching happens automatically based on user language.
+When you add a new language (let’s say `es`), and you set your home page name to `es`:
+
+<a id="fig-language-name"></a> **FIG 45:** Example of language page name
+<img src="./language-name.png" width="700">
+
+Your content files must be organized like this:
+
+```
+content/
+├── default/       → default language name
+│   └── home.md    → default home page name
+└── es/            → Spanish language name
+    └── es.md      → Spanish home page name
+```
+
+The folder name for each languages comes from: 
+
+- **language code**: A custom field on the language template  (it doesnt exits by default, but heres how to [add it](#improving-the-structure)) 
+-  Otherwise it falls back to the Processwire **language name**. 
+  
+The filename comes from the **page name**. For the home page, if the page name is empty, the module makes an opinionated choice: it treats `/` as `home` and looks for `home.md`.  
+
+That’s why the default language folder is named `default`, and the Spanish home page is `es.md`: because that’s the name you set in [home page > settings](#fig-language-name).
+
+
+#### Improving the structure
+
+I prefer a structure where all content files are mirrored using same names:
+
+```
+content/
+├── en/
+│   └── home.md    → English content
+├── es/
+│   └── home.md    → Spanish content
+└── de/
+    └── home.md    → German content
+```
+
+To achieve it, all you have to do is:
+
+1. Add a simple `code` text field to the template of languages.
+
+<a id="fig-language-code"></a> **FIG 46:** Code field on language template
+<img src="./language-code.png" width="700">
+
+
+2. Set the code in your language, for example `en` for default, `es` for Spanish.
+
+<a id="fig-language-default-code"></a> **FIG 47:** Default language code name
+<img src="./language-default-code.png" width="700">
+
+3. Set your homepage class to use `home.md` as the content source.
+
+HomePage.php
+```php
+<?php
+
+namespace ProcessWire;
+
+class HomePage extends DefaultPage {
+  public function contentSource(): string {
+    return 'home.md';
+  }
+}
+
+```
 
 
 
@@ -1281,7 +1342,7 @@ Same API in templates, different content per language. Language switching happen
 
 This config goes in your `config.php` file. It controls how markdown is found, parsed, and synced.
 
-<a id="fig-example-config-file"></a> **FIG 45:** Example config file with all properties
+<a id="fig-example-config-file"></a> **FIG 48:** Example config file with all properties
 
 ```php
 $config->MarkdownToFields = [
