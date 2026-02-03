@@ -22,6 +22,14 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     // Keep original markdown format intact; only adjust for render.
     $renderMarkdown = self::ensureStructuralBreaksForRender($markdown);
     $html = self::parsedown()->text($renderMarkdown);
+    
+    if ($page) {
+      self::logInfo($page, 'markdownToHtml: Parsedown output', [
+        'input' => substr($markdown, 0, 100),
+        'output' => substr($html, 0, 150),
+        'hasBr' => strpos($html, '<br') !== false ? 'yes' : 'no',
+      ]);
+    }
 
     if ($page) {
       self::logInfo($page, 'markdownToHtml: about to process images', [
@@ -537,6 +545,8 @@ class MarkdownHtmlConverter extends MarkdownFileIO
   {
     if (!self::$parsedown) {
       self::$parsedown = new Parsedown();
+      // Allow raw HTML in markdown (e.g., <br> tags) to be preserved
+      self::$parsedown->setSafeMode(false);
     }
 
     return self::$parsedown;
