@@ -1271,6 +1271,7 @@ content/
 When you add a new language (let’s say `es`), and you set your home page name to `es`:
 
 <a id="fig-language-name"></a> **FIG 45:** Example of language page name
+
 <img src="./language-name.png" width="700">
 
 Your content files must be organized like this:
@@ -1312,12 +1313,14 @@ To achieve it, all you have to do is:
 1. Add a simple `code` text field to the template of languages.
 
 <a id="fig-language-code"></a> **FIG 46:** Code field on language template
+
 <img src="./language-code.png" width="700">
 
 
 2. Set the code in your language, for example `en` for default, `es` for Spanish.
 
 <a id="fig-language-default-code"></a> **FIG 47:** Default language code name
+
 <img src="./language-default-code.png" width="700">
 
 3. Set your homepage class to use `home.md` as the content source.
