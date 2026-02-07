@@ -193,6 +193,20 @@ class MarkdownConfig extends MarkdownLanguageResolver
     return $config['frontmatter'] ?? [];
   }
 
+  /** Returns the image base URL prefix defined for the page. */
+  public static function getImageBaseUrl(Page $page): ?string
+  {
+    $config = self::config($page);
+    return $config['imageBaseUrl'] ?? null;
+  }
+
+  /** Returns the configured image source paths for the page. */
+  public static function getImageSourcePaths(Page $page): array
+  {
+    $config = self::config($page);
+    return $config['imageSourcePaths'] ?? [];
+  }
+
   protected static function fieldMap(Page $page): array
   {
     $config = self::config($page);
