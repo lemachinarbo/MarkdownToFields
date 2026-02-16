@@ -232,7 +232,7 @@ class MarkdownFileIO extends MarkdownConfig
       'language' => $languageCode,
     ]);
 
-    self::logInfo(
+    self::logDebug(
       $page,
       sprintf('loaded markdown [%s]: %s', $languageCode, $path),
       ['language' => $languageCode],

@@ -24,7 +24,7 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     $html = self::parsedown()->text($renderMarkdown);
     
     if ($page) {
-      self::logInfo($page, 'markdownToHtml: Parsedown output', [
+      self::logDebug($page, 'markdownToHtml: Parsedown output', [
         'input' => substr($markdown, 0, 100),
         'output' => substr($html, 0, 150),
         'hasBr' => strpos($html, '<br') !== false ? 'yes' : 'no',
@@ -32,7 +32,7 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     }
 
     if ($page) {
-      self::logInfo($page, 'markdownToHtml: about to process images', [
+      self::logDebug($page, 'markdownToHtml: about to process images', [
         'htmlLength' => strlen($html),
         'pageId' => $page->id,
       ]);

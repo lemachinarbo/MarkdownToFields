@@ -21,15 +21,11 @@ class MarkdownSyncEngine extends MarkdownSessionManager
   /** Syncs page fields from markdown files. */
   public static function syncFromMarkdown(Page $page): array
   {
-    self::logInfo($page, 'syncFromMarkdown: starting sync', ['pageName' => $page->name, 'pagePath' => $page->path]);
-    
     $config = self::config($page);
     if ($config === null) {
-      self::logInfo($page, 'syncFromMarkdown: no config found, returning empty');
       return [];
     }
 
-    self::logInfo($page, 'syncFromMarkdown: config found', ['markdownField' => $config['markdownField'] ?? '?']);
     self::$syncingFromMarkdown[$page->id] = true;
 
     try {
@@ -43,7 +39,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
   {
     $config = self::config($page);
     if ($config === null) {
-      self::logInfo($page, 'doSyncFromMarkdown: no config found');
       return [];
     }
 
@@ -51,7 +46,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
     $markdownField = $config['markdownField'];
     $htmlField = $config['htmlField'] ?? null;
-    self::logInfo($page, 'doSyncFromMarkdown: fields to sync', ['markdownField' => $markdownField, 'htmlField' => $htmlField]);
 
     $dirtyFields = [];
 
@@ -73,8 +67,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         continue;
       }
 
-      self::logInfo($page, 'doSyncFromMarkdown: loading content for language', ['language' => $languageCode, 'isDefault' => $isDefaultLanguage]);
-      
       $content = $isDefaultLanguage
         ? self::loadMarkdown($page)
         : self::loadLanguageMarkdown($page, $language);
@@ -173,7 +165,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     foreach (array_unique($dirtyFields) as $field) {
       $supports = self::pageSupportsMappedField($page, $field);
       if (!$supports) {
-        self::logInfo($page, 'skipping field: not supported', ['field' => $field]);
+        self::logDebug($page, 'skipping field: not supported', ['field' => $field]);
         continue;
       }
 
@@ -288,17 +280,10 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     }
 
     $postedWrittenLanguages = [];
-    if (!empty($postedMarkdownMap)) {
-      self::logInfo($page, 'postedMarkdown', ['langs' => array_keys($postedMarkdownMap), 'wrote' => $postedWrittenLanguages]);
-    }
 
     $currentHashes = self::languageFileHashes($page, $languageCodes);
 
     try {
-      if ($rawPriorityOverride !== null) {
-        self::logInfo($page, 'rawPriorityOverrideUsed', ['value' => $rawPriorityOverride ? 1 : 0]);
-      }
-
       if (!empty($postedMarkdownMap)) {
         foreach ($languageCodes as $languageCode) {
           if (!array_key_exists($languageCode, $postedMarkdownMap)) continue;
@@ -316,12 +301,8 @@ class MarkdownSyncEngine extends MarkdownSessionManager
                 self::deleteLanguageMarkdown($page, $languageCode);
                 self::rememberFileHash($page, [$languageCode => null]);
                 $postedWrittenLanguages[] = $languageCode;
-                self::logInfo($page, 'deletedPostedMarkdown', ['lang' => $languageCode]);
               } catch (\Throwable $e) {
-                self::logInfo($page, 'deletePostedError', ['lang' => $languageCode, 'error' => $e->getMessage()]);
               }
-            } else {
-              self::logInfo($page, 'postedEmptyNoFile', ['lang' => $languageCode]);
             }
 
             continue;
@@ -343,18 +324,10 @@ class MarkdownSyncEngine extends MarkdownSessionManager
               $page->set($hashField, self::encodeHashPayload($page, [$languageCode => $hash]));
             }
             $postedWrittenLanguages[] = $languageCode;
-            self::logInfo($page, 'wrotePostedMarkdown', ['lang' => $languageCode]);
-          } else {
-            self::logInfo($page, 'postedMatchesExisting', ['lang' => $languageCode]);
           }
         }
       }
     } catch (\Throwable $e) {
-      self::logInfo($page, 'writePostedError', ['error' => $e->getMessage()]);
-    }
-
-    if (!empty($postedWrittenLanguages)) {
-      self::logInfo($page, 'wrotePostedMarkdowns', ['langs' => $postedWrittenLanguages]);
     }
 
     // Skip hash mismatch check if we're currently syncing FROM markdown
@@ -403,11 +376,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         }
 
         if ($hasMarkdownPost) {
-          self::logInfo(
-            $page,
-            'skip hash mismatch: markdown posted for language',
-            ['language' => $mismatch],
-          );
         } else {
           $language = self::resolveLanguage($page, $mismatch);
           $label =
@@ -556,31 +524,9 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         $trimmedHtml = trim($normalizedHtml);
 
         if (self::shouldPreferMarkdownForSync($rawPriorityOverride, $postedMarkdown)) {
-          self::logInfo(
-            $page,
-            'skip html override: raw priority and posted markdown present',
-            ['language' => self::languageLogLabel($page, $language)],
-          );
         } elseif ($trimmedHtml === '' && $postedMarkdown !== null) {
-          self::logInfo(
-            $page,
-            'skip html fallback: empty submission with markdown input',
-            ['language' => self::languageLogLabel($page, $language)],
-          );
         } else {
-          self::logInfo($page, 'syncToMarkdown html input', [
-            'language' => self::languageLogLabel($page, $language),
-            'len' => strlen($normalizedHtml),
-            'preview' => substr(strip_tags($normalizedHtml), 0, 80),
-          ]);
-
           $convertedMarkdown = self::htmlToMarkdown($normalizedHtml, $page);
-
-          self::logInfo($page, 'syncToMarkdown html converted', [
-            'language' => self::languageLogLabel($page, $language),
-            'len' => strlen($convertedMarkdown),
-            'preview' => substr($convertedMarkdown, 0, 80),
-          ]);
 
           $bodyContent = $convertedMarkdown;
         }
@@ -688,34 +634,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
             ? self::frontmatterChangeDetected($previousValue, $documentValue)
             : false;
 
-        if ($field === 'name') {
-          self::logInfo($page, 'syncToMarkdown name state', [
-            'language' => $languageCode,
-            'postedRaw' => $postedFrontRaw,
-            'normalizedPosted' => $normalizedPosted,
-            'documentValue' => $documentValue,
-            'currentValue' => $currentValue,
-            'previousValue' => $previousValue,
-            'fieldChanged' => $fieldChanged,
-            'markdownChanged' => $markdownChanged,
-          ]);
-        }
-
-        if ($field === 'title') {
-          self::logInfo($page, 'syncToMarkdown title frontmatter start', [
-            'language' => $languageCode,
-            'frontKey' => $frontKey,
-            'preferMarkdown' => self::shouldPreferMarkdownForSync($rawPriorityOverride, $postedMarkdown) ? 1 : 0,
-            'postedFrontRaw' => $postedFrontRaw,
-            'normalizedPosted' => $normalizedPosted,
-            'currentValue' => $currentValue,
-            'documentValue' => $documentValue,
-            'previousValue' => $previousValue,
-            'fieldChanged' => $fieldChanged,
-            'markdownChanged' => $markdownChanged,
-          ]);
-        }
-
         if ($fieldChanged && $markdownChanged) {
           if (
             $existingDocument !== null &&
@@ -771,35 +689,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
         if (self::frontmatterValuesDiffer($finalValue, $currentValue)) {
           $frontmatterUpdates[$field] = $finalValue;
-          
-          if ($field === 'title') {
-            self::logInfo($page, 'syncToMarkdown title will update', [
-              'language' => $languageCode,
-              'from' => $currentValue,
-              'to' => $finalValue,
-            ]);
-          }
-        }
-
-        if ($field === 'title') {
-          self::logInfo($page, 'syncToMarkdown title decision', [
-            'language' => $languageCode,
-            'finalValue' => $finalValue,
-            'source' => $fieldChanged ? 'posted' : ($markdownChanged ? 'markdown' : 'fallback'),
-            'currentValue' => $currentValue,
-          ]);
-        }
-
-        if ($field === 'name') {
-          self::logInfo($page, 'syncToMarkdown name decision', [
-            'language' => $languageCode,
-            'finalValue' => $finalValue,
-            'source' => $fieldChanged
-              ? 'posted'
-              : ($markdownChanged
-                ? 'markdown'
-                : 'fallback'),
-          ]);
         }
       }
 
@@ -809,12 +698,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
       if ($frontmatterUpdates) {
         foreach ($frontmatterUpdates as $field => $value) {
-          if ($field === 'title') {
-            self::logInfo($page, 'syncToMarkdown title applying update', [
-              'language' => $languageCode,
-              'value' => $value,
-            ]);
-          }
           self::setFieldValueForLanguage($page, $field, $value, $language);
         }
       }
@@ -831,14 +714,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         ? self::composeDocument($frontmatter, $bodyContent)
         : '';
 
-      if (array_key_exists('title', $frontmatter)) {
-        self::logInfo($page, 'syncToMarkdown title in composed document', [
-          'language' => $languageCode,
-          'frontmatterTitle' => $frontmatter['title'] ?? null,
-          'documentLen' => strlen($document),
-        ]);
-      }
-
       $storedMarkdown = (string) self::getFieldValueForLanguage(
         $page,
         $markdownField,
@@ -852,15 +727,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
           $document,
           $language,
         );
-        
-        if (array_key_exists('title', $frontmatter)) {
-          self::logInfo($page, 'syncToMarkdown markdown field updated with new document', [
-            'language' => $languageCode,
-            'frontmatterTitle' => $frontmatter['title'] ?? null,
-            'oldLen' => strlen($storedMarkdown),
-            'newLen' => strlen($document),
-          ]);
-        }
       }
 
       if ($htmlField && $page->hasField($htmlField)) {
@@ -969,10 +835,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
           "occurrences" => $bindingSyncCount,
         ]);
       }
-    }
-
-    if ($bindingSyncCount > 0) {
-      self::logInfo($page, "syncToMarkdown field bindings updated", ["count" => $bindingSyncCount]);
     }
 
     return $bodyContent;

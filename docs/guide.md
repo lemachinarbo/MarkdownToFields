@@ -1037,6 +1037,7 @@ It keeps:
 
 * the original **markdown**
 * the rendered **HTML**
+* the **innerHtml** (outer tag removed when possible)
 * a plain **text** version
 * the **type** of element (list, image, paragraph, etc.)
 * the parsed **data** (links, images, src, alt, etc.)
@@ -1056,6 +1057,7 @@ Example:
 
 ```php
 LetMeDown\FieldData
+  innerHtml: '<li>...</li>'
   name: 'offices'
   markdown: '- ![Chicago office](chicago.jpg) ...'
   html: '<ul>...</ul>'

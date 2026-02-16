@@ -67,7 +67,6 @@ class MarkdownSyncHooks
   /** Prepare edit form with markdown field data and sync. */
   public static function prepareEditForm(HookEvent $event): void
   {
-    wire('log')->save('markdown-sync', 'Hook: prepareEditForm triggered');
     $page = MarkdownEditor::pageFromProcess($event);
     if (!$page) {
       return;
@@ -196,7 +195,6 @@ class MarkdownSyncHooks
   /** Append hidden hash field to edit form. */
   public static function appendHashField(HookEvent $event): void
   {
-    wire('log')->save('markdown-sync', 'Hook: appendHashField triggered');
     $page = MarkdownEditor::pageFromProcess($event);
     if (!$page) {
       return;
@@ -384,15 +382,6 @@ class MarkdownSyncHooks
   /** Refresh module auto-discovery when modules are loaded. */
   public static function handleModulesRefresh(HookEvent $event): void
   {
-    wire('log')->save('markdown-sync', 'Hook: handleModulesRefresh triggered - starting sync');
-    $user = $event->wire('user');
-    $userName = $user ? ($user->name ?? '') : '?';
-    $url = $event->wire('input') ? ($event->wire('input')->url() ?? '') : '';
-    wire('log')->save(
-      'markdown-sync',
-      sprintf('Modules::refresh hook invoked: user=%s request=%s', $userName, $url),
-    );
-
     // Delegates TTL, locking and logging logic to the batch sync helper
     try {
       $result = MarkdownBatchSync::syncAllManagedPages(
