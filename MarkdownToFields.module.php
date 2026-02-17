@@ -194,19 +194,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     }
     
     // Using fallback: stored module config from previous UI configuration
-    // This is normal but can be risky if the stored config is stale
-    $stored = (array) ($this->templates ?? []);
-    if (!empty($stored)) {
-      $this->wire('log')->save(
-        'markdown-sync',
-        'NOTE: Using templates from stored module config (not from $config->MarkdownToFields). ' .
-        'Enabled: [' . implode(', ', $stored) . ']. ' .
-        'To lock this in config.php, set $config->MarkdownToFields[enabledTemplates].',
-        ['type' => 'info']
-      );
-    }
-    
-    return $stored;
+    return (array) ($this->templates ?? []);
   }
 
   /** True when site config defines enabledTemplates (UI read-only). */
