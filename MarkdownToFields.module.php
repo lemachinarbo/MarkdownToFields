@@ -193,14 +193,16 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       return (array) $mdConfig['enabledTemplates'];
     }
     
-    // SAFETY CHECK: Warn if falling back to module state (potential field loss risk)
+    // Using fallback: stored module config from previous UI configuration
+    // This is normal but can be risky if the stored config is stale
     $stored = (array) ($this->templates ?? []);
     if (!empty($stored)) {
       $this->wire('log')->save(
         'markdown-sync',
-        'WARNING: Using stored module config templates instead of $config->MarkdownToFields[enabledTemplates]. ' .
-        'This may cause field loss if modules are in an inconsistent state. Set enabledTemplates in config.php.',
-        ['type' => 'warning']
+        'NOTE: Using templates from stored module config (not from $config->MarkdownToFields). ' .
+        'Enabled: [' . implode(', ', $stored) . ']. ' .
+        'To lock this in config.php, set $config->MarkdownToFields[enabledTemplates].',
+        ['type' => 'info']
       );
     }
     
@@ -416,9 +418,13 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       
       // Remove from all templates/fieldgroups
       foreach ($templates as $template) {
-        if ($template->fieldgroup->has($field)) {
-          $template->fieldgroup->remove($field);
-          $template->fieldgroup->save();
+        // SAFETY: Reload fieldgroup fresh from database
+        $fieldgroup = $this->wire('fieldgroups')->get($template->fieldgroup->id);
+        if (!$fieldgroup) continue;
+        
+        if ($fieldgroup->has($field)) {
+          $fieldgroup->remove($field);
+          $fieldgroup->save();
         }
       }
       
@@ -589,6 +595,19 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   {
     $fields = $this->wire('fields');
     $fieldgroup = $template->fieldgroup;
+    
+    // SAFETY: Force fresh reload from database to ensure complete state
+    // This prevents issues where WireArray might have stale/partial field data
+    $fieldgroupId = $fieldgroup->id;
+    if ($fieldgroupId) {
+      // Clear any cached state and reload
+      $fieldgroup = $this->wire('fieldgroups')->get($fieldgroupId);
+      if (!$fieldgroup) {
+        $this->wire('log')->save('markdown-sync', 
+          'ERROR: Could not reload fieldgroup for template: ' . $template->name);
+        return;
+      }
+    }
     
     // SAFETY: Track existing non-markdown fields before modification
     $nonMDFieldsBefore = [];
