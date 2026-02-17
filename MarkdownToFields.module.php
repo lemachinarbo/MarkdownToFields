@@ -192,7 +192,19 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     if (isset($mdConfig['enabledTemplates'])) {
       return (array) $mdConfig['enabledTemplates'];
     }
-    return (array) ($this->templates ?? []);
+    
+    // SAFETY CHECK: Warn if falling back to module state (potential field loss risk)
+    $stored = (array) ($this->templates ?? []);
+    if (!empty($stored)) {
+      $this->wire('log')->save(
+        'markdown-sync',
+        'WARNING: Using stored module config templates instead of $config->MarkdownToFields[enabledTemplates]. ' .
+        'This may cause field loss if modules are in an inconsistent state. Set enabledTemplates in config.php.',
+        ['type' => 'warning']
+      );
+    }
+    
+    return $stored;
   }
 
   /** True when site config defines enabledTemplates (UI read-only). */
@@ -577,6 +589,14 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   {
     $fields = $this->wire('fields');
     $fieldgroup = $template->fieldgroup;
+    
+    // SAFETY: Track existing non-markdown fields before modification
+    $nonMDFieldsBefore = [];
+    foreach ($fieldgroup as $f) {
+      if (strpos($f->name, 'md_') !== 0) {
+        $nonMDFieldsBefore[$f->name] = $f;
+      }
+    }
 
     foreach (array_keys($this->fieldDefs) as $name) {
       if ($name === 'md_editor') continue;
@@ -608,6 +628,26 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       if ($selectedEditorField && $fieldgroup->has($selectedEditorField)) {
         $fieldgroup->remove($selectedEditorField);
       }
+    }
+    
+    // SAFETY: Verify non-markdown fields are still present after modifications
+    $nonMDFieldsAfter = [];
+    foreach ($fieldgroup as $f) {
+      if (strpos($f->name, 'md_') !== 0) {
+        $nonMDFieldsAfter[$f->name] = $f;
+      }
+    }
+    
+    $lostFields = array_diff_key($nonMDFieldsBefore, $nonMDFieldsAfter);
+    if (!empty($lostFields)) {
+      // CRITICAL: Don't save if we're losing non-markdown fields!
+      $this->wire('log')->save(
+        'markdown-sync',
+        'CRITICAL: Field loss detected! Not saving fieldgroup for ' . $template->name . 
+        '. Lost fields: ' . implode(', ', array_keys($lostFields)),
+        ['type' => 'critical']
+      );
+      return;  // Abort save to prevent data loss
     }
 
     $fieldgroup->save();
