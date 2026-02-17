@@ -102,7 +102,7 @@ class MarkdownFileIO extends MarkdownConfig
       // Default: use page name with .md extension
       $pageName = trim((string) $page->name);
       if ($pageName !== '') {
-        self::logInfo($page, 'contentSource: using page name default', [
+        self::logDebug($page, 'contentSource: using page name default', [
           'pageName' => $pageName,
           'source' => $pageName . '.md',
         ]);
@@ -635,7 +635,7 @@ class MarkdownFileIO extends MarkdownConfig
       $imageBaseUrl = str_replace('{pageId}', $page->id, $imageBaseUrl);
     }
 
-    self::logInfo($page, 'processContentDataImages: starting', [
+    self::logDebug($page, 'processContentDataImages: starting', [
       'hasSources' => !empty($imageSources),
       'hasUrl' => !empty($imageBaseUrl),
     ]);
@@ -647,7 +647,7 @@ class MarkdownFileIO extends MarkdownConfig
     // intentionally created with final HTML (see processing before parse).
     self::processContentImages($page, $content);
 
-    self::logInfo($page, 'processContentDataImages: complete', [
+    self::logDebug($page, 'processContentDataImages: complete', [
       'pageId' => $page->id,
     ]);
   }

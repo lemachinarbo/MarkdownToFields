@@ -640,7 +640,7 @@ class MarkdownHtmlConverter extends MarkdownFileIO
 
         // Record the rewrite and emit a single concise info-level log per rewrite
         $rewrites[] = ['src' => $src, 'resolved' => $resolved];
-        self::logInfo($page, 'processImagesToPageAssets: rewrote', [
+        self::logDebug($page, 'processImagesToPageAssets: rewrote', [
           'pageId' => $page->id,
           'src' => $src,
           'resolved' => $resolved,
@@ -653,7 +653,7 @@ class MarkdownHtmlConverter extends MarkdownFileIO
 
     // Emit a single summary line per page when at least one image was rewritten.
     if (!empty($rewrites)) {
-      self::logInfo($page, 'processImagesToPageAssets: summary', [
+      self::logDebug($page, 'processImagesToPageAssets: summary', [
         'pageId' => $page->id,
         'rewrites' => count($rewrites),
       ]);
