@@ -56,7 +56,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   {
     return [
       'title' => 'Markdown to fields',
-      'version' => '1.2.13.1',
+      'version' => '1.2.14',
       'summary' => 'Markdown files as your content source of truth',
       'description' =>
         'Use markdown as your content. Structure it with simple tags, and enjoy the markdown <-> ProcessWire fields sync',
@@ -583,6 +583,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   {
     $fields = $this->wire('fields');
     $fieldgroup = $template->fieldgroup;
+    $changed = false;
     
     // SAFETY: Force fresh reload from database to ensure complete state
     // This prevents issues where WireArray might have stale/partial field data
@@ -613,8 +614,10 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       $has = $fieldgroup->has($field);
       if ($enabled && !$has) {
         $fieldgroup->add($field);
+        $changed = true;
       } elseif (!$enabled && $has) {
         $fieldgroup->remove($field);
+        $changed = true;
       }
     }
 
@@ -624,18 +627,24 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     if ($enabled) {
       if ($selectedEditorField && !$fieldgroup->has($selectedEditorField)) {
         $fieldgroup->add($selectedEditorField);
+        $changed = true;
       }
       if ($mdEditorField && $editorField !== 'md_editor' && $fieldgroup->has($mdEditorField)) {
         $fieldgroup->remove($mdEditorField);
+        $changed = true;
       }
     } else {
       if ($mdEditorField && $fieldgroup->has($mdEditorField)) {
         $fieldgroup->remove($mdEditorField);
+        $changed = true;
       }
       if ($selectedEditorField && $fieldgroup->has($selectedEditorField)) {
         $fieldgroup->remove($selectedEditorField);
+        $changed = true;
       }
     }
+
+    if (!$changed) return;
     
     // SAFETY: Verify non-markdown fields are still present after modifications
     $nonMDFieldsAfter = [];
