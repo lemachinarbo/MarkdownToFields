@@ -56,7 +56,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   {
     return [
       'title' => 'Markdown to fields',
-      'version' => '1.2.14',
+      'version' => '1.2.15',
       'summary' => 'Markdown files as your content source of truth',
       'description' =>
         'Use markdown as your content. Structure it with simple tags, and enjoy the markdown <-> ProcessWire fields sync',
@@ -144,6 +144,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $templates = $this->wire('templates');
     $wrapper = new InputfieldWrapper();
     $mdConfig = $this->wire('config')->MarkdownToFields ?? [];
+    $input = $this->wire('input');
 
     $options = $this->buildTemplateOptions($templates);
 
@@ -170,6 +171,41 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     
     $wrapper->add($configFieldset);
 
+    // Image resync action (explicit, manual)
+    $imageFieldset = $modules->get('InputfieldFieldset');
+    $imageFieldset->name = 'image_resync';
+    $imageFieldset->label = 'Image Resync';
+    $imageFieldset->description = 'Resync referenced images from the source library into page assets.';
+
+    $statusLines = [];
+    $statusMessage = 'Click "Resync Images" to start a one-time resync.';
+    if ($input->requestMethod('POST') && $input->post->resync_images) {
+      $result = $this->resyncImagesForManagedPages(10000, $statusLines);
+      $statusMessage = sprintf(
+        'Resync complete. Pages checked: %d. Pages updated: %d. Images refreshed: %d.',
+        $result['processed'],
+        $result['updatedPages'],
+        $result['updatedImages'],
+      );
+    }
+
+    $statusOutput = $modules->get('InputfieldMarkup');
+    $statusOutput->label = 'Resync Status';
+    $statusOutput->value =
+      '<div class="Message"><p>' . htmlspecialchars($statusMessage) . '</p></div>' .
+      '<pre style="background:#f5f5f5; border:1px solid #ddd; border-radius:3px; padding:10px; max-height:240px; overflow:auto; font-size:12px;">' .
+      htmlspecialchars(implode("\n", $statusLines)) .
+      '</pre>';
+    $imageFieldset->add($statusOutput);
+
+    $resyncButton = $modules->get('InputfieldSubmit');
+    $resyncButton->name = 'resync_images';
+    $resyncButton->value = 'Resync Images';
+    $resyncButton->description = 'Runs a one-time resync for images referenced by markdown (no background checks).';
+    $imageFieldset->add($resyncButton);
+
+    $wrapper->add($imageFieldset);
+
     // Configuration reference
     $refFieldset = $modules->get('InputfieldFieldset');
     $refFieldset->name = 'configuration_reference';
@@ -183,6 +219,50 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $wrapper->add($refFieldset);
 
     return $wrapper;
+  }
+
+  private function resyncImagesForManagedPages(int $limit = 10000, array &$log = null): array
+  {
+    $pages = $this->wire('pages')->find("limit={$limit}");
+    $processed = 0;
+    $updatedPages = 0;
+    $updatedImages = 0;
+
+    if (is_array($log)) {
+      $log[] = 'Starting image resync.';
+      $log[] = 'Scanning pages for managed templates...';
+    }
+
+    foreach ($pages as $page) {
+      if (!MarkdownConfig::supportsPage($page)) {
+        continue;
+      }
+
+      $processed++;
+      $count = MarkdownHtmlConverter::resyncImageHashesForPage($page);
+      if ($count > 0) {
+        $updatedPages++;
+        $updatedImages += $count;
+        if (is_array($log)) {
+          $log[] = sprintf('Updated page %d (%s): %d image(s).', $page->id, $page->name, $count);
+        }
+      }
+    }
+
+    if (is_array($log)) {
+      $log[] = sprintf(
+        'Done. Pages checked: %d. Pages updated: %d. Images refreshed: %d.',
+        $processed,
+        $updatedPages,
+        $updatedImages,
+      );
+    }
+
+    return [
+      'processed' => $processed,
+      'updatedPages' => $updatedPages,
+      'updatedImages' => $updatedImages,
+    ];
   }
 
   /** Determine enabled templates from site config or module state. */

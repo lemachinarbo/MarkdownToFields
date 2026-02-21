@@ -130,7 +130,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
       }
 
       if ($htmlField && $page->hasField($htmlField)) {
-        $htmlDocument = self::markdownToHtml($bodyContent, $page);
+        $htmlDocument = self::markdownToHtml($bodyContent, $page, $languageCode);
         $preparedHtml = self::commentsToEditorPlaceholders($htmlDocument);
         $storedHtml = (string) self::getFieldValueForLanguage(
           $page,
@@ -730,7 +730,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
       }
 
       if ($htmlField && $page->hasField($htmlField)) {
-        $htmlDocument = self::markdownToHtml($bodyContent, $page);
+        $htmlDocument = self::markdownToHtml($bodyContent, $page, $languageCode);
         $preparedHtml = self::commentsToEditorPlaceholders($htmlDocument);
         $storedHtml = $storedHtmlString;
         if ($storedHtml === null) {

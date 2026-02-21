@@ -219,15 +219,11 @@ class MarkdownFileIO extends MarkdownConfig
       return null;
     }
 
-    // Rewrite markdown image references to page assets before parsing so
-    // readonly LetMeDown elements are created with final HTML already.
-    $processedMarkdown = self::processImagesInMarkdown($page, $markdown);
-
     $parser = new LetMeDown();
 
     // Parse processed markdown directly in-memory so readonly elements are
     // created with final HTML. Prefer in-memory over temp files for cleanliness.
-    $content = $parser->loadFromString($processedMarkdown);
+    $content = $parser->loadFromString($markdown);
     self::logDebug($page, 'loaded processed markdown from memory', [
       'language' => $languageCode,
     ]);

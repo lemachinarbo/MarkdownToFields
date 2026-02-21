@@ -15,6 +15,7 @@ class MarkdownHtmlConverter extends MarkdownFileIO
   protected static function markdownToHtml(
     string $markdown,
     ?Page $page = null,
+    ?string $languageCode = null,
   ): string {
     if ($markdown === '') {
       return '';
@@ -36,7 +37,7 @@ class MarkdownHtmlConverter extends MarkdownFileIO
         'htmlLength' => strlen($html),
         'pageId' => $page->id,
       ]);
-      $html = self::processImagesToPageAssets($page, $html);
+      $html = self::processImagesToPageAssets($page, $html, $languageCode);
       $config = self::config($page);
       $baseUrl = is_array($config)
         ? $config['imageBaseUrl'] ?? null
@@ -58,6 +59,7 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     }
 
     if ($page) {
+      $html = self::normalizeRuntimeImageUrlsToSource($html, $page);
       $config = self::config($page);
       $baseUrl = is_array($config)
         ? $config['imageBaseUrl'] ?? null
@@ -541,6 +543,47 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     ) ?? $html;
   }
 
+  protected static function normalizeRuntimeImageUrlsToSource(
+    string $html,
+    Page $page,
+  ): string {
+    if ($html === '' || !$page->id) {
+      return $html;
+    }
+
+    $config = $page->wire('config');
+    $base = $config && isset($config->urls->files)
+      ? rtrim((string) $config->urls->files, '/') . '/' . (int) $page->id . '/'
+      : '';
+
+    if ($base === '') {
+      return $html;
+    }
+
+    $pattern = '/(<img\b[^>]*\bsrc\s*=\s*)([\'"])([^\'"]+)(\2)/i';
+
+    return preg_replace_callback(
+      $pattern,
+      function (array $match) use ($base) {
+        $prefix = $match[1];
+        $quote = $match[2];
+        $src = trim($match[3]);
+
+        if (strpos($src, $base) !== 0) {
+          return $match[0];
+        }
+
+        $relative = substr($src, strlen($base));
+        if ($relative === '' || strpos($relative, '/') !== false || strpos($relative, '?') !== false) {
+          return $match[0];
+        }
+
+        return $prefix . $quote . $relative . $quote;
+      },
+      $html,
+    ) ?? $html;
+  }
+
   protected static function parsedown(): Parsedown
   {
     if (!self::$parsedown) {
@@ -580,7 +623,11 @@ class MarkdownHtmlConverter extends MarkdownFileIO
   }
 
   /** Copy referenced images into the page assets folder and rewrite src URLs. */
-  public static function processImagesToPageAssets(Page $page, string $html): string
+  public static function processImagesToPageAssets(
+    Page $page,
+    string $html,
+    ?string $languageCode = null,
+  ): string
   {
     // Skip processing early when there's no HTML or page id
     if ($html === '' || !$page->id) {
@@ -619,20 +666,33 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     
     $matchCount = 0;
     $rewrites = [];
+    $hashes = [];
+    $collectHashes = $languageCode !== null && trim($languageCode) !== '';
     $result = preg_replace_callback(
       $pattern,
-      function (array $match) use ($page, $sourcePaths, $destBasePath, $destBaseUrl, &$matchCount, &$rewrites) {
+      function (array $match) use ($page, $sourcePaths, $destBasePath, $destBaseUrl, &$matchCount, &$rewrites, &$hashes, $collectHashes) {
         $matchCount++;
         $quote = $match[1];
         $src = trim((string) $match[2]);
 
-        $resolved = self::resolveImageForPage(
-          $page,
-          $src,
-          $sourcePaths,
-          $destBasePath,
-          $destBaseUrl,
-        );
+        if ($collectHashes) {
+          $resolved = self::resolveImageForPage(
+            $page,
+            $src,
+            $sourcePaths,
+            $destBasePath,
+            $destBaseUrl,
+            $hashes,
+          );
+        } else {
+          $resolved = self::resolveImageForPage(
+            $page,
+            $src,
+            $sourcePaths,
+            $destBasePath,
+            $destBaseUrl,
+          );
+        }
 
         if ($resolved === null) {
           return $match[0];
@@ -659,6 +719,10 @@ class MarkdownHtmlConverter extends MarkdownFileIO
       ]);
     }
 
+    if ($collectHashes && $hashes) {
+      self::persistImageHashes($page, $languageCode, $hashes);
+    }
+
     return $result ?? $html;
   }
 
@@ -669,6 +733,7 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     array $sourcePaths,
     string $destBasePath,
     string $destBaseUrl,
+    ?array &$hashes = null,
   ): ?string {
     $trimmed = trim($src);
 
@@ -719,6 +784,13 @@ class MarkdownHtmlConverter extends MarkdownFileIO
           @copy($sourceFile, $destPath);
         }
 
+        if (is_array($hashes)) {
+          $hash = hash_file('sha256', $sourceFile);
+          if (is_string($hash) && $hash !== '') {
+            $hashes[$candidate] = $hash;
+          }
+        }
+
         try {
           $wrapper = new Pageimages($page);
           $img = new Pageimage($wrapper, $destPath);
@@ -726,6 +798,174 @@ class MarkdownHtmlConverter extends MarkdownFileIO
         } catch (\Throwable) {
           return $destBaseUrl . ltrim($candidate, '/');
         }
+      }
+    }
+
+    return null;
+  }
+
+  protected static function persistImageHashes(
+    Page $page,
+    ?string $languageCode,
+    array $hashes,
+  ): void {
+    $languageCode = $languageCode !== null ? trim($languageCode) : '';
+    if ($languageCode === '' || !$hashes) {
+      return;
+    }
+
+    $filesManager = $page->filesManager();
+    if (!$filesManager) {
+      return;
+    }
+
+    $path = rtrim($filesManager->path(), '/\\') . '/image-hashes.json';
+    $existing = [];
+
+    if (is_file($path)) {
+      $raw = @file_get_contents($path);
+      if (is_string($raw) && $raw !== '') {
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) {
+          $existing = $decoded;
+        }
+      }
+    }
+
+    $lang = self::determineLanguageCode($page, $languageCode);
+    $current = $existing[$lang] ?? [];
+    if (!is_array($current)) {
+      $current = [];
+    }
+
+    $existing[$lang] = array_merge($current, $hashes);
+
+    $encoded = json_encode($existing);
+    if ($encoded === false) {
+      return;
+    }
+
+    @file_put_contents($path, $encoded);
+  }
+
+  public static function resyncImageHashesForPage(Page $page): int
+  {
+    if (!$page->id) {
+      return 0;
+    }
+
+    $filesManager = $page->filesManager();
+    if (!$filesManager) {
+      return 0;
+    }
+
+    $path = rtrim($filesManager->path(), '/\\') . '/image-hashes.json';
+    if (!is_file($path)) {
+      return 0;
+    }
+
+    $raw = @file_get_contents($path);
+    if (!is_string($raw) || $raw === '') {
+      return 0;
+    }
+
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded) || !$decoded) {
+      return 0;
+    }
+
+    $config = self::config($page) ?? [];
+    $sourcePaths = self::normalizeSourcePaths($config['imageSourcePaths'] ?? []);
+    if (!$sourcePaths) {
+      $sitePath = $page->wire('config')->paths->site ?? null;
+      if ($sitePath) {
+        $sourcePaths[] = self::withTrailingSlash($sitePath . 'images');
+      }
+    }
+
+    if (!$sourcePaths) {
+      return 0;
+    }
+
+    $destBasePath = self::withTrailingSlash($filesManager->path());
+    $updated = 0;
+    $changed = false;
+    $hashCache = [];
+
+    foreach ($decoded as $lang => $map) {
+      if (!is_array($map) || !$map) {
+        continue;
+      }
+
+      $langChanged = false;
+      foreach ($map as $filename => $storedHash) {
+        if (!is_string($filename) || $filename === '') {
+          continue;
+        }
+
+        $sourceFile = self::findImageSourceFile($sourcePaths, $filename);
+        if ($sourceFile === null) {
+          continue;
+        }
+
+        if (!isset($hashCache[$sourceFile])) {
+          $hash = hash_file('sha256', $sourceFile);
+          if (!is_string($hash) || $hash === '') {
+            continue;
+          }
+          $hashCache[$sourceFile] = $hash;
+        }
+
+        $sourceHash = $hashCache[$sourceFile];
+        $destPath = $destBasePath . ltrim($filename, '/');
+        $destHash = is_file($destPath) ? hash_file('sha256', $destPath) : null;
+
+        if (is_string($destHash) && $destHash === $sourceHash) {
+          continue;
+        }
+
+        $destDir = dirname($destPath);
+        if (!is_dir($destDir)) {
+          wire('files')?->mkdir($destDir, true);
+        }
+
+        @copy($sourceFile, $destPath);
+
+        $map[$filename] = $sourceHash;
+        $langChanged = true;
+        $updated++;
+      }
+
+      if ($langChanged) {
+        $decoded[$lang] = $map;
+        $changed = true;
+      }
+    }
+
+    if ($changed) {
+      $encoded = json_encode($decoded);
+      if ($encoded !== false) {
+        @file_put_contents($path, $encoded);
+      }
+    }
+
+    return $updated;
+  }
+
+  protected static function findImageSourceFile(
+    array $sourcePaths,
+    string $filename,
+  ): ?string {
+    $relative = ltrim($filename, '/');
+    if ($relative === '') {
+      return null;
+    }
+
+    foreach ($sourcePaths as $sourceBase) {
+      $sourceBase = self::withTrailingSlash($sourceBase);
+      $candidate = $sourceBase . $relative;
+      if (is_file($candidate)) {
+        return $candidate;
       }
     }
 

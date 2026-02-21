@@ -178,7 +178,26 @@ class MarkdownBatchSync extends MarkdownSyncEngine
           $existingDecoded = self::decodeHashPayload($p, $existingPayload);
           $existingEncoded = self::encodeHashPayload($p, $existingDecoded);
 
+          $imageUpdates = MarkdownHtmlConverter::resyncImageHashesForPage($p);
+          $didImageSync = $imageUpdates > 0;
+
           if ($existingEncoded !== '' && $currentEncoded === $existingEncoded) {
+            if ($didImageSync) {
+              $label = 'images:' . $imageUpdates;
+              $updated++;
+              $updatedPages[] = sprintf('%s [%s]', (string) $p->path, $label);
+              self::logInfo($p, 'page images refreshed', [
+                'changes' => $label,
+              ]);
+              try {
+                $log->save(
+                  $logChannel,
+                  sprintf('Updated %s: %s', (string) $p->path, $label),
+                );
+              } catch (\Throwable $_e) {
+              }
+            }
+
             // Uncomment for deep debugging to see all skipped pages:
             // self::logDebug($p, 'skip page: file hash unchanged', [
             //   'path' => (string) $p->path,
@@ -265,7 +284,7 @@ class MarkdownBatchSync extends MarkdownSyncEngine
             }
           }
           $didDirtySave = !empty($dirtyFields);
-          $didAnySave = $didDirtySave || !empty($didHashSave);
+          $didAnySave = $didDirtySave || !empty($didHashSave) || $didImageSync;
 
           if ($didAnySave) {
             // Only log & count updated pages if we actually persisted something
@@ -284,13 +303,22 @@ class MarkdownBatchSync extends MarkdownSyncEngine
             } else {
               $label = 'hash';
             }
+            if ($didImageSync) {
+              $label = ($label !== '' ? $label . ', ' : '') . 'images:' . $imageUpdates;
+            }
             $updated++;
             $updatedPages[] = sprintf('%s [%s]', (string) $p->path, $label);
 
             // Production-level log for actual updates
-            self::logInfo($p, 'page synced from markdown', [
-              'changes' => $label,
-            ]);
+            if ($didDirtySave || $didHashSave) {
+              self::logInfo($p, 'page synced from markdown', [
+                'changes' => $label,
+              ]);
+            } elseif ($didImageSync) {
+              self::logInfo($p, 'page images refreshed', [
+                'changes' => $label,
+              ]);
+            }
 
             try {
               $log->save(
