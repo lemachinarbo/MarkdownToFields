@@ -804,6 +804,44 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     return null;
   }
 
+  /**
+   * Resolve image and copy to page assets for editor insertion.
+   * Public wrapper for resolveImageForPage without hash collection.
+   * Used by MarkdownToFieldsFrontEditor to ensure images exist in PW assets.
+   */
+  public static function resolveImageForInsertion(Page $page, string $imagePath): ?string
+  {
+    $config = self::config($page) ?? [];
+    $sourcePaths = self::normalizeSourcePaths($config['imageSourcePaths'] ?? []);
+    
+    if (!$sourcePaths) {
+      $sitePath = $page->wire('config')->paths->site ?? null;
+      if ($sitePath) {
+        $sourcePaths[] = self::withTrailingSlash($sitePath . 'images');
+      }
+    }
+
+    $filesManager = $page->filesManager();
+    if (!$filesManager) {
+      return null;
+    }
+
+    $destBasePath = $filesManager->path();
+    $destBaseUrl = $config['imageBaseUrl'] ?? $filesManager->url();
+
+    if (!$destBasePath || !$destBaseUrl || !$sourcePaths) {
+      return null;
+    }
+
+    return self::resolveImageForPage(
+      $page,
+      $imagePath,
+      $sourcePaths,
+      $destBasePath,
+      $destBaseUrl
+    );
+  }
+
   protected static function persistImageHashes(
     Page $page,
     ?string $languageCode,
