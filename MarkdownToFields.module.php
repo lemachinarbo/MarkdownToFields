@@ -174,15 +174,16 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     // Image resync action (explicit, manual)
     $imageFieldset = $modules->get('InputfieldFieldset');
     $imageFieldset->name = 'image_resync';
-    $imageFieldset->label = 'Image Resync';
-    $imageFieldset->description = 'Resync referenced images from the source library into page assets.';
+    $imageFieldset->label = 'Image Refresh';
+    $imageFieldset->description = 'Re-sync images copies the current versions of images from your source library into ProcessWire for all images used in this markdown.
+    Use this if you replaced an image but kept the same filename.';
 
     $statusLines = [];
-    $statusMessage = 'Click "Resync Images" to start a one-time resync.';
+    $statusMessage = 'Click "Refresh Images" to refresh all images from your source folders.';
     if ($input->requestMethod('POST') && $input->post->resync_images) {
       $result = $this->resyncImagesForManagedPages(10000, $statusLines);
       $statusMessage = sprintf(
-        'Resync complete. Pages checked: %d. Pages updated: %d. Images refreshed: %d.',
+        '✓ Done! Checked %d page(s), updated %d page(s), refreshed %d image(s).',
         $result['processed'],
         $result['updatedPages'],
         $result['updatedImages'],
@@ -200,8 +201,8 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
 
     $resyncButton = $modules->get('InputfieldSubmit');
     $resyncButton->name = 'resync_images';
-    $resyncButton->value = 'Resync Images';
-    $resyncButton->description = 'Runs a one-time resync for images referenced by markdown (no background checks).';
+    $resyncButton->value = 'Refresh Images';
+    $resyncButton->description = 'One-time manual refresh. Copies current images from source folders to ProcessWire assets.';
     $imageFieldset->add($resyncButton);
 
     $wrapper->add($imageFieldset);

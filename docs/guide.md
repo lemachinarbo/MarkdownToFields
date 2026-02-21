@@ -1,7 +1,6 @@
 # The MarkdownToFields survival guide. V1.0
 
 Use markdown as your content. Structure it with simple tags, and enjoy the markdown <-> ProcessWire fields sync. That’s MarkdownToFields.
-For a more detailed explanation, check the [readme](../README.md)
 
 ## Why use this?
 
@@ -1143,18 +1142,18 @@ Useful for prices, dates, version numbers, or any value that appears multiple ti
 `price: USD 6000`, you’ll need to trigger a [Manual Sync](#manual-syncing-markdown-files-to-processwire) for that change to be reflected in the rendered content (e.g. “Our premium package costs *USD 6000*”).
 
 
-## Images (Markdown → ProcessWire assets)
+## Images Management
 
 In ProcessWire, you usually create an image field, attach it to a template, and upload images there.
 With this module, you have an alternative.
 
-You just write images using regular Markdown syntax:
+You drop all your images in a folder of your choice (eg: /site/images or /src/images), and then you reference those images in your markdown as if they were in the same folder:
 
 ```markdown
 ![hero](hero.jpg)
 ```
 
-When a sync occurs, the module looks for that file in the default images folder:
+When a sync occurs, the module looks for that file in the images folder:
 
 ```
 site/images/hero.jpg
@@ -1182,11 +1181,8 @@ From there, ProcessWire serves them normally:
 The module does **zero image processing**.
 It just outputs the original image URL. No variants. No compression. No magic.
 
-If you want resizing, crops, formats, etc., that’s your job.
+If you want resizing, crops, formats, etc., that’s your job. You can access the actual `ProcessWire\Pageimage` object via the `img` property:
 
-For that, you can access the actual `ProcessWire\Pageimage` object via the `img` property.
-
----
 
 <a id="fig-image-with-field-tag"></a> **FIG 43:** Image with field tag
 
@@ -1233,6 +1229,15 @@ $config->MarkdownToFields = [
   'imageSourcePaths' => 'myimages/'
 ];
 ```
+
+### Resyncing images
+
+Imagine you are using an image `mypicture.jpg` and you want to replace it, BUT, new image will be also `mypicture.jpg` (same name, different content). You can just overwrite it in your images folder and `resync` it, so Processwire picks the update. You can do it in two ways: 
+
+1. **Module Refresh**: Go to `Modules > Refresh` and automatically any changed images will be copied to ProcessWire's asset folders.
+
+2. **"Image Resync" button** in the module settings.
+
 
 ## Frontmatter
 
