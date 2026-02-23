@@ -367,6 +367,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $html .= "  // content\n";
     $html .= "  'sourcePath' => 'content/',\n";
     $html .= "  'imageBaseUrl' => \$config->urls->files . '{pageId}/',\n";
+    $html .= "  // Must be relative to site/";
     $html .= "  'imageSourcePaths' => \$config->paths->site . 'images/',\n";
     $html .= "\n";
     $html .= "  // frontmatter\n";

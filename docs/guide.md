@@ -1221,12 +1221,8 @@ If you want to customize the folder where your source images are, use:
 ```php
 $config->MarkdownToFields = [
 
-  // absolute and relative paths allowed
-  // /var/www/html/myimages/
-  // myimages/
-  // ../../myimages
-
-  'imageSourcePaths' => 'myimages/'
+  // Relative to site folder 
+  'imageSourcePaths' => $config->paths->site . 'images/'
 ];
 ```
 
@@ -1401,7 +1397,7 @@ $config->MarkdownToFields = [
   `{pageId}` is replaced with the page ID.
 
 - **imageSourcePaths**
-  Folders to search for referenced images.
+  Folders to search for referenced images. Must be relative to `site/` folder or use `$config->paths->site` prefix. Paths outside the ProcessWire site structure are not supported.
 
 - **autoSyncFrontmatter**
   If `true`, frontmatter keys are synced to page fields.
