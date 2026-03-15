@@ -1,103 +1,114 @@
-
+```markdown
 # ProcessWire Module Coding Contract
 
-You are assisting with ProcessWire module development.
+You are assisting with **ProcessWire module** development.
 
-Mantra:
-- You’re coding for a ProcessWire module.
-- Keep it simple. Trust the framework.
-- No enterprise patterns, no abstractions, no defensive over-engineering.
-- Prefer clear, boring, readable code over clever code.
-- Use native ProcessWire APIs and conventions.
-- Avoid smart magic, DSLs, service layers, or unnecessary indirection.
-- If something can be done in one obvious way, do it that way
+## Mantra
 
+- This is a **module**, not an application.
+- **Keep it simple. Trust ProcessWire.**
+- Prefer **clear, boring, readable** code over cleverness.
+- Use **native ProcessWire APIs and conventions**.
+- Avoid enterprise patterns, DSLs, magic helpers, and unnecessary indirection.
+- If there’s **one obvious way**, do that.
 
-Assume the following as hard constraints, not preferences:
+These are **hard constraints**, not preferences.
 
-## Architecture & intent
+## 1) Simplicity & Abstraction Gate
 
-* This is a *module*, not an application.
-* ProcessWire already provides lifecycle, safety, permissions, and IO.
-* Trust the framework, trust processwire API
-* Do not reimplement Processwire API
-* Always look for existing API methods before adding new ones. If you dont know them ask or check the docs.
-* Do not re-implement framework responsibilities.
-* APIs > behavior. Data exposure > helper logic.
-* Refactors must be behavior-preserving. Do not change semantics, output, side effects, or data shape unless explicitly instructed.
+Prefer the **simplest correct implementation**—code a human can understand top-to-bottom.
 
-## Code style
+Do **not** introduce abstractions (services, interfaces, factories, managers, adapters, DTOs, utility layers, etc.) unless they solve a **real, current** problem.
 
-* Prefer boring, explicit, linear code.
-* One obvious way > flexible abstractions.
-* No enterprise patterns: no services, factories, managers, adapters, DTOs.
-* No magic helpers, no DSLs, no reflection hacks.
-* Minimal indirection. If a function can be inline, inline it.
+An abstraction is allowed **only if all three are true**:
+- It removes real duplication or existing complexity.
+- It makes the code easier for a human to understand.
+- It is used in **at least two concrete places**.
 
-## Error handling
+Avoid premature generalization. Optimize for **clarity, maintainability, and debuggability**—not sophistication.
 
-* Use `try/catch` **only** at real system boundaries:
+## 2) Framework First
 
-  * external input
-  * persistence
-  * framework calls that are documented to throw
-* Never catch exceptions just to “be safe”.
-* Never swallow exceptions silently.
-* If failure is unrecoverable, let it fail loudly.
+- ProcessWire already provides lifecycle, safety, permissions, and IO.
+- **Do not reimplement ProcessWire responsibilities or APIs.**
+- Always look for existing API methods before adding your own.
+  - If you’re unsure, **ask or check the docs**.
+- Prefer exposing **data via APIs** over adding “smart” behavior helpers.
+- Refactors must be **behavior-preserving** unless explicitly instructed:
+  - do not change semantics, output, side effects, or data shape.
 
-## Mutability rules
+## 3) Code Style & Structure
 
-* Parsed data is canonical and immutable after creation.
-* No post-parse fixing, patching, or mutation.
-* If data must be transformed, do it *before* object creation.
-* Projection helpers are allowed only if:
+- Prefer **explicit, linear** code.
+- Minimal indirection.
+- One obvious way > flexible abstractions.
+- Inline small logic instead of creating layers to “organize” it.
+- No “architecture as aesthetics”: avoid patterns for their own sake.
 
-  * they are pure
-  * they do not recompute or invent data
-  * they do not mutate originals
+## 4) Error Handling & Boundaries
 
-## Fallback Policy
+Use `try/catch` **only** at real system boundaries:
+- external input
+- persistence
+- framework calls documented to throw
 
-Do not add defensive fallbacks inside deterministic logic.
+Rules:
+- Never catch exceptions “just to be safe”.
+- Never swallow exceptions silently.
+- If failure is unrecoverable, **fail loudly**.
+
+## 5) Determinism, Fallbacks, and Layers
+
+Do not add defensive fallbacks inside **deterministic** logic.  
 Do not turn deterministic systems into probabilistic ones.
 
-## Layered rule
+Layer rule:
+- **Core logic** → strict. No fallbacks. Throw on invalid state or missing required data.
+- **Boundary layer** → tolerant. Fallbacks allowed for external uncertainty (IO, network, user input).
+- **UI layer** → user-friendly. Convert errors into messages; never silence them.
 
-* **Core logic** → strict. No fallbacks. Throw on invalid state or missing required data.
-* **Boundary layer** → tolerant. Fallbacks allowed for external uncertainty (IO, network, user input).
-* **UI layer** → user-friendly. Convert errors into messages, never silence them.
+If it indicates a bug: **fail fast**.  
+If it can happen normally: **handle gracefully**.
 
-If a condition indicates a bug, fail fast.
-If a condition can happen in normal operation, handle gracefully.
+## 6) Data & Mutability
 
+- Parsed data is **canonical** and immutable after creation.
+- No post-parse fixing, patching, or mutation.
+- If transformation is needed, do it **before** object creation.
 
-## Logging
+Projection helpers are allowed only if:
+- they are **pure**
+- they do not recompute or invent data
+- they do not mutate originals
 
-* Log only when something *meaningful changes*.
-* Never log:
+## 7) Logging
 
-  * function entry
-  * configuration
-  * no-ops
-  * early exits
-* One log per actual mutation, maximum.
+- Log only when something **meaningful changes**.
+- One log per actual mutation (max).
 
-## Templates
+Never log:
+- function entry
+- configuration dumps
+- no-ops
+- early exits
 
-* Templates are dumb.
-* No helpers required to “fix” data for templates.
-* If templates need logic, the data model is wrong.
+## 8) Templates
 
-## When proposing changes
+- Templates are **dumb**.
+- No helpers required to “fix” data for templates.
+- If templates need logic, the **data model is wrong**.
 
-* Default to the smallest possible change.
-* Prefer documentation over behavior changes.
-* Prefer explicit opt-in helpers over automatic behavior.
-* Avoid adding new public methods unless they expose data, not behavior.
+## 9) When Proposing Changes
 
-## Tone
+- Default to the **smallest possible change**.
+- Prefer documentation over behavior changes.
+- Prefer explicit **opt-in** helpers over automatic behavior.
+- Avoid adding new public methods unless they **expose data**, not behavior.
 
-* Be direct.
-* No cheerleading.
-* No summaries unless explicitly requested.
-* If something is over-engineered, say so plainly.
+## 10) Tone
+
+- Be direct.
+- No cheerleading.
+- No summaries unless explicitly requested.
+- If something is over-engineered, say so plainly.
+```

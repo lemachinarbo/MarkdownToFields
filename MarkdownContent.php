@@ -4,6 +4,9 @@ namespace ProcessWire;
 
 use LetMeDown\ContentData;
 
+require_once __DIR__ . '/MarkdownNodeData.php';
+require_once __DIR__ . '/MarkdownContentView.php';
+
 /**
  * MarkdownContent Trait
  * 
@@ -152,9 +155,17 @@ trait MarkdownContent {
 
   public function content(): ContentData {
     if ($this->cachedContent === null) {
-      $this->cachedContent = $this->loadContent($this->contentSource());
+      $this->cachedContent = new MarkdownContentView(
+        $this,
+        $this->loadContent($this->contentSource())
+      );
     }
     return $this->cachedContent;
+  }
+
+  /** Returns ProcessWire-aware plain-PHP data for a LetMeDown node or path. */
+  public function contentData($source) {
+    return MarkdownNodeData::fromNode($this, $source, $this->content());
   }
 
   /** Provides view-ready content data for templates. */
@@ -163,4 +174,3 @@ trait MarkdownContent {
   }
 
 }
-
