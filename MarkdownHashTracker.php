@@ -114,11 +114,6 @@ class MarkdownHashTracker extends MarkdownHtmlConverter
       $currentValue = $current[$code] ?? null;
 
       if ($expectedValue !== $currentValue) {
-        self::logDebug($page, 'markdown hash mismatch detected', [
-          'language' => $code,
-          'expected' => $expectedValue,
-          'current' => $currentValue,
-        ]);
         return (string) $code;
       }
     }

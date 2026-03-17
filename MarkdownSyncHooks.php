@@ -60,10 +60,13 @@ class MarkdownSyncHooks
 
       $module->repairMarkdownEditor($fieldName);
       $module->message("Editor field '{$fieldName}' has been configured with required TinyMCE settings.");
-      $module->wire('log')->save('markdown-sync', "Editor field '{$fieldName}' configured with required TinyMCE settings.");
+      MarkdownUtilities::logChannel(
+        null,
+        "Editor field '{$fieldName}' configured with required TinyMCE settings.",
+      );
     }
 
-    $module->wire('log')->save('markdown-sync', 'Template field sync complete.');
+    MarkdownUtilities::logChannel(null, 'Template field sync complete.');
   }
 
   /** Prepare edit form with markdown field data and sync. */
@@ -125,7 +128,11 @@ class MarkdownSyncHooks
       }
     } catch (\Throwable $e) {
       // non-fatal: continue without blocking edit form
-      wire('log')->save('markdown-sync', 'Editor ensure failed: ' . $e->getMessage());
+      MarkdownUtilities::logChannel(
+        $page,
+        'Editor ensure failed',
+        ['message' => $e->getMessage()],
+      );
     }
 
     $documentField = MarkdownConfig::getMarkdownField($page);
@@ -178,19 +185,23 @@ class MarkdownSyncHooks
     try {
       $changedFields = MarkdownSyncEngine::syncFromMarkdown($page);
       MarkdownBoundLinks::persistLinkIndex($page);
-      if (!empty($changedFields)) {
-        wire('log')->save(
-          'markdown-sync',
-          sprintf(
-            'prepareEditForm applied fields: %s for %s',
-            implode(',', $changedFields),
-            (string) $page->path,
-          ),
+      $coreChangedFields = array_values(
+        array_intersect($changedFields, ['name'])
+      );
+      if (!empty($coreChangedFields)) {
+        MarkdownUtilities::logChannel(
+          $page,
+          'prepareEditForm applied fields',
+          ['fields' => implode(',', $coreChangedFields)],
         );
       }
       MarkdownEditor::rememberHash($page);
     } catch (\Throwable $e) {
-      wire('log')->save('markdown-sync', $e->getMessage());
+      MarkdownUtilities::logChannel(
+        $page,
+        'prepareEditForm sync failed',
+        ['message' => $e->getMessage()],
+      );
       $event->wire('session')->error($e->getMessage());
     }
   }
@@ -434,14 +445,15 @@ class MarkdownSyncHooks
         5,
         true,
       );
-      wire('log')->save(
-        'markdown-sync',
+      MarkdownUtilities::logChannel(
+        null,
         sprintf('syncAllManagedPages completed: %d pages synced', $result ?? 0),
       );
     } catch (\Throwable $e) {
-      wire('log')->save(
-        'markdown-sync',
-        'syncAllManagedPages error: ' . $e->getMessage(),
+      MarkdownUtilities::logChannel(
+        null,
+        'syncAllManagedPages error',
+        ['message' => $e->getMessage()],
       );
     }
   }
@@ -501,15 +513,17 @@ class MarkdownSyncHooks
       $event->wire('session')->message(
         sprintf('Created markdown file: %s', $defaultPath)
       );
-      wire('log')->save(
-        'markdown-sync',
-        sprintf('Auto-created markdown file for page "%s" (%s)', $page->title, $defaultPath),
+      MarkdownUtilities::logChannel(
+        $page,
+        'Auto-created markdown file',
+        ['title' => (string) $page->title, 'path' => $defaultPath],
       );
     } catch (\Throwable $e) {
       // Non-fatal: log the error but don't block page save
-      wire('log')->save(
-        'markdown-sync',
-        'ensureMarkdownFileExists error: ' . $e->getMessage(),
+      MarkdownUtilities::logChannel(
+        $page,
+        'ensureMarkdownFileExists error',
+        ['message' => $e->getMessage()],
       );
     }
   }

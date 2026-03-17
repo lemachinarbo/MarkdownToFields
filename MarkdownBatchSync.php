@@ -10,6 +10,22 @@ namespace ProcessWire;
  */
 class MarkdownBatchSync extends MarkdownSyncEngine
 {
+  private static function writeBatchLog(
+    ?Page $page,
+    string $logChannel,
+    string $message,
+  ): void {
+    if ($logChannel === 'markdown-sync') {
+      MarkdownUtilities::logChannel($page, $message);
+      return;
+    }
+
+    $log = wire('log');
+    if ($log) {
+      $log->save($logChannel, $message);
+    }
+  }
+
   /**
    * Synchronizes managed pages from markdown files with optional locking and TTL.
    */
@@ -26,13 +42,12 @@ class MarkdownBatchSync extends MarkdownSyncEngine
     $updated = 0;
     $updatedPages = [];
     $logChannel = $logChannel ?? 'migrate-markdown';
-    $log = wire('log');
 
     $cacheKey = 'markdown-sync-last-run';
     $apcuKey = 'markdown-sync-lock';
 
     try {
-      $log->save($logChannel, 'Starting markdown sync migration');
+      self::writeBatchLog(null, $logChannel, 'Starting markdown sync migration');
     } catch (\Throwable $_e) {
       // Logging is best-effort; ignore errors
     }
@@ -190,7 +205,8 @@ class MarkdownBatchSync extends MarkdownSyncEngine
                 'changes' => $label,
               ]);
               try {
-                $log->save(
+                self::writeBatchLog(
+                  $p,
                   $logChannel,
                   sprintf('Updated %s: %s', (string) $p->path, $label),
                 );
@@ -288,12 +304,6 @@ class MarkdownBatchSync extends MarkdownSyncEngine
           $didAnySave = $didDirtySave || !empty($didHashSave) || $didImageSync;
 
           if ($didAnySave) {
-            // Only log & count updated pages if we actually persisted something
-            if ($didDirtySave && !empty($dirtyFields)) {
-              self::logDebug($p, 'fields updated after markdown sync', [
-                'fields' => implode(',', $dirtyFields),
-              ]);
-            }
             if ($languageChanges) {
               $labelParts = [];
               foreach ($languageChanges as $code => $type) {
@@ -322,7 +332,8 @@ class MarkdownBatchSync extends MarkdownSyncEngine
             }
 
             try {
-              $log->save(
+              self::writeBatchLog(
+                $p,
                 $logChannel,
                 sprintf('Updated %s: %s', (string) $p->path, $label),
               );
@@ -339,7 +350,8 @@ class MarkdownBatchSync extends MarkdownSyncEngine
 
           if ($isProtectedFieldError) {
             // Log prominently for protected field failures
-            $log->save(
+            self::writeBatchLog(
+              $p,
               $logChannel,
               sprintf(
                 'ERROR: Failed to sync %s - %s',
@@ -349,10 +361,17 @@ class MarkdownBatchSync extends MarkdownSyncEngine
             );
           }
 
-          self::logDebug($p, 'syncAllManagedPages failed', [
-            'message' => $e->getMessage(),
-            'protectedFieldError' => $isProtectedFieldError,
-          ]);
+          if (!$isProtectedFieldError) {
+            self::writeBatchLog(
+              $p,
+              $logChannel,
+              sprintf(
+                'ERROR: Failed to sync %s - %s',
+                (string) $p->path,
+                $e->getMessage(),
+              ),
+            );
+          }
         }
       }
     } finally {
@@ -377,7 +396,8 @@ class MarkdownBatchSync extends MarkdownSyncEngine
     }
 
     try {
-      $log->save(
+      self::writeBatchLog(
+        null,
         $logChannel,
         sprintf(
           'Markdown sync migration done (%d pages; %d updated)',
@@ -397,7 +417,7 @@ class MarkdownBatchSync extends MarkdownSyncEngine
         if ($more > 0) {
           $message .= sprintf(' ... +%d more', $more);
         }
-        $log->save($logChannel, $message);
+        self::writeBatchLog(null, $logChannel, $message);
       }
     } catch (\Throwable $_e) {
       // ignore

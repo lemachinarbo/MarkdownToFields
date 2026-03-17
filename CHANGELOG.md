@@ -4,6 +4,8 @@
 
 - Add config option to control whether markdown links should be automatically updated when the linked page moves (linkSync).
 - Fixes stale internal link updates when pages or their parents move, and allows the homepage name to be empty so the root URL stays /.
+- Markdown Editor content now updates when internal links are rewritten, avoiding stale content.
+- Logging is quieter and only emits debug details when enabled.
 
 ## v1.2.16
 

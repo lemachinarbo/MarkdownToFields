@@ -52,15 +52,65 @@ class MarkdownBoundLinks extends MarkdownFileIO
     $page->save(self::FIELD_NAME);
   }
 
-  public static function refreshReferencesForPage(Page $targetPage): void
+  public static function persistLinkIndexFromStoredPage(Page $page): void
+  {
+    if (
+      !$page->id ||
+      !$page->hasField(self::FIELD_NAME) ||
+      !MarkdownConfig::isLinkSyncEnabled($page)
+    ) {
+      return;
+    }
+
+    $storedPage = $page->wire('pages')->get((int) $page->id);
+    if (!$storedPage instanceof Page || !$storedPage->id) {
+      return;
+    }
+
+    $payload = self::buildIndexPayload($storedPage);
+    $page->of(false);
+    $page->set(self::FIELD_NAME, $payload);
+    $page->save(self::FIELD_NAME);
+  }
+
+  public static function capturePageTreeUrls(Page $page): array
+  {
+    if (!$page->id) {
+      return [];
+    }
+
+    $urlsByPageId = [];
+    $targets = [$page];
+
+    $descendants = $page->wire('pages')->find(
+      'has_parent=' . (int) $page->id . ', include=all',
+    );
+
+    foreach ($descendants as $descendant) {
+      if ($descendant instanceof Page && $descendant->id) {
+        $targets[] = $descendant;
+      }
+    }
+
+    foreach ($targets as $targetPage) {
+      $urlsByPageId[(int) $targetPage->id] = self::pageUrlsByLanguage($targetPage);
+    }
+
+    return $urlsByPageId;
+  }
+
+  public static function refreshReferencesForPage(
+    Page $targetPage,
+    array $oldUrlsByPageId = [],
+  ): array
   {
     if (!$targetPage->id) {
-      return;
+      return ['candidatePages' => 0, 'affectedPages' => 0, 'rewrittenLinks' => 0];
     }
 
     $templates = self::enabledTemplateNames($targetPage);
     if ($templates === []) {
-      return;
+      return ['candidatePages' => 0, 'affectedPages' => 0, 'rewrittenLinks' => 0];
     }
 
     $selector =
@@ -70,6 +120,10 @@ class MarkdownBoundLinks extends MarkdownFileIO
       self::FIELD_NAME .
       '!=';
     $pages = $targetPage->wire('pages')->find($selector);
+
+    $candidatePages = 0;
+    $affectedPages = 0;
+    $rewrittenLinks = 0;
 
     foreach ($pages as $page) {
       if (!$page instanceof Page || !$page->id) {
@@ -81,64 +135,105 @@ class MarkdownBoundLinks extends MarkdownFileIO
         continue;
       }
 
+      $candidatePages++;
+
       $index = self::decodeIndexPayload($payload);
       $linksByLanguage = $index['links'] ?? [];
       if (!is_array($linksByLanguage) || $linksByLanguage === []) {
-        continue;
+        $linksByLanguage = [];
       }
 
       $pageChanged = false;
-
-      foreach ($linksByLanguage as $languageCode => $entries) {
-        if (!is_array($entries) || $entries === []) {
-          continue;
+      $oldUrlsByLanguage = $oldUrlsByPageId[(int) $targetPage->id] ?? [];
+      $languagesToCheck = array_keys($linksByLanguage);
+      foreach (array_keys($oldUrlsByLanguage) as $languageCode) {
+        if (!in_array($languageCode, $languagesToCheck, true)) {
+          $languagesToCheck[] = $languageCode;
         }
+      }
 
+      if ($languagesToCheck === []) {
+        continue;
+      }
+
+      foreach ($languagesToCheck as $languageCode) {
+        $entries = $linksByLanguage[$languageCode] ?? [];
         $markdown = self::readLanguageMarkdown($page, (string) $languageCode);
         if ($markdown === null) {
           continue;
         }
 
-        $updated = self::refreshMarkdownLinks(
+        [$updated, $changedLinks] = self::refreshMarkdownLinks(
           $page,
           $targetPage,
           $markdown,
           (string) $languageCode,
           $entries,
+          is_array($oldUrlsByLanguage) ? $oldUrlsByLanguage : [],
         );
 
-        if ($updated === $markdown) {
+        if ($updated === $markdown || $changedLinks === 0) {
           continue;
         }
 
         self::saveLanguageMarkdown($page, $updated, (string) $languageCode);
+        self::syncMarkdownFieldFromDocument($page, $updated, (string) $languageCode);
         $pageChanged = true;
+        $rewrittenLinks += $changedLinks;
       }
 
       if ($pageChanged) {
         self::persistLinkIndex($page);
+        $affectedPages++;
       }
     }
+
+    return [
+      'candidatePages' => $candidatePages,
+      'affectedPages' => $affectedPages,
+      'rewrittenLinks' => $rewrittenLinks,
+    ];
   }
 
-  public static function refreshReferencesForPageTree(Page $page): void
+  public static function refreshReferencesForPageTree(
+    Page $page,
+    array $oldUrlsByPageId = [],
+  ): void
   {
     if (!$page->id) {
       return;
     }
 
-    self::refreshReferencesForPage($page);
+    $candidatePages = 0;
+    $affectedPages = 0;
+    $rewrittenLinks = 0;
 
-    $affectedPages = $page->wire('pages')->find(
+    $result = self::refreshReferencesForPage($page, $oldUrlsByPageId);
+    $candidatePages += (int) ($result['candidatePages'] ?? 0);
+    $affectedPages += (int) ($result['affectedPages'] ?? 0);
+    $rewrittenLinks += (int) ($result['rewrittenLinks'] ?? 0);
+
+    $descendants = $page->wire('pages')->find(
       'has_parent=' . (int) $page->id . ', include=all',
     );
 
-    foreach ($affectedPages as $affectedPage) {
+    foreach ($descendants as $affectedPage) {
       if (!$affectedPage instanceof Page || !$affectedPage->id) {
         continue;
       }
 
-      self::refreshReferencesForPage($affectedPage);
+      $result = self::refreshReferencesForPage($affectedPage, $oldUrlsByPageId);
+      $candidatePages += (int) ($result['candidatePages'] ?? 0);
+      $affectedPages += (int) ($result['affectedPages'] ?? 0);
+      $rewrittenLinks += (int) ($result['rewrittenLinks'] ?? 0);
+    }
+
+    if ($candidatePages > 0 || $affectedPages > 0 || $rewrittenLinks > 0) {
+      self::logDebug($page, 'link references checked', [
+        'candidatePages' => $candidatePages,
+        'affectedPages' => $affectedPages,
+        'rewrittenLinks' => $rewrittenLinks,
+      ]);
     }
   }
 
@@ -148,7 +243,8 @@ class MarkdownBoundLinks extends MarkdownFileIO
     string $markdown,
     string $languageCode,
     array $entries,
-  ): string {
+    array $oldUrlsByLanguage = [],
+  ): array {
     $replacements = [];
 
     foreach ($entries as $entry) {
@@ -174,13 +270,23 @@ class MarkdownBoundLinks extends MarkdownFileIO
       $replacements[$href] = $resolvedHref;
     }
 
-    if ($replacements === []) {
-      return $markdown;
+    $oldHref = trim((string) ($oldUrlsByLanguage[$languageCode] ?? ''));
+    if ($oldHref !== '') {
+      $resolvedHref = self::pageUrlForLanguage($targetPage, $languageCode);
+      if ($resolvedHref !== '' && $resolvedHref !== $oldHref) {
+        $replacements[$oldHref] = $resolvedHref;
+      }
     }
 
-    return (string) preg_replace_callback(
+    if ($replacements === []) {
+      return [$markdown, 0];
+    }
+
+    $replacementCount = 0;
+
+    $updated = (string) preg_replace_callback(
       self::LINK_PATTERN,
-      static function (array $matches) use ($replacements): string {
+      static function (array $matches) use ($replacements, &$replacementCount): string {
         $label = (string) ($matches[1] ?? '');
         $href = (string) ($matches[2] ?? '');
         $title = (string) ($matches[3] ?? '');
@@ -188,6 +294,8 @@ class MarkdownBoundLinks extends MarkdownFileIO
         if (!isset($replacements[$href])) {
           return $matches[0];
         }
+
+        $replacementCount++;
 
         $markdown = '[' . $label . '](' . $replacements[$href];
         if ($title !== '') {
@@ -199,6 +307,8 @@ class MarkdownBoundLinks extends MarkdownFileIO
       },
       $markdown,
     );
+
+    return [$updated, $replacementCount];
   }
 
   private static function extractResolvedLinks(
@@ -311,6 +421,48 @@ class MarkdownBoundLinks extends MarkdownFileIO
     }
 
     return (string) $targetPage->url;
+  }
+
+  private static function syncMarkdownFieldFromDocument(
+    Page $page,
+    string $document,
+    string $languageCode,
+  ): void {
+    $markdownField = self::getMarkdownField($page);
+    if (
+      !is_string($markdownField) ||
+      $markdownField === '' ||
+      !self::pageSupportsMappedField($page, $markdownField)
+    ) {
+      return;
+    }
+
+    $language = self::resolveLanguage($page, $languageCode);
+
+    $page->of(false);
+
+    if ($language instanceof Language && !self::isDefaultLanguage($page, $language)) {
+      if (method_exists($page, 'setLanguageValue')) {
+        $page->setLanguageValue($language, $markdownField, $document);
+      } else {
+        return;
+      }
+    } else {
+      $page->set($markdownField, $document);
+    }
+
+    $page->save($markdownField);
+  }
+
+  private static function pageUrlsByLanguage(Page $page): array
+  {
+    $urls = [];
+
+    foreach (self::languageIdentifiers($page) as $languageCode) {
+      $urls[$languageCode] = self::pageUrlForLanguage($page, $languageCode);
+    }
+
+    return $urls;
   }
 
   private static function readLanguageMarkdown(

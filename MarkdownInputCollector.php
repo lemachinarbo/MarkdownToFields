@@ -24,46 +24,6 @@ class MarkdownInputCollector extends MarkdownFieldSync
       if ($defaultValue === null) {
         $defaultValue = $input->post('_pw_page_name');
       }
-
-      $rawKeys = array_keys($_POST ?? []);
-      $postKeys = array_slice($rawKeys, 0, 20);
-      $nameKeys = array_values(
-        array_filter(
-          $rawKeys,
-          static fn($key) => stripos((string) $key, 'name') !== false,
-        ),
-      );
-      $nameSamples = [];
-      foreach (array_slice($nameKeys, 0, 5) as $key) {
-        $value = $_POST[$key] ?? null;
-        if (is_scalar($value)) {
-          $description = (string) $value;
-        } elseif (is_array($value)) {
-          $description = 'array(' . count($value) . ')';
-        } elseif (is_object($value)) {
-          $description = 'object(' . get_class($value) . ')';
-        } elseif ($value === null) {
-          $description = 'null';
-        } else {
-          $description = gettype($value);
-        }
-        $nameSamples[] = $key . '=' . $description;
-      }
-      self::logDebug($page, 'collect submitted value default probe', [
-        'field' => $field,
-        'defaultPresent' => array_key_exists($field, $_POST ?? []),
-        'defaultType' => is_object($defaultValue)
-          ? get_class($defaultValue)
-          : gettype($defaultValue),
-        'defaultValue' => is_scalar($defaultValue)
-          ? (string) $defaultValue
-          : (is_array($defaultValue)
-            ? 'array'
-            : null),
-        'postKeys' => implode(', ', $postKeys),
-        'nameKeys' => implode(', ', array_slice($nameKeys, 0, 20)),
-        'nameSamples' => $nameSamples ? implode(', ', $nameSamples) : null,
-      ]);
     }
 
     if ($defaultValue !== null) {
@@ -86,18 +46,6 @@ class MarkdownInputCollector extends MarkdownFieldSync
           if ($value === null) {
             continue;
           }
-
-          if (is_array($value)) {
-            $context = ['keys' => array_keys($value)];
-          } else {
-            $context = ['value' => self::summarizeValue($value)];
-          }
-
-          self::logDebug(
-            $page,
-            sprintf('collect submitted value for %s via %s', $field, $key),
-            $context,
-          );
 
           self::registerPostedLanguageValue(
             $page,

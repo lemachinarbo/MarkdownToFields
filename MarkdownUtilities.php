@@ -7,25 +7,35 @@ class MarkdownUtilities
   protected const DEBUG_CONFIG_FLAG = 'debug';
   protected const LOG_CHANNEL = 'markdown-sync';
 
+  public static function loggingEnabled(): bool
+  {
+    $config = wire('config');
+    if (!$config) {
+      return false;
+    }
+
+    $moduleConfig = $config->MarkdownToFields ?? [];
+    return (bool) ($moduleConfig[self::DEBUG_CONFIG_FLAG] ?? false);
+  }
+
+  public static function logChannel(
+    ?Page $page,
+    string $message,
+    array $context = [],
+  ): void {
+    if (!self::loggingEnabled()) {
+      return;
+    }
+
+    self::writeLog($page, $message, $context);
+  }
+
   protected static function logDebug(
     ?Page $page,
     string $message,
     array $context = [],
   ): void {
-    $config = wire('config');
-    $enabled = false;
-
-    if ($config) {
-      // Check module config first (MarkdownToFields.debug)
-      $moduleConfig = $config->MarkdownToFields ?? [];
-      $enabled = (bool) ($moduleConfig['debug'] ?? false);
-    }
-
-    if (!$enabled) {
-      return;
-    }
-
-    self::writeLog($page, $message, $context);
+    self::logChannel($page, $message, $context);
   }
 
   protected static function logInfo(
@@ -33,7 +43,7 @@ class MarkdownUtilities
     string $message,
     array $context = [],
   ): void {
-    self::writeLog($page, $message, $context);
+    self::logChannel($page, $message, $context);
   }
 
   private static function writeLog(

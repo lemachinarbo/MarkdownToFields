@@ -25,18 +25,6 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     $html = self::parsedown()->text($renderMarkdown);
     
     if ($page) {
-      self::logDebug($page, 'markdownToHtml: Parsedown output', [
-        'input' => substr($markdown, 0, 100),
-        'output' => substr($html, 0, 150),
-        'hasBr' => strpos($html, '<br') !== false ? 'yes' : 'no',
-      ]);
-    }
-
-    if ($page) {
-      self::logDebug($page, 'markdownToHtml: about to process images', [
-        'htmlLength' => strlen($html),
-        'pageId' => $page->id,
-      ]);
       $html = self::processImagesToPageAssets($page, $html, $languageCode);
       $config = self::config($page);
       $baseUrl = is_array($config)
@@ -698,13 +686,8 @@ class MarkdownHtmlConverter extends MarkdownFileIO
           return $match[0];
         }
 
-        // Record the rewrite and emit a single concise info-level log per rewrite
+        // Track rewrites and emit one summary line after processing.
         $rewrites[] = ['src' => $src, 'resolved' => $resolved];
-        self::logDebug($page, 'processImagesToPageAssets: rewrote', [
-          'pageId' => $page->id,
-          'src' => $src,
-          'resolved' => $resolved,
-        ]);
 
         return str_replace($quote . $src . $quote, $quote . $resolved . $quote, $match[0]);
       },

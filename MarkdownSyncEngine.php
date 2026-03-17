@@ -101,10 +101,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         );
         if ($syncedBodyContent !== $bodyContent) {
           // Body content changed - compose new document with updated body
-          self::logDebug($page, 'syncFromMarkdown: binding sync changed body content', [
-            'bodyLengthBefore' => strlen($bodyContent),
-            'bodyLengthAfter' => strlen($syncedBodyContent),
-          ]);
           $document = self::composeDocument($frontmatter, $syncedBodyContent);
           $bodyContent = $syncedBodyContent;
           
@@ -165,20 +161,24 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     foreach (array_unique($dirtyFields) as $field) {
       $supports = self::pageSupportsMappedField($page, $field);
       if (!$supports) {
-        self::logDebug($page, 'skipping field: not supported', ['field' => $field]);
         continue;
       }
 
+      $oldUrlsByPageId = [];
+
       try {
-        self::logInfo(
-          $page,
-          sprintf('saving field %s after markdown sync', $field),
-        );
+        if ($field === 'name' && MarkdownConfig::isLinkSyncEnabled($page)) {
+          $oldUrlsByPageId = MarkdownBoundLinks::capturePageTreeUrls(
+            $page->wire('pages')->get((int) $page->id),
+          );
+          MarkdownBoundLinks::persistLinkIndexFromStoredPage($page);
+        }
+
         $page->save($field);
         $savedFields[] = $field;
 
         if ($field === 'name' && MarkdownConfig::isLinkSyncEnabled($page)) {
-          MarkdownBoundLinks::refreshReferencesForPageTree($page);
+          MarkdownBoundLinks::refreshReferencesForPageTree($page, $oldUrlsByPageId);
         }
       } catch (\Throwable $e) {
         $failedFields[$field] = $e->getMessage();
@@ -187,14 +187,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
           sprintf('failed to save field %s: %s', $field, $e->getMessage()),
         );
       }
-    }
-
-    if ($savedFields) {
-      self::logInfo(
-        $page,
-        sprintf('synced from markdown: %d fields updated', count($savedFields)),
-        ['fields' => implode(', ', $savedFields)],
-      );
     }
 
     if ($failedFields) {
@@ -219,16 +211,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         self::logInfo($page, $errorMsg);
         throw new WireException($errorMsg);
       }
-    }
-
-    if ($savedFields) {
-      self::logDebug(
-        $page,
-        sprintf('synced %d fields from markdown', count($savedFields)),
-        ['fields' => $savedFields],
-      );
-    } else {
-      self::logDebug($page, 'no fields changed from markdown sync');
     }
 
     return $savedFields;
@@ -826,19 +808,16 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     $bindingSyncCount = 0;
     foreach ($frontmatter as $fieldName => $frontValue) {
       $pattern = "/(<!--\s+field:" . preg_quote($fieldName, "/") . "\s+-->.*?)(\*|__)([^*_]+)\\2/s";
-      $beforeSync = $bodyContent;
       $bodyContent = preg_replace_callback($pattern, function($matches) use ($frontValue, &$bindingSyncCount) {
         $bindingSyncCount++;
         return $matches[1] . $matches[2] . $frontValue . $matches[2];
       }, $bodyContent);
-      
-      if ($bodyContent !== $beforeSync) {
-        self::logDebug($page, "syncBindingsToFrontmatter field synced", [
-          "field" => $fieldName,
-          "value" => $frontValue,
-          "occurrences" => $bindingSyncCount,
-        ]);
-      }
+    }
+
+    if ($bindingSyncCount > 0) {
+      self::logDebug($page, 'field bindings synced', [
+        'occurrences' => $bindingSyncCount,
+      ]);
     }
 
     return $bodyContent;

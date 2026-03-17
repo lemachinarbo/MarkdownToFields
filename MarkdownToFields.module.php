@@ -552,7 +552,10 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $this->wire('modules')->saveConfig($this, ['templates' => []]);
     
     if ($deletedCount > 0) {
-      $log->save('markdown-sync', "Uninstall complete: removed $deletedCount fields");
+      MarkdownUtilities::logChannel(
+        null,
+        "Uninstall complete: removed $deletedCount fields",
+      );
     }
   }
 
@@ -591,7 +594,10 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   public function syncTemplateFields(): void
   {
     if (self::$uninstalling) {
-      $this->wire('log')->save('markdown-sync', 'Template field sync skipped (uninstalling)');
+      MarkdownUtilities::logChannel(
+        null,
+        'Template field sync skipped (uninstalling)',
+      );
       return;
     }
     
@@ -690,7 +696,10 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $currentConfig = $this->wire('modules')->getConfig($this) ?? [];
     $currentConfig['htmlField'] = $field;
     $this->wire('modules')->saveConfig($this, $currentConfig);
-    $this->wire('log')->save('markdown-sync', "Editor field set to {$field} via resolveEditorField");
+    MarkdownUtilities::logChannel(
+      null,
+      "Editor field set to {$field} via resolveEditorField",
+    );
   }
 
   /** Sync a single template's fieldgroup for Markdown fields and editor field. */
@@ -707,8 +716,11 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       // Clear any cached state and reload
       $fieldgroup = $this->wire('fieldgroups')->get($fieldgroupId);
       if (!$fieldgroup) {
-        $this->wire('log')->save('markdown-sync', 
-          'ERROR: Could not reload fieldgroup for template: ' . $template->name);
+        MarkdownUtilities::logChannel(
+          null,
+          'Fieldgroup reload failed',
+          ['template' => $template->name],
+        );
         return;
       }
     }
@@ -772,11 +784,13 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $lostFields = array_diff_key($nonMDFieldsBefore, $nonMDFieldsAfter);
     if (!empty($lostFields)) {
       // CRITICAL: Don't save if we're losing non-markdown fields!
-      $this->wire('log')->save(
-        'markdown-sync',
-        'CRITICAL: Field loss detected! Not saving fieldgroup for ' . $template->name . 
-        '. Lost fields: ' . implode(', ', array_keys($lostFields)),
-        ['type' => 'critical']
+      MarkdownUtilities::logChannel(
+        null,
+        'CRITICAL: Field loss detected',
+        [
+          'template' => $template->name,
+          'lostFields' => implode(', ', array_keys($lostFields)),
+        ],
       );
       return;  // Abort save to prevent data loss
     }

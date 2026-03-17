@@ -102,14 +102,6 @@ class MarkdownFieldSync extends MarkdownHashTracker
     }
 
     if (!self::pageSupportsMappedField($page, $field)) {
-      self::logDebug(
-        $page,
-        sprintf(
-          'skip writing %s (%s): field missing on template',
-          $field,
-          $languageLabel,
-        ),
-      );
       return;
     }
 
@@ -136,25 +128,8 @@ class MarkdownFieldSync extends MarkdownHashTracker
     }
 
     if ($written) {
-      self::logDebug(
-        $page,
-        sprintf('write %s (%s) language value', $field, $languageLabel),
-        [
-          'len' => self::valueLength($value),
-          'value' => self::summarizeValue($value),
-        ],
-      );
       return;
     }
-
-    self::logDebug(
-      $page,
-      sprintf(
-        'skip writing %s (%s): language API unavailable',
-        $field,
-        $languageLabel,
-      ),
-    );
   }
 
   protected static function writeLanguageFieldValueFallback(
@@ -548,14 +523,6 @@ class MarkdownFieldSync extends MarkdownHashTracker
         trim((string) $pageValue) === '' &&
         !self::allowsEmptyFrontmatterValue($page, $field)
       ) {
-        self::logDebug(
-          $page,
-          sprintf(
-            'skip field %s for %s: empty frontmatter value',
-            $field,
-            self::languageLogLabel($page, $language),
-          ),
-        );
         continue;
       }
 
@@ -563,28 +530,12 @@ class MarkdownFieldSync extends MarkdownHashTracker
         $respectChanges && self::fieldChangedViaForm($page, $field);
 
       if ($changedViaForm) {
-        self::logDebug(
-          $page,
-          sprintf(
-            'skip field %s for %s: changed via form',
-            $field,
-            self::languageLogLabel($page, $language),
-          ),
-        );
         continue;
       }
 
       $currentValue = self::getFieldValueForLanguage($page, $field, $language);
 
       if ($field === 'name') {
-        self::logDebug($page, 'applyFrontmatterFields name', [
-          'language' => self::languageLogLabel($page, $language),
-          'frontmatterValue' => $pageValue,
-          'currentValue' => $currentValue,
-          'respectChanges' => $respectChanges,
-          'changedViaForm' => $changedViaForm,
-        ]);
-
         // Log path change if name will change
         if ((string) $currentValue !== (string) $pageValue) {
           $oldPath = $page->path;
@@ -601,25 +552,9 @@ class MarkdownFieldSync extends MarkdownHashTracker
 
       if (is_array($pageValue)) {
         if ($currentValue === $pageValue) {
-          self::logDebug(
-            $page,
-            sprintf(
-              'skip field %s for %s: array unchanged',
-              $field,
-              self::languageLogLabel($page, $language),
-            ),
-          );
           continue;
         }
       } elseif ((string) $currentValue === (string) $pageValue) {
-        self::logDebug(
-          $page,
-          sprintf(
-            'skip field %s for %s: value unchanged',
-            $field,
-            self::languageLogLabel($page, $language),
-          ),
-        );
         continue;
       }
 

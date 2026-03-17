@@ -43,10 +43,6 @@ class MarkdownFileIO extends MarkdownConfig
   public static function contentSource(Page $page): string
   {
     $pageId = $page->id;
-    self::logDebug($page, 'contentSource: resolving for page', [
-      'pageName' => $page->name,
-      'pagePath' => $page->path,
-    ]);
 
     if (isset(self::$gettingContentSource[$pageId])) {
       $config = self::requireConfig($page);
@@ -102,10 +98,6 @@ class MarkdownFileIO extends MarkdownConfig
       // Default: use page name with .md extension
       $pageName = trim((string) $page->name);
       if ($pageName !== '') {
-        self::logDebug($page, 'contentSource: using page name default', [
-          'pageName' => $pageName,
-          'source' => $pageName . '.md',
-        ]);
         return $pageName . '.md';
       }
 
@@ -224,18 +216,8 @@ class MarkdownFileIO extends MarkdownConfig
     // Parse processed markdown directly in-memory so readonly elements are
     // created with final HTML. Prefer in-memory over temp files for cleanliness.
     $content = $parser->loadFromString($markdown);
-    self::logDebug($page, 'loaded processed markdown from memory', [
-      'language' => $languageCode,
-    ]);
-
-    self::logDebug(
-      $page,
-      sprintf('loaded markdown [%s]: %s', $languageCode, $path),
-      ['language' => $languageCode],
-    );
-
     // Post-process ContentData to handle image URLs in HTML properties
-    self::processContentDataImages($page, $content);
+    self::processContentDataImages($page, $content, $languageCode);
 
     return $content;
   }
@@ -313,12 +295,6 @@ class MarkdownFileIO extends MarkdownConfig
     self::ensureDirectory($path);
 
     [$frontRaw, $body] = self::splitDocument($document);
-    self::logDebug($page, 'saveLanguageMarkdown', [
-      'language' => $languageCode,
-      'len' => strlen($document),
-      'frontmatter' => $frontRaw !== '' ? 1 : 0,
-    ]);
-
     if (wire('files')->filePutContents($path, $document) === false) {
       throw new WireException(
         sprintf('Unable to write markdown file at %s', $path),
@@ -423,9 +399,6 @@ class MarkdownFileIO extends MarkdownConfig
         $page,
         $content->html,
       );
-      self::logDebug($page, 'processContentImages: rewrote content->html', [
-        'length' => strlen($content->html),
-      ]);
     }
 
     // Process all properties on ContentData recursively
@@ -616,7 +589,11 @@ class MarkdownFileIO extends MarkdownConfig
    * Process images in ContentData after LetMeDown parsing.
    * Attaches Pageimage objects only; URL rewriting happens during final HTML render.
    */
-  protected static function processContentDataImages(Page $page, $content): void
+  protected static function processContentDataImages(
+    Page $page,
+    $content,
+    ?string $languageCode = null,
+  ): void
   {
     if (!$content) {
       return;
@@ -631,21 +608,13 @@ class MarkdownFileIO extends MarkdownConfig
       $imageBaseUrl = str_replace('{pageId}', $page->id, $imageBaseUrl);
     }
 
-    self::logDebug($page, 'processContentDataImages: starting', [
-      'hasSources' => !empty($imageSources),
-      'hasUrl' => !empty($imageBaseUrl),
-    ]);
-
     // Attach Pageimage objects (asset binding)
-    self::walkContent($page, $content, $imageSources, $imageBaseUrl);
+    $attachedImages = self::walkContent($page, $content, $imageSources, $imageBaseUrl);
 
     // Rewrite HTML properties for writable elements. Readonly elements are
     // intentionally created with final HTML (see processing before parse).
     self::processContentImages($page, $content);
 
-    self::logDebug($page, 'processContentDataImages: complete', [
-      'pageId' => $page->id,
-    ]);
   }
 
   /**
@@ -694,18 +663,20 @@ class MarkdownFileIO extends MarkdownConfig
     $item,
     array $imageSources,
     string $imageBaseUrl,
-  ): void {
+  ): int {
     if (
       !is_object($item) &&
       !is_array($item) &&
       !($item instanceof \ArrayObject)
     ) {
-      return;
+      return 0;
     }
+
+    $attached = 0;
 
     // Skip HeadingElement (immutable structural node)
     if (is_object($item) && $item instanceof \LetMeDown\HeadingElement) {
-      return;
+      return 0;
     }
 
     // Attach Pageimage if src exists
@@ -713,16 +684,14 @@ class MarkdownFileIO extends MarkdownConfig
       $img = MarkdownUtilities::pageimage($page, $item);
       if ($img instanceof Pageimage) {
         $item->data['img'] = $img;
-        self::logDebug($page, 'Attached Pageimage to ' . get_class($item), [
-          'src' => $item->data['src'],
-        ]);
+        $attached++;
       }
     }
 
     // Recursively process arrays / ArrayObjects
     if (is_array($item) || $item instanceof \ArrayObject) {
       foreach ($item as $child) {
-        self::walkContent($page, $child, $imageSources, $imageBaseUrl);
+        $attached += self::walkContent($page, $child, $imageSources, $imageBaseUrl);
       }
     }
 
@@ -730,7 +699,7 @@ class MarkdownFileIO extends MarkdownConfig
     if (is_object($item)) {
       foreach (get_object_vars($item) as $value) {
         if ($value !== null) {
-          self::walkContent($page, $value, $imageSources, $imageBaseUrl);
+          $attached += self::walkContent($page, $value, $imageSources, $imageBaseUrl);
         }
       }
 
@@ -738,14 +707,16 @@ class MarkdownFileIO extends MarkdownConfig
       if ($item instanceof \LetMeDown\Section) {
         $blocks = self::getSectionBlocks($page, $item);
         if ($blocks !== null) {
-          self::walkContent($page, $blocks, $imageSources, $imageBaseUrl);
+          $attached += self::walkContent($page, $blocks, $imageSources, $imageBaseUrl);
         }
       } elseif (isset($item->blocks)) {
         $blocks = $item->blocks;
         if ($blocks !== null) {
-          self::walkContent($page, $blocks, $imageSources, $imageBaseUrl);
+          $attached += self::walkContent($page, $blocks, $imageSources, $imageBaseUrl);
         }
       }
     }
+
+    return $attached;
   }
 }
