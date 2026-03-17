@@ -542,8 +542,12 @@ class MarkdownFieldSync extends MarkdownHashTracker
       }
 
       // Skip empty frontmatter assignments to preserve existing field values.
-      // For `name`, require an explicit non-empty value to rename.
-      if (!is_array($pageValue) && trim((string) $pageValue) === '') {
+      // Homepage name is the only valid empty-name exception in ProcessWire.
+      if (
+        !is_array($pageValue) &&
+        trim((string) $pageValue) === '' &&
+        !self::allowsEmptyFrontmatterValue($page, $field)
+      ) {
         self::logDebug(
           $page,
           sprintf(
@@ -642,6 +646,13 @@ class MarkdownFieldSync extends MarkdownHashTracker
     }
 
     return $updated;
+  }
+
+  protected static function allowsEmptyFrontmatterValue(
+    Page $page,
+    string $field,
+  ): bool {
+    return $field === 'name' && $page->id === 1;
   }
 
   protected static function documentHasContent(

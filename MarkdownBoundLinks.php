@@ -121,6 +121,27 @@ class MarkdownBoundLinks extends MarkdownFileIO
     }
   }
 
+  public static function refreshReferencesForPageTree(Page $page): void
+  {
+    if (!$page->id) {
+      return;
+    }
+
+    self::refreshReferencesForPage($page);
+
+    $affectedPages = $page->wire('pages')->find(
+      'has_parent=' . (int) $page->id . ', include=all',
+    );
+
+    foreach ($affectedPages as $affectedPage) {
+      if (!$affectedPage instanceof Page || !$affectedPage->id) {
+        continue;
+      }
+
+      self::refreshReferencesForPage($affectedPage);
+    }
+  }
+
   private static function refreshMarkdownLinks(
     Page $contextPage,
     Page $targetPage,
@@ -280,6 +301,10 @@ class MarkdownBoundLinks extends MarkdownFileIO
     Page $targetPage,
     string $languageCode,
   ): string {
+    if ($languageCode === self::getDefaultLanguageCode($targetPage)) {
+      return (string) $targetPage->url;
+    }
+
     $language = self::resolveLanguage($targetPage, $languageCode);
     if ($language instanceof Language) {
       return (string) $targetPage->localUrl($language);

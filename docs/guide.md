@@ -1250,6 +1250,8 @@ By default, only the `title` and `name` fields are synced.
 If you update the `name` attribute, keep in mind that it changes the page URL.
 You’ll need to run a [module refresh](#manual-syncing-markdown-files-to-processwire) (`Modules > Refresh`) to update routing.
 
+For the homepage, an empty `name:` is a valid special case. If you set `name:` to empty in frontmatter, MarkdownToFields will sync that too, so the homepage can stay at `/`.
+
 Frontmatter **does sync automatically** by default.
 You can disable it with:
 

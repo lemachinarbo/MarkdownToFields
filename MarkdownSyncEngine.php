@@ -176,6 +176,10 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         );
         $page->save($field);
         $savedFields[] = $field;
+
+        if ($field === 'name' && MarkdownConfig::isLinkSyncEnabled($page)) {
+          MarkdownBoundLinks::refreshReferencesForPageTree($page);
+        }
       } catch (\Throwable $e) {
         $failedFields[$field] = $e->getMessage();
         self::logInfo(

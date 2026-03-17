@@ -6,6 +6,8 @@ use ProcessWire\MarkdownEditor;
 
 class MarkdownSyncHooks
 {
+  private static array $pendingLinkedPageRefresh = [];
+
   /** Enqueue markdown editor asset files. */
   public static function enqueueAssets(HookEvent $event): void
   {
@@ -382,6 +384,26 @@ class MarkdownSyncHooks
     MarkdownBoundLinks::persistLinkIndex($page);
   }
 
+  public static function trackLinkedPageSaveReady(HookEvent $event): void
+  {
+    $page = MarkdownEditor::pageFromArgs($event);
+    if (!$page || !$page->id) {
+      return;
+    }
+
+    if (!MarkdownConfig::isLinkSyncEnabled($page)) {
+      unset(self::$pendingLinkedPageRefresh[(int) $page->id]);
+      return;
+    }
+
+    if (!self::pageUrlMayHaveChanged($page)) {
+      unset(self::$pendingLinkedPageRefresh[(int) $page->id]);
+      return;
+    }
+
+    self::$pendingLinkedPageRefresh[(int) $page->id] = true;
+  }
+
   /** Refresh bound page links after a ProcessWire page save. */
   public static function handleLinkedPageSaved(HookEvent $event): void
   {
@@ -390,15 +412,13 @@ class MarkdownSyncHooks
       return;
     }
 
-    if (!MarkdownConfig::isLinkSyncEnabled($page)) {
+    if (empty(self::$pendingLinkedPageRefresh[(int) $page->id])) {
       return;
     }
 
-    if (!self::pageUrlMayHaveChanged($page)) {
-      return;
-    }
+    unset(self::$pendingLinkedPageRefresh[(int) $page->id]);
 
-    MarkdownBoundLinks::refreshReferencesForPage($page);
+    MarkdownBoundLinks::refreshReferencesForPageTree($page);
   }
 
   /** Refresh module auto-discovery when modules are loaded. */

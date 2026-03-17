@@ -118,6 +118,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
 
     $this->addHook('ProcessPageEdit::buildForm', MarkdownSyncHooks::class . '::prepareEditForm');
     $this->addHook('ProcessPageEdit::buildFormContent', MarkdownSyncHooks::class . '::appendHashField');
+    $this->addHookBefore('Pages::saveReady', MarkdownSyncHooks::class . '::trackLinkedPageSaveReady');
     $this->addHook('Pages::saveReady', MarkdownSyncHooks::class . '::handleSaveReady');
     $this->addHookAfter('Pages::saved', MarkdownSyncHooks::class . '::handleLinkedPageSaved');
     $this->addHookAfter('ProcessPageEdit::execute', MarkdownSyncHooks::class . '::enqueueAssets');
