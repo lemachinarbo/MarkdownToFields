@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.2.17
+
+- Add config option to control whether markdown links should be automatically updated when the linked page moves (linkSync).
+
 ## v1.2.16
 
 - Added a page-aware content data bridge on top of LetMeDown

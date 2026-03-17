@@ -206,6 +206,7 @@ class MarkdownBatchSync extends MarkdownSyncEngine
             continue;
           }
           $dirtyFields = self::syncFromMarkdown($p);
+          MarkdownBoundLinks::persistLinkIndex($p);
 
           // If syncFromMarkdown threw an exception (e.g., protected field save failed),
           // it will be caught in the outer catch block and we skip hash updates.

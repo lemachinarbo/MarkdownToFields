@@ -1343,6 +1343,45 @@ class HomePage extends DefaultPage {
 ```
 
 
+## Keeping internal links updated
+
+Sometimes a markdown link points to another ProcessWire page:
+
+```markdown
+Read more about [our team](/about/team/)
+```
+
+That is fine, but if the target page later changes URL, your markdown link becomes old.
+
+If you want MarkdownToFields to keep those internal URLs updated for you, enable:
+
+```php
+$config->MarkdownToFields = [
+  'linkSync' => true,
+];
+```
+
+When `linkSync` is on, the module scans normal markdown links, remembers which ProcessWire page they point to, and updates the URL in the markdown file if that page moves.
+
+It only works with normal internal links and it only updates the URL part, leaving the link text intact.
+
+The references are stored in the `md_markdown_links` field as an array of page IDs, so the module can find and update them when needed. Eg:
+
+```json
+{
+  "links": 
+  {
+    "en":[
+      {
+        "href":"\/some\/url\/",
+        "pageId":1034,
+        "language":"en"
+      }
+    ]
+  }
+}
+```
+
 
 ## Config reference
 
@@ -1360,6 +1399,7 @@ $config->MarkdownToFields = [
   'htmlField' => 'md_editor',
   'markdownField' => 'md_markdown',
   'hashField' => 'md_markdown_hash',
+  'linkSync' => false,
 
   // content
   'sourcePath' => 'content/',
@@ -1388,6 +1428,10 @@ $config->MarkdownToFields = [
 
 - **hashField**
   Stores a hash for change detection.
+
+- **linkSync**
+  If `true`, MarkdownToFields keeps internal markdown links updated when linked ProcessWire pages change URL.
+  It is off by default because it can write updated URLs back into the markdown file.
 
 - **sourcePath**
   Folder (relative to `site/`) where markdown files live.

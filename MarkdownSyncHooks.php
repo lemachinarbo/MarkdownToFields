@@ -175,6 +175,7 @@ class MarkdownSyncHooks
 
     try {
       $changedFields = MarkdownSyncEngine::syncFromMarkdown($page);
+      MarkdownBoundLinks::persistLinkIndex($page);
       if (!empty($changedFields)) {
         wire('log')->save(
           'markdown-sync',
@@ -377,6 +378,27 @@ class MarkdownSyncHooks
       $page->set($hashField, MarkdownHashTracker::buildHashPayload($page));
       $page->save($hashField);
     }
+
+    MarkdownBoundLinks::persistLinkIndex($page);
+  }
+
+  /** Refresh bound page links after a ProcessWire page save. */
+  public static function handleLinkedPageSaved(HookEvent $event): void
+  {
+    $page = MarkdownEditor::pageFromArgs($event);
+    if (!$page || !$page->id) {
+      return;
+    }
+
+    if (!MarkdownConfig::isLinkSyncEnabled($page)) {
+      return;
+    }
+
+    if (!self::pageUrlMayHaveChanged($page)) {
+      return;
+    }
+
+    MarkdownBoundLinks::refreshReferencesForPage($page);
   }
 
   /** Refresh module auto-discovery when modules are loaded. */
@@ -470,5 +492,33 @@ class MarkdownSyncHooks
         'ensureMarkdownFileExists error: ' . $e->getMessage(),
       );
     }
+  }
+
+  private static function pageUrlMayHaveChanged(Page $page): bool
+  {
+    foreach (['name', 'status', 'parent_id', 'templates_id'] as $field) {
+      if ($page->isChanged($field)) {
+        return true;
+      }
+    }
+
+    if ($page->parentPrevious && $page->parent && $page->parentPrevious->id !== $page->parent->id) {
+      return true;
+    }
+
+    $languages = $page->wire('languages');
+    if ($languages && count($languages) > 1) {
+      foreach ($languages as $language) {
+        if (!$language instanceof Language) {
+          continue;
+        }
+
+        if ($page->isChanged('name' . $language->id)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 }

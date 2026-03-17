@@ -50,6 +50,17 @@ class MarkdownConfig extends MarkdownLanguageResolver
     ];
   }
 
+  public static function isLinkSyncEnabled(Page $page): bool
+  {
+    $siteConfig = $page->wire('config')->MarkdownToFields ?? [];
+    if (array_key_exists('linkSync', $siteConfig)) {
+      return (bool) $siteConfig['linkSync'];
+    }
+
+    $moduleConfig = $page->wire('modules')->getConfig('MarkdownToFields') ?? [];
+    return (bool) ($moduleConfig['linkSync'] ?? false);
+  }
+
   protected static function requireConfig(Page $page): array
   {
     $config = self::config($page);
