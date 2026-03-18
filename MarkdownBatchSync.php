@@ -197,11 +197,29 @@ class MarkdownBatchSync extends MarkdownSyncEngine
           $didImageSync = $imageUpdates > 0;
 
           if ($existingEncoded !== '' && $currentEncoded === $existingEncoded) {
+            $didLinkIndexSync = MarkdownBoundLinks::persistLinkIndex($p);
             if ($didImageSync) {
               $label = 'images:' . $imageUpdates;
               $updated++;
               $updatedPages[] = sprintf('%s [%s]', (string) $p->path, $label);
               self::logInfo($p, 'page images refreshed', [
+                'changes' => $label,
+              ]);
+              try {
+                self::writeBatchLog(
+                  $p,
+                  $logChannel,
+                  sprintf('Updated %s: %s', (string) $p->path, $label),
+                );
+              } catch (\Throwable $_e) {
+              }
+            }
+
+            if ($didLinkIndexSync) {
+              $label = 'link-index';
+              $updated++;
+              $updatedPages[] = sprintf('%s [%s]', (string) $p->path, $label);
+              self::logInfo($p, 'page link index refreshed', [
                 'changes' => $label,
               ]);
               try {

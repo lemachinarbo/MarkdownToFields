@@ -33,44 +33,60 @@ class MarkdownBoundLinks extends MarkdownFileIO
     return $encoded === false ? '' : $encoded;
   }
 
-  public static function persistLinkIndex(Page $page): void
+  public static function persistLinkIndex(Page $page): bool
   {
     if (!$page->id || !$page->hasField(self::FIELD_NAME)) {
-      return;
+      return false;
     }
 
     if (!MarkdownConfig::isLinkSyncEnabled($page)) {
+      $existing = (string) $page->get(self::FIELD_NAME);
+      if ($existing === '') {
+        return false;
+      }
       $page->of(false);
       $page->set(self::FIELD_NAME, '');
       $page->save(self::FIELD_NAME);
-      return;
+      return true;
     }
 
     $payload = self::buildIndexPayload($page);
+    $existing = (string) $page->get(self::FIELD_NAME);
+    if ($existing === $payload) {
+      return false;
+    }
+
     $page->of(false);
     $page->set(self::FIELD_NAME, $payload);
     $page->save(self::FIELD_NAME);
+    return true;
   }
 
-  public static function persistLinkIndexFromStoredPage(Page $page): void
+  public static function persistLinkIndexFromStoredPage(Page $page): bool
   {
     if (
       !$page->id ||
       !$page->hasField(self::FIELD_NAME) ||
       !MarkdownConfig::isLinkSyncEnabled($page)
     ) {
-      return;
+      return false;
     }
 
     $storedPage = $page->wire('pages')->get((int) $page->id);
     if (!$storedPage instanceof Page || !$storedPage->id) {
-      return;
+      return false;
     }
 
     $payload = self::buildIndexPayload($storedPage);
+    $existing = (string) $page->get(self::FIELD_NAME);
+    if ($existing === $payload) {
+      return false;
+    }
+
     $page->of(false);
     $page->set(self::FIELD_NAME, $payload);
     $page->save(self::FIELD_NAME);
+    return true;
   }
 
   public static function capturePageTreeUrls(Page $page): array

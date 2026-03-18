@@ -214,14 +214,6 @@ class MarkdownHtmlConverter extends MarkdownFileIO
       $html,
     );
 
-    // Emit a single summary line per page when at least one image was rewritten.
-    if (!empty($rewrites)) {
-      self::logDebug($page, 'processImagesToPageAssets: summary', [
-        'pageId' => $page->id,
-        'rewrites' => count($rewrites),
-      ]);
-    }
-
     if ($collectHashes && $hashes) {
       self::persistImageHashes($page, $languageCode, $hashes);
     }

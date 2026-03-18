@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.1
+
+- Missing internal-link indexes are now rebuilt during module refresh (no need to visit each page). 
+- Logs are quieter. Repeated image-rewrite messages have been removed.
+
 ## v1.3
 
 - BREAKING: MarkdownToFields no longer includes the backend visual editor. For rich text editing, use MarkdownToFieldsFrontEditor.
