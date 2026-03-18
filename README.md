@@ -17,6 +17,9 @@ So, basically, what you write in markdown stays in… markdown, but gets synced 
 
 You can also use frontmatter as page metadata. So things like `title`, `name` can get synced to their respective fields.
 
+Note: For a rich markdown editing experience, use [MarkdownToFieldsFrontEditor](https://github.com/lemachinarbo/MarkdownToFieldsFrontEditor), not this module.
+
+
 ### Quick FAQ
 
 **Q: Wait, what? So you’re telling me that the whole markdown is the content, not the Procewsswire Fields, and that you only support syncing of basic text fields?**

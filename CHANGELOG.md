@@ -1,10 +1,13 @@
 # Changelog
 
-## v1.2.17
+## v1.3
 
+- BREAKING: MarkdownToFields no longer includes the backend visual editor. For rich text editing, use MarkdownToFieldsFrontEditor.
+- The backend now edits markdown directly, so there is only one real version of the content instead of two competing ones.
+- Old `md_editor` fields are removed during module sync because they are no longer used.
 - Add config option to control whether markdown links should be automatically updated when the linked page moves (linkSync).
 - Fixes stale internal link updates when pages or their parents move, and allows the homepage name to be empty so the root URL stays /.
-- Markdown Editor content now updates when internal links are rewritten, avoiding stale content.
+- Markdown field content now updates when internal links are rewritten, avoiding stale content.
 - Logging is quieter and only emits debug details when enabled.
 
 ## v1.2.16

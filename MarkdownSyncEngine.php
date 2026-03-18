@@ -45,8 +45,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     $page->of(false);
 
     $markdownField = $config['markdownField'];
-    $htmlField = $config['htmlField'] ?? null;
-
     $dirtyFields = [];
 
     $languageCodes = self::availableLanguageCodes($page);
@@ -125,30 +123,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         $dirtyFields[] = $markdownField;
       }
 
-      if ($htmlField && $page->hasField($htmlField)) {
-        $htmlDocument = self::markdownToHtml($bodyContent, $page, $languageCode);
-        $preparedHtml = self::commentsToEditorPlaceholders($htmlDocument);
-        $storedHtml = (string) self::getFieldValueForLanguage(
-          $page,
-          $htmlField,
-          $language,
-        );
-
-        $normalizedStoredHtml = self::normalizeHtmlForComparison($storedHtml);
-        $normalizedPreparedHtml = self::normalizeHtmlForComparison(
-          $preparedHtml,
-        );
-
-        if ($normalizedStoredHtml !== $normalizedPreparedHtml) {
-          self::setFieldValueForLanguage(
-            $page,
-            $htmlField,
-            $preparedHtml,
-            $language,
-          );
-          $dirtyFields[] = $htmlField;
-        }
-      }
     }
 
     if (!$dirtyFields) {
@@ -222,7 +196,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     ?string $expectedHash = null,
     ?array $languageScope = null,
     array $postedLanguageValues = [],
-    ?bool $rawPriorityOverride = null,
   ): void {
     $config = self::config($page);
     if ($config === null) {
@@ -247,8 +220,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
     $map = self::fieldMap($page);
     $markdownField = $config['markdownField'];
-    $htmlField = $config['htmlField'] ?? null;
-
     $postedByField = [];
     if ($postedLanguageValues) {
       foreach ($postedLanguageValues as $fieldName => $values) {
@@ -274,11 +245,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         foreach ($languageCodes as $languageCode) {
           if (!array_key_exists($languageCode, $postedMarkdownMap)) continue;
           $postedMarkdown = (string) $postedMarkdownMap[$languageCode];
-
-          // Only persist posted markdown immediately if it's the authoritative source
-          if (!self::shouldPreferMarkdownForSync($rawPriorityOverride, $postedMarkdown)) {
-            continue;
-          }
 
           if ($postedMarkdown === '') {
             $path = self::getMarkdownFilePath($page, $languageCode);
@@ -344,21 +310,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
         if ($languagePost !== null) {
           $hasMarkdownPost = true;
-        } else {
-          $htmlFieldPosts = $htmlField ? $postedByField[$htmlField] ?? [] : [];
-          $htmlPost = $htmlFieldPosts[$mismatch] ?? null;
-          if (
-            $htmlPost === null &&
-            $mismatch === $defaultCode &&
-            $htmlField &&
-            isset($htmlFieldPosts[$defaultCode])
-          ) {
-            $htmlPost = $htmlFieldPosts[$defaultCode];
-          }
-
-          if ($htmlPost !== null) {
-            $hasMarkdownPost = true;
-          }
         }
 
         if ($hasMarkdownPost) {
@@ -382,20 +333,11 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     }
 
     $markdownChanged = $page->isChanged($markdownField);
-    $htmlChanged = false;
-
-    if ($htmlField && !$markdownChanged && $page->hasField($htmlField)) {
-      $htmlChanged = $page->isChanged($htmlField);
-    }
-
     $postedMarkdownMap = $postedByField[$markdownField] ?? [];
-    $postedHtmlMap = $htmlField ? $postedByField[$htmlField] ?? [] : [];
 
     $bodyChanged =
       $markdownChanged ||
-      $htmlChanged ||
-      !empty($postedMarkdownMap) ||
-      !empty($postedHtmlMap);
+      !empty($postedMarkdownMap);
     $fieldsChanged = self::mappedFieldsChanged($page, array_keys($map));
 
     if (!$bodyChanged && !$fieldsChanged) {
@@ -476,64 +418,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
       [$frontRaw, $bodyContent] = self::splitDocument($markdownValue);
 
-      $postedHtml = $htmlField
-        ? self::postedLanguageValue(
-          $postedByField[$htmlField] ?? [],
-          $languageCode,
-        )
-        : null;
-
-      $storedHtmlRaw = null;
-      $storedHtmlString = null;
-
-      if ($htmlField && $page->hasField($htmlField)) {
-        $storedHtmlRaw = self::getFieldValueForLanguage(
-          $page,
-          $htmlField,
-          $language,
-        );
-
-        if (
-          is_scalar($storedHtmlRaw) ||
-          $storedHtmlRaw === null ||
-          (is_object($storedHtmlRaw) &&
-            method_exists($storedHtmlRaw, '__toString'))
-        ) {
-          $storedHtmlString = (string) $storedHtmlRaw;
-        } else {
-          $storedHtmlString = null;
-        }
-      }
-
-      if ($postedHtml !== null) {
-        $normalizedHtml = (string) $postedHtml;
-        $trimmedHtml = trim($normalizedHtml);
-
-        if (self::shouldPreferMarkdownForSync($rawPriorityOverride, $postedMarkdown)) {
-        } elseif ($trimmedHtml === '' && $postedMarkdown !== null) {
-        } else {
-          $convertedMarkdown = self::htmlToMarkdown($normalizedHtml, $page);
-
-          $bodyContent = $convertedMarkdown;
-        }
-      } elseif (
-        $htmlChanged &&
-        $htmlField &&
-        $isDefaultLanguage &&
-        $postedMarkdown === null
-      ) {
-        $htmlValue = $storedHtmlString;
-        if ($htmlValue === null) {
-          $htmlValue = (string) self::getFieldValueForLanguage(
-            $page,
-            $htmlField,
-            $language,
-          );
-        }
-
-        $bodyContent = self::htmlToMarkdown($htmlValue, $page);
-      }
-
       $frontmatter =
         $frontRaw !== '' ? self::parseFrontmatterRaw($frontRaw) : [];
 
@@ -552,13 +436,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         $postedFrontRaw = is_array($postedFieldValues)
           ? self::postedLanguageValue($postedFieldValues, $languageCode)
           : null;
-
-        // When raw markdown is the authoritative source for this save,
-        // ignore form field values for frontmatter fields and use only
-        // the values extracted from the markdown document itself
-        if (self::shouldPreferMarkdownForSync($rawPriorityOverride, $postedMarkdown)) {
-          $postedFrontRaw = null;
-        }
 
         $normalizedPosted =
           $postedFrontRaw !== null
@@ -715,28 +592,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         );
       }
 
-      if ($htmlField && $page->hasField($htmlField)) {
-        $htmlDocument = self::markdownToHtml($bodyContent, $page, $languageCode);
-        $preparedHtml = self::commentsToEditorPlaceholders($htmlDocument);
-        $storedHtml = $storedHtmlString;
-        if ($storedHtml === null) {
-          $storedHtml = (string) self::getFieldValueForLanguage(
-            $page,
-            $htmlField,
-            $language,
-          );
-        }
-
-        if ($storedHtml !== $preparedHtml) {
-          self::setFieldValueForLanguage(
-            $page,
-            $htmlField,
-            $preparedHtml,
-            $language,
-          );
-        }
-      }
-
       if ($hasDocumentContent) {
         $shouldWriteFile = true;
 
@@ -764,16 +619,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         }
       }
     }
-  }
-
-  /** Determines whether raw markdown should be the authoritative source. */
-  protected static function shouldPreferMarkdownForSync(
-    ?bool $rawPriorityOverride,
-    ?string $postedMarkdown,
-  ): bool {
-    $rawPriority = $rawPriorityOverride ?? false;
-
-    return $rawPriority && $postedMarkdown !== null;
   }
 
   /** Extracts the posted value for a specific language from a language map. */
@@ -829,7 +674,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     $config = self::config($page) ?? [];
     $exclude = [];
     if (!empty($config['markdownField'])) $exclude[] = (string) $config['markdownField'];
-    if (!empty($config['htmlField'])) $exclude[] = (string) $config['htmlField'];
     if (!empty($config['hashField'])) $exclude[] = (string) $config['hashField'];
     // Internal fieldset wrappers used by this module
     $exclude[] = 'md_markdown_tab';

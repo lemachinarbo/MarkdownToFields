@@ -64,9 +64,11 @@ class MarkdownSessionManager extends MarkdownInputCollector
     }
 
     $map = self::fieldMap($page);
-    $htmlField = self::getHtmlField($page);
-
-    if (!$map && !$htmlField && !array_key_exists('title', $values)) {
+    if (
+      !$map &&
+      !array_key_exists('title', $values) &&
+      !array_key_exists('name', $values)
+    ) {
       return;
     }
 
@@ -74,9 +76,6 @@ class MarkdownSessionManager extends MarkdownInputCollector
     $defaultCode = self::getDefaultLanguageCode($page);
 
     $allowedFields = $map;
-    if ($htmlField) {
-      $allowedFields[$htmlField] = null;
-    }
 
     if (array_key_exists('title', $values) && !isset($allowedFields['title'])) {
       $allowedFields['title'] = 'title';
@@ -92,9 +91,7 @@ class MarkdownSessionManager extends MarkdownInputCollector
         continue;
       }
 
-      $isHtmlField = $htmlField && $fieldName === $htmlField;
-
-      if (!$isHtmlField && !self::pageSupportsMappedField($page, $fieldName)) {
+      if (!self::pageSupportsMappedField($page, $fieldName)) {
         continue;
       }
 
@@ -104,10 +101,6 @@ class MarkdownSessionManager extends MarkdownInputCollector
 
       $value = $values[$fieldName];
       $languageValues = self::collectLanguageFieldValues($page, $fieldName);
-
-      if ($htmlField && $fieldName === $htmlField && is_string($value)) {
-        $value = self::editorPlaceholdersToComments($value);
-      }
 
       if (is_array($value)) {
         $languageValues = array_merge(

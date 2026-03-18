@@ -44,7 +44,6 @@ require_once __DIR__ . '/MarkdownContentView.php';
  *   use MarkdownContent;
  *   protected string $sourcePath = '/var/markdown/';  // path to markdown files
  *   protected string $markdownField = 'md_content';   // markdown content field
- *   protected string $htmlField = 'html';             // rendered HTML field
  *   protected string $hashField = 'md_hash';          // hash tracking field
  * }
  * ```
@@ -92,7 +91,6 @@ trait MarkdownContent {
     if ($autoSync && $this->template) {
       $excludeNames = [
         (string)($mdConfig['markdownField'] ?? 'md_markdown'),
-        (string)($mdConfig['htmlField'] ?? 'md_editor'),
         (string)($mdConfig['hashField'] ?? 'md_markdown_hash'),
         'md_markdown_tab',
         'md_markdown_tab_END',
@@ -113,7 +111,6 @@ trait MarkdownContent {
         'fallback' => $this->contentSource(),
       ],
       'markdownField' => $mdConfig['markdownField'] ?? 'md_markdown',
-      'htmlField' => $mdConfig['htmlField'] ?? 'md_editor',
       'hashField' => $mdConfig['hashField'] ?? 'md_markdown_hash',
       'frontmatter' => $frontmatterMap,
     ];

@@ -28,7 +28,7 @@ Check this simple example and pay attention to the `<!-- tags -->`.
 The content indentation is *unnecessary*, it's just to highlight the tags.
 
 
-<a id="fig-markdown-example"></a> **FIG 1:** Markdown example
+<a id="fig-markdown-example"></a> **FIG 2:** Markdown example
 
 ```markdown
 ---
@@ -151,7 +151,7 @@ Usually in ProcessWire you start by creating a template, add some fields, and th
 
 Those markdown files are mapped per **ProcessWire page** using the `page name` (for example, `about` → `about.md`), and the module will look for them by default in the `site/content/` folder.
 
-<a id="fig-markdown-files-per-page"></a> **FIG 2:** Markdown files per page
+<a id="fig-markdown-files-per-page"></a> **FIG 3:** Markdown files per page
 
 ```
 site
@@ -168,21 +168,22 @@ You can add content files at any time, even empty ones.
 
 By default when installed, the template doesn’t know in which templates you want to use it. You have to enable them. Go to the module settings and check the templates of the pages you want to use markdown as the source of content.
 
-<a id="fig-enable-templates-checkboxes"></a> **FIG 3:** Enabling the module for your templates using the "Enabled Templates" checkboxes
+<a id="fig-enable-templates-checkboxes"></a> **FIG 4:** Enabling the module for your templates using the "Enabled Templates" checkboxes
 
 <img src="./enabled-templates.png" width="700">
 
-By doing this, the module will add a textarea field you can use to edit the content, and a markdown tab you can use to edit athe raw markdown.
 
-<a id="fig-content-editor-backend"></a> **FIG 4:** Content editor in your page Backend
-
-<img src="./editor.png" width="700">
+By doing this, the module will add a markdown tab with a textfield you can use to edit the raw markdown.
 
 Also, if you uncheck a template, the fields to edit the content and the markdown will be removed. But don’t worry, you won’t lose any content. Remember, your source of truth is the markdown file. Nice.
 
 <a id="fig-markdown-editor-tab"></a> **FIG 5:** Markdown editor tab
 
 <img src="./editor-markdown.png" width="700">
+
+
+>Note: Editing a raw markdown file isn't the best experience for all users. But I got you covered: For a rich markdown editing experience, use [MarkdownToFieldsFrontEditor](https://github.com/lemachinarbo/MarkdownToFieldsFrontEditor).
+
 
 #### Automatic generation of markdown files
 
@@ -1174,7 +1175,7 @@ site/assets/files/{pageId}/
 
 From there, ProcessWire serves them normally:
 
-* visible in the editor preview
+* visible in the editor preview (if you are using MarkdownToFieldsFrontEditor)
 * available in the frontend
 * accessible as `PageImage` objects
 
@@ -1398,7 +1399,6 @@ $config->MarkdownToFields = [
   'enabledTemplates' => ['home', 'about'],
 
   // fields
-  'htmlField' => 'md_editor',
   'markdownField' => 'md_markdown',
   'hashField' => 'md_markdown_hash',
   'linkSync' => false,
@@ -1421,9 +1421,6 @@ $config->MarkdownToFields = [
 
 - **enabledTemplates**
   Lets you define the active templates in code instead of clicking around in the 'Enable templates' section of modules UI.
-
-- **htmlField**
-  Field where rendered HTML is stored (your content editor).
 
 - **markdownField**
   Field where raw markdown is stored (source of truth).

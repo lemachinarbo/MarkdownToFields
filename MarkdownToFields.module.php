@@ -40,7 +40,6 @@ require_once __DIR__ . '/MarkdownSyncHooks.php';
  *
  * @property array  $templates     Configured templates with markdown sync enabled
  * @property string $markdownField Default field name for markdown content
- * @property string $htmlField     Markdown editor field (authoring surface)
  * @property string $contentPath   Base path for markdown files
  * @property bool   $debug         Enable debug logging to markdown-sync.txt
  */
@@ -55,7 +54,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     'md_markdown_hash' => ['FieldtypeText', 'Markdown hash'],
     'md_link_index' => ['FieldtypeTextarea', 'Markdown links'],
     'md_markdown_tab_END' => ['FieldtypeFieldsetClose', 'Close Markdown tab'],
-    'md_editor' => ['FieldtypeTextarea', 'Content editor'],
   ];
 
   /** Provide module metadata to ProcessWire. */
@@ -76,41 +74,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     ];
   }
 
-  /** Single source of truth for required md_editor configuration. */
-  protected function getRequiredMarkdownEditorConfig(): array
-  {
-    $contentStyle = '.md-comment-placeholder{display:inline-block;padding:2px 6px;border-radius:4px;font-family:monospace;opacity:.9;} .md-comment-placeholder--section{display:block;width:100%;text-align:center;background:#ececec;color:#555;font-size:12px;font-weight:600;} .md-comment-placeholder--sub{display:block;width:100%;background:#f2f2f2;color:#666;font-size:11px;font-weight:500;} .md-comment-placeholder--field{background:#f7f7f7;color:#666;font-size:10px;border-left:4px solid #d0d0d0;padding-left:6px;} .md-comment-placeholder--close{background:#e8e8e8;color:#888;font-size:10px;font-style:italic;} img{pointer-events:none;}';
-
-    return [
-      'tags' => 'markdown',
-      'inputfieldClass' => 'InputfieldTinyMCE',
-      'contentType' => 1,
-      'height' => 1000,
-      'rows' => 40,
-      'features' => ['toolbar', 'stickybars', 'purifier', 'imgResize', 'pasteFilter'],
-      'plugins' => ['anchor', 'code', 'link', 'lists', 'pwlink', 'table'],
-      'toolbar' => 'styles bold italic pwlink blockquote bullist numlist anchor code',
-      'settingsJSON' => json_encode([
-        // Mark elements with this class as non-editable (via data-mce-noneditable attribute)
-        'noneditable_class' => 'md-comment-placeholder',
-        'content_style' => $contentStyle,
-        'object_resizing' => false,
-      ]),
-    ];
-  }
-
-  /** Apply required config wholesale to a field. */
-  protected function applyMarkdownEditorConfig(Field $field, array $cfg): void
-  {
-    foreach ($cfg as $key => $val) {
-      if (property_exists($field, $key)) {
-        $field->$key = $val;
-      } else {
-        $field->set($key, $val);
-      }
-    }
-  }
-
   /** Register hooks and sync template fields. */
   public function init()
   {
@@ -121,7 +84,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $this->addHookBefore('Pages::saveReady', MarkdownSyncHooks::class . '::trackLinkedPageSaveReady');
     $this->addHook('Pages::saveReady', MarkdownSyncHooks::class . '::handleSaveReady');
     $this->addHookAfter('Pages::saved', MarkdownSyncHooks::class . '::handleLinkedPageSaved');
-    $this->addHookAfter('ProcessPageEdit::execute', MarkdownSyncHooks::class . '::enqueueAssets');
     $this->addHookAfter('ProcessPageEdit::buildForm', MarkdownSyncHooks::class . '::lockRawMarkdownField');
     $this->addHookAfter('Modules::refresh', MarkdownSyncHooks::class . '::handleModulesRefresh');
     $this->addHookAfter('Modules::saveConfig', MarkdownSyncHooks::class . '::handleSaveConfig');
@@ -132,7 +94,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   {
     $this->syncTemplateFields();
     $this->wire('modules')->saveConfig($this, [
-      'htmlField' => 'md_editor',
       'linkSync' => false,
       'templates' => [],
       // Global frontmatter auto-sync defaults (opt-out only)
@@ -179,23 +140,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       $linkSyncField->notes = 'Controlled by $config->MarkdownToFields["linkSync"].';
     }
     $wrapper->add($linkSyncField);
-
-    // Configuration and editor field setup
-    $configFieldset = $modules->get('InputfieldFieldset');
-    $configFieldset->name = 'editor_field_setup';
-    $configFieldset->label = 'Editor Field Setup';
-    $configFieldset->description = 'If you choose a different TinyMCE field in config.php to be the content editor, use this option to set up the required settings. Or use it to reset to defaults if needed.';
-    
-    $currentField = $mdConfig['htmlField'] ?? 'md_editor';
-    
-    $setupCheckbox = $modules->get('InputfieldCheckbox');
-    $setupCheckbox->name = 'configure_editor_field';
-    $setupCheckbox->label = 'Apply default settings to ' . htmlspecialchars($currentField) . '?';
-    $setupCheckbox->description = 'Applies required TinyMCE settings: protected content markers (via contenteditable), disabled image interaction, and custom CSS.';
-    $setupCheckbox->attr('value', 1);
-    $configFieldset->add($setupCheckbox);
-    
-    $wrapper->add($configFieldset);
 
     // Image resync action (explicit, manual)
     $imageFieldset = $modules->get('InputfieldFieldset');
@@ -248,7 +192,10 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     return $wrapper;
   }
 
-  private function resyncImagesForManagedPages(int $limit = 10000, array &$log = null): array
+  private function resyncImagesForManagedPages(
+    int $limit = 10000,
+    ?array &$log = null,
+  ): array
   {
     $pages = $this->wire('pages')->find("limit={$limit}");
     $processed = 0;
@@ -367,7 +314,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       'linkSync' => array_key_exists('linkSync', $mdConfig)
         ? (bool) $mdConfig['linkSync']
         : (bool) ($moduleConfig['linkSync'] ?? false),
-      'htmlField' => $mdConfig['htmlField'] ?? 'md_editor',
       'markdownField' => $mdConfig['markdownField'] ?? 'md_markdown',
       'hashField' => $mdConfig['hashField'] ?? 'md_markdown_hash',
       'sourcePath' => $mdConfig['sourcePath'] ?? 'content/',
@@ -390,7 +336,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $html .= "  'enabledTemplates' => ['home', 'about'],\n";
     $html .= "\n";
     $html .= "  // fields\n";
-    $html .= "  'htmlField' => 'md_editor',\n";
     $html .= "  'markdownField' => 'md_markdown',\n";
     $html .= "  'hashField' => 'md_markdown_hash',\n";
     $html .= "  'linkSync' => false,\n";
@@ -431,9 +376,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       $isDefault = false;
       
       // Check all defaults against module's getNormalizedSettings defaults
-      if ($key === 'htmlField' && $display === 'md_editor') {
-        $isDefault = true;
-      } elseif ($key === 'linkSync' && $display === 'false') {
+      if ($key === 'linkSync' && $display === 'false') {
         $isDefault = true;
       } elseif ($key === 'markdownField' && $display === 'md_markdown') {
         $isDefault = true;
@@ -483,7 +426,10 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $log = $this->wire('log');
     
     // Get all fields created by this module
-    $fieldNames = array_keys($this->fieldDefs);
+    $fieldNames = array_values(array_unique(array_merge(
+      array_keys($this->fieldDefs),
+      ['md_editor'],
+    )));
     $fieldsInUse = false;
     
     // Check if any field is still assigned to a template
@@ -577,19 +523,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     MarkdownSyncEngine::syncToMarkdown($page, null, null);
   }
 
-  /** Checks if the field uses a TinyMCE textarea editor. */
-  public function isMarkdownEditorCompatible(Field $field): bool
-  {
-    if ($field->type->name !== 'FieldtypeTextarea') {
-      return false;
-    }
-    if ($field->inputfieldClass !== 'InputfieldTinyMCE') {
-      return false;
-    }
-    
-    return true;
-  }
-
   /** Sync template field associations for configured templates. */
   public function syncTemplateFields(): void
   {
@@ -602,108 +535,20 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     }
     
     $this->createFields();
+    $this->removeLegacyEditorField();
     $enabled = $this->getEffectiveEnabledTemplates();
     $templates = $this->wire('templates');
-
-    $resolvedEditorField = $this->resolveEditorField();
-    $this->persistEditorFieldIfChanged($resolvedEditorField);
 
     foreach ($templates as $template) {
       if ($this->isTemplateExcluded($template)) continue;
 
       $shouldHaveFields = in_array($template->name, $enabled, true);
-      $this->syncTemplateFieldgroup($template, $shouldHaveFields, $resolvedEditorField);
+      $this->syncTemplateFieldgroup($template, $shouldHaveFields);
     }
   }
 
-  /** Decide which editor field to use (config first, then page-class override). */
-  private function resolveEditorField(): string
-  {
-    $fields = $this->wire('fields');
-    $templates = $this->wire('templates');
-    $enabled = $this->getEffectiveEnabledTemplates();
-
-    $current = $this->htmlField ?? 'md_editor';
-
-    foreach ($templates as $tmpl) {
-      if ($this->isTemplateExcluded($tmpl)) continue;
-      if (!in_array($tmpl->name, $enabled, true)) continue;
-
-      $pageClass = $this->resolveTemplatePageClass($tmpl);
-      if (!$pageClass) continue;
-
-      $override = $this->extractHtmlFieldOverride($pageClass);
-      if (!$override) continue;
-
-      $overrideField = $fields->get($override);
-      if ($overrideField && $this->isMarkdownEditorCompatible($overrideField)) {
-        return $override;
-      }
-    }
-
-    return $current;
-  }
-
-  /** Resolve page class for a template (config or first page instance). */
-  private function resolveTemplatePageClass(Template $template): ?string
-  {
-    if ($template->pageClass) {
-      return $template->pageClass;
-    }
-
-    $pages = $this->wire('pages');
-    $firstPage = $pages->findOne("template={$template->id}");
-    if ($firstPage) {
-      return get_class($firstPage);
-    }
-
-    return null;
-  }
-
-  /** Extract default htmlField property from a page class if present. */
-  private function extractHtmlFieldOverride(string $pageClass): ?string
-  {
-    if (!class_exists($pageClass)) {
-      return null;
-    }
-
-    try {
-      $refl = new \ReflectionClass($pageClass);
-      if (!$refl->hasProperty('htmlField')) {
-        return null;
-      }
-
-      $prop = $refl->getProperty('htmlField');
-      if (!$prop->hasDefaultValue()) {
-        return null;
-      }
-
-      $val = $prop->getDefaultValue();
-      return is_string($val) && $val !== '' ? $val : null;
-    } catch (\Throwable $e) {
-      return null;
-    }
-  }
-
-  /** Persist editor field choice if it differs from current module config. */
-  private function persistEditorFieldIfChanged(string $field): void
-  {
-    if ($this->htmlField === $field) {
-      return;
-    }
-
-    $this->htmlField = $field;
-    $currentConfig = $this->wire('modules')->getConfig($this) ?? [];
-    $currentConfig['htmlField'] = $field;
-    $this->wire('modules')->saveConfig($this, $currentConfig);
-    MarkdownUtilities::logChannel(
-      null,
-      "Editor field set to {$field} via resolveEditorField",
-    );
-  }
-
-  /** Sync a single template's fieldgroup for Markdown fields and editor field. */
-  private function syncTemplateFieldgroup(Template $template, bool $enabled, string $editorField): void
+  /** Sync a single template's fieldgroup for Markdown fields. */
+  private function syncTemplateFieldgroup(Template $template, bool $enabled): void
   {
     $fields = $this->wire('fields');
     $fieldgroup = $template->fieldgroup;
@@ -734,7 +579,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     }
 
     foreach (array_keys($this->fieldDefs) as $name) {
-      if ($name === 'md_editor') continue;
       $field = $fields->get($name);
       if (!$field) continue;
 
@@ -744,29 +588,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
         $changed = true;
       } elseif (!$enabled && $has) {
         $fieldgroup->remove($field);
-        $changed = true;
-      }
-    }
-
-    $mdEditorField = $fields->get('md_editor');
-    $selectedEditorField = $fields->get($editorField);
-
-    if ($enabled) {
-      if ($selectedEditorField && !$fieldgroup->has($selectedEditorField)) {
-        $fieldgroup->add($selectedEditorField);
-        $changed = true;
-      }
-      if ($mdEditorField && $editorField !== 'md_editor' && $fieldgroup->has($mdEditorField)) {
-        $fieldgroup->remove($mdEditorField);
-        $changed = true;
-      }
-    } else {
-      if ($mdEditorField && $fieldgroup->has($mdEditorField)) {
-        $fieldgroup->remove($mdEditorField);
-        $changed = true;
-      }
-      if ($selectedEditorField && $fieldgroup->has($selectedEditorField)) {
-        $fieldgroup->remove($selectedEditorField);
         $changed = true;
       }
     }
@@ -806,8 +627,8 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $hasLanguages = $modules->isInstalled('LanguageSupport');
 
     $resolveType = function (string $name, string $defaultType) use ($hasLanguages, $modules) {
-      // md_markdown and md_editor should be language-aware when languages are installed
-      if ($hasLanguages && in_array($name, ['md_markdown', 'md_editor'], true)) {
+      // md_markdown should be language-aware when languages are installed
+      if ($hasLanguages && $name === 'md_markdown') {
         if ($defaultType === 'FieldtypeTextarea') {
           return $modules->get('FieldtypeTextareaLanguage');
         }
@@ -842,16 +663,39 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
           $f->rows = 8;
         }
 
-
-        
-        // Configure md_editor field authoritatively
-        if ($name === 'md_editor') {
-          $this->applyMarkdownEditorConfig($f, $this->getRequiredMarkdownEditorConfig());
-        }
-
         $fields->save($f);
       }
     }
+  }
+
+  private function removeLegacyEditorField(): void
+  {
+    $fields = $this->wire('fields');
+    $templates = $this->wire('templates');
+    $field = $fields->get('md_editor');
+
+    if (!$field) {
+      return;
+    }
+
+    foreach ($templates as $template) {
+      $fieldgroup = $template->fieldgroup;
+      if (!$fieldgroup || !$fieldgroup->has($field)) {
+        continue;
+      }
+
+      $fieldgroup = $this->wire('fieldgroups')->get($fieldgroup->id);
+      if (!$fieldgroup || !$fieldgroup->has($field)) {
+        continue;
+      }
+
+      $fieldgroup->remove($field);
+      $fieldgroup->save();
+    }
+
+    $field->flags = 0;
+    $fields->save($field);
+    $fields->delete($field);
   }
 
   private function isTemplateExcluded(Template $template): bool
@@ -859,26 +703,4 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     return $template->name === 'admin' || (($template->flags ?? 0) & Template::flagSystem);
   }
 
-  /** Applies the required TinyMCE configuration to the editor field. */
-  public function repairMarkdownEditor(?string $fieldName = null): void
-  {
-    $fieldName = $fieldName ?: 'md_editor';
-    $fields = $this->wire('fields');
-    $modules = $this->wire('modules');
-    $required = $this->getRequiredMarkdownEditorConfig();
-
-    $field = $fields->get($fieldName);
-    if (!$field) {
-      $field = new Field();
-      $field->type = $modules->get('FieldtypeTextarea');
-      $field->name = $fieldName;
-      $field->label = 'Content Editor';
-      $this->applyMarkdownEditorConfig($field, $required);
-      $fields->save($field);
-      return;
-    }
-
-    $this->applyMarkdownEditorConfig($field, $required);
-    $fields->save($field);
-  }
 }

@@ -8,18 +8,6 @@ class MarkdownSyncHooks
 {
   private static array $pendingLinkedPageRefresh = [];
 
-  /** Enqueue markdown editor asset files. */
-  public static function enqueueAssets(HookEvent $event): void
-  {
-    $config = $event->wire('config');
-    $url = $config->urls->MarkdownToFields ?? null;
-    if (!$url) {
-      return;
-    }
-
-    $config->scripts->add($url . 'assets/markdown-editor.js');
-  }
-
   /** Disable raw markdown field in edit form. */
   public static function lockRawMarkdownField(HookEvent $event): void
   {
@@ -33,9 +21,8 @@ class MarkdownSyncHooks
       return;
     }
 
-    $markdown->attr('disabled', 'disabled');
-    $markdown->description = 'Double-click the field to edit the Markdown content.
-    While editing Markdown, do not modify the same content in other fields (such as the title or content editor) to avoid losing changes.';
+    $markdown->removeAttr('disabled');
+    $markdown->description = 'Edit markdown directly here';
   }
 
   /** Sync template fields after module config save. */
@@ -52,19 +39,6 @@ class MarkdownSyncHooks
     if (!$module) return;
 
     $module->syncTemplateFields();
-
-    if ($event->wire('input')->post('configure_editor_field')) {
-      $config = $event->wire('config');
-      $mdConfig = $config->MarkdownToFields ?? [];
-      $fieldName = $mdConfig['htmlField'] ?? 'md_editor';
-
-      $module->repairMarkdownEditor($fieldName);
-      $module->message("Editor field '{$fieldName}' has been configured with required TinyMCE settings.");
-      MarkdownUtilities::logChannel(
-        null,
-        "Editor field '{$fieldName}' configured with required TinyMCE settings.",
-      );
-    }
 
     MarkdownUtilities::logChannel(null, 'Template field sync complete.');
   }
@@ -89,50 +63,6 @@ class MarkdownSyncHooks
     $templates = wire('modules')->getConfig('MarkdownToFields')['templates'] ?? [];
     if (!is_array($templates) || !in_array($page->template->name, $templates, true)) {
       return;
-    }
-
-    // Ensure the page's selected editor field exists and is attached to the template
-    try {
-      $htmlFieldName = MarkdownConfig::getHtmlField($page);
-      if ($htmlFieldName) {
-        $fields = wire('fields');
-        $modules = wire('modules');
-        $mtf = $modules->get('MarkdownToFields');
-
-        $field = $fields->get($htmlFieldName);
-        if (!$field && $mtf) {
-          // Create/repair the requested editor field
-          $mtf->repairMarkdownEditor($htmlFieldName);
-          $field = $fields->get($htmlFieldName);
-        }
-
-        // Attach to template if missing
-        if ($field) {
-          $fg = $page->template->fieldgroup;
-          if ($fg && !$fg->has($field)) {
-            $fg->add($field);
-            $fg->save();
-          }
-        }
-
-        // If the override is valid, align module config/htmlField so UI reflects programmatic choice
-        if ($mtf && $field && $mtf->isMarkdownEditorCompatible($field)) {
-          $currentConfig = $modules->getConfig($mtf) ?? [];
-          $currentValue = $currentConfig['htmlField'] ?? null;
-          if ($currentValue !== $htmlFieldName) {
-            $currentConfig['htmlField'] = $htmlFieldName;
-            $modules->saveConfig($mtf, $currentConfig);
-            $mtf->htmlField = $htmlFieldName;
-          }
-        }
-      }
-    } catch (\Throwable $e) {
-      // non-fatal: continue without blocking edit form
-      MarkdownUtilities::logChannel(
-        $page,
-        'Editor ensure failed',
-        ['message' => $e->getMessage()],
-      );
     }
 
     $documentField = MarkdownConfig::getMarkdownField($page);
@@ -219,14 +149,6 @@ class MarkdownSyncHooks
       return;
     }
 
-    $htmlField = MarkdownConfig::getHtmlField($page);
-    if ($htmlField) {
-      $inputfield = $form->get($htmlField);
-      if ($inputfield) {
-        MarkdownHtmlConverter::applyEditorPlaceholdersToInputfield($inputfield);
-      }
-    }
-
     $field = MarkdownEditor::hashField($page);
     if ($form->get($field)) {
       return;
@@ -299,26 +221,6 @@ class MarkdownSyncHooks
       $postedLanguageValues[$documentField] = $bodyValues;
     }
 
-    $htmlField = MarkdownConfig::getHtmlField($page);
-    if ($htmlField && $page->hasField($htmlField)) {
-      $htmlValues = MarkdownInputCollector::collectSubmittedLanguageValues(
-        $page,
-        $htmlField,
-        $input,
-      );
-
-      if ($htmlValues) {
-        $sanitized = [];
-        foreach ($htmlValues as $code => $value) {
-          $sanitized[$code] = MarkdownHtmlConverter::editorPlaceholdersToComments(
-            $value,
-          );
-        }
-
-        $postedLanguageValues[$htmlField] = $sanitized;
-      }
-    }
-
     $titleValues = MarkdownInputCollector::collectSubmittedLanguageValues(
       $page,
       'title',
@@ -363,23 +265,11 @@ class MarkdownSyncHooks
       MarkdownFieldSync::applyLanguageValues($page, $fieldName, $languageValues);
     }
 
-    $raw = wire('input')->post('md_markdown_lock_transient_value');
-    if ($raw === null) {
-      $raw = wire('input')->post('md_markdown_lock_transient');
-    }
-
-    $rawPriorityOverride = null;
-    if ($raw !== null) {
-      $normalized = strtolower(trim((string) $raw));
-      $rawPriorityOverride = in_array($normalized, ['1', 'true', 'on'], true);
-    }
-
     MarkdownSyncEngine::syncToMarkdown(
       $page,
       $expectedHash,
       $languageScope ?: null,
       $postedLanguageValues,
-      $rawPriorityOverride,
     );
     
     MarkdownEditor::rememberHash($page);

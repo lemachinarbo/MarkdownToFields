@@ -42,7 +42,6 @@ class MarkdownConfig extends MarkdownLanguageResolver
         'fallback' => (string) ($source['fallback'] ?? ''),
       ],
       'markdownField' => $markdownField,
-      'htmlField' => self::normalizeFieldName($map['htmlField'] ?? null),
       'hashField' => self::normalizeFieldName($map['hashField'] ?? null),
       'frontmatter' => self::normalizeFrontmatter($map['frontmatter'] ?? []),
       'imageBaseUrl' => self::normalizeUrlBase($map['imageBaseUrl'] ?? null),
@@ -181,13 +180,6 @@ class MarkdownConfig extends MarkdownLanguageResolver
   {
     $config = self::config($page);
     return $config['markdownField'] ?? null;
-  }
-
-  /** Returns the configured HTML field name for the page. */
-  public static function getHtmlField(Page $page): ?string
-  {
-    $config = self::config($page);
-    return $config['htmlField'] ?? null;
   }
 
   /** Returns the configured hash field name for the page. */
