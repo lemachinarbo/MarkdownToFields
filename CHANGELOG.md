@@ -1,13 +1,12 @@
 # Changelog
 
-## v1.3.2
+## v1.3.3
 
 - `content()->data()` is now a stable structural projection boundary for templates.
 - Section and subsection data now always expose `key`, `area`, and `subsections`.
 - Field container data now behaves as a structural node with named children plus ordered `items`.
 - Field data now keeps associative shape consistently when reached directly or through parent `data()`.
 - Empty public `blocks` output was removed from the `data()` contract.
-- Added starter documentation for the `data()` contract and its structural/non-semantic boundary.
 
 ## v1.3.1
 
