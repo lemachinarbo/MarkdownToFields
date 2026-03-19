@@ -166,14 +166,19 @@ You can add content files at any time, even empty ones.
 
 #### Enabling MarkdowntoFields in your templates
 
-By default when installed, the template doesn’t know in which templates you want to use it. You have to enable them. Go to the module settings and check the templates of the pages you want to use markdown as the source of content.
+By default when installed, the module doesn’t know in which templates you want the backend markdown integration. You have to enable them. Go to the module settings and check the templates of the pages you want to manage with markdown.
 
 <a id="fig-enable-templates-checkboxes"></a> **FIG 4:** Enabling the module for your templates using the "Enabled Templates" checkboxes
 
 <img src="./enabled-templates.png" width="700">
 
 
-By doing this, the module will add a markdown tab with a textfield you can use to edit the raw markdown.
+What enabling a template actually does is:
+
+- add a markdown tab with a textfield you can use to edit the raw markdown (and 2 extra fields we use internally to map links and hashes, but you can ignore those)
+- let the admin edit form sync content for pages using that template
+- let the save hooks run for those pages
+
 
 Also, if you uncheck a template, the fields to edit the content and the markdown will be removed. But don’t worry, you won’t lose any content. Remember, your source of truth is the markdown file. Nice.
 
@@ -761,7 +766,7 @@ This is the main heading that defines the block’s title and level.
 | Property    | Type   | Description                                     |
 | ----------- | ------ | ----------------------------------------------- |
 | `text`      | string | Plain text of the block’s main heading          |
-| `innerHtml` | string | Rendered inner HTML of the heading              |
+| `innerHtml` | string | Content of the heading without the outer tag when possible |
 | `html`      | string | Rendered HTML of the heading                    |
 | `level`     | int    | Heading level (`1` for `#`, `2` for `##`, etc.) |
 
@@ -771,10 +776,17 @@ This is the main heading that defines the block’s title and level.
 ```
 LetMeDown\HeadingElement
   text: 'Digital Studio'
-  innerHtml: '<h1>Digital Studio</h1>'
+  innerHtml: 'Digital Studio'
   html: '<h1>Digital Studio</h1>'
   level: 1
 ```
+
+So:
+
+- `html` = the full rendered tag (`<h1>Digital Studio</h1>`)
+- `innerHtml` = what lives inside that tag (`Digital Studio`)
+
+For some element types the two may look very similar, but the intention is different.
 
 ##### Paragraphs
 
@@ -1043,6 +1055,14 @@ It keeps:
 * the parsed **data** (links, images, src, alt, etc.)
 * the **field name** you used (`offices`, `intro`, etc.)
 
+One important detail: `FieldData` does **not** always carry the exact same payload.
+The wrapper is the same, but `type` and `data` depend on what you tagged.
+
+- If you tag a paragraph, `data` will usually be minimal or empty.
+- If you tag a link, `data` will include things like `href`.
+- If you tag an image, `data` will include things like `src`, `alt`, and in MarkdownToFields also a ProcessWire image object when available.
+- If you tag a list, `data` will include the list `type` and `items`.
+
 Example:
 
 <a id="fig-fielddata-offices"></a> **FIG 39:** FieldData object for the [`offices`](fig-content-with-field-tags) field tag
@@ -1070,6 +1090,8 @@ So:
 
 * `ContentElement` = raw parsed element
 * `FieldData` = named, structured, easier to use
+* `FieldData->type` tells you what kind of thing you tagged
+* `FieldData->data` changes shape depending on that type
 
 They refer to the same content, just exposed in different ways. Nice.
 

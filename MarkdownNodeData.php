@@ -40,42 +40,42 @@ class MarkdownNodeData
     }
 
     $adapted = $data;
-    if ($area !== '') {
-      $adapted['area'] = $area;
-    }
 
-    if ($node instanceof Section) {
-      foreach ($node->fields as $name => $field) {
-        if (array_key_exists($name, $adapted)) {
-          $adapted[$name] = self::adaptNode($page, $field, $adapted[$name], self::joinArea($area, (string) $name));
-        }
-      }
-
-      if (!empty($node->subsections)) {
-        $items = [];
-        foreach ($node->subsections as $name => $subsection) {
-          $childArea = self::joinArea($area, (string) $name);
-          $child = self::adaptNode($page, $subsection, $adapted[$name] ?? $subsection->data(), $childArea);
-          $adapted[$name] = $child;
-          $items[] = $child;
-        }
-        $adapted['items'] = $items;
-      }
-
-      if (isset($adapted['images']) && is_array($adapted['images'])) {
-        $adapted['images'] = self::adaptImageList($page, $adapted['images'], self::joinArea($area, 'images'));
-      }
-      if (isset($adapted['links']) && is_array($adapted['links'])) {
-        $adapted['links'] = self::adaptLinkList($adapted['links'], self::joinArea($area, 'links'));
+    if ($node instanceof ContentData) {
+      foreach ($node->sectionsByName as $name => $section) {
+        $childArea = self::joinArea($area, (string) $name);
+        $adapted[(string) $name] = self::adaptNode($page, $section, $adapted[$name] ?? $section->data(), $childArea);
       }
 
       return $adapted;
     }
 
-    if ($node instanceof FieldData) {
-      if ($area !== '' && !isset($adapted['area'])) {
-        $adapted['area'] = $area;
+    if ($node instanceof Section) {
+      $adapted['key'] = (string) ($adapted['key'] ?? $node->key ?? '');
+      $adapted['area'] = $area;
+      $adapted['subsections'] = is_array($adapted['subsections'] ?? null) ? $adapted['subsections'] : [];
+
+      foreach ($node->fields as $name => $field) {
+        $childArea = self::joinArea($area, (string) $name);
+        $adapted[(string) $name] = self::adaptNode($page, $field, $adapted[$name] ?? $field->data(), $childArea);
       }
+
+      foreach ($node->subsections as $name => $subsection) {
+        $childArea = self::joinArea($area, (string) $name);
+        $child = self::adaptNode($page, $subsection, $adapted[$name] ?? $subsection->data(), $childArea);
+        $adapted[(string) $name] = $child;
+        $adapted['subsections'][(string) $name] = $child;
+      }
+
+      unset($adapted['items'], $adapted['blocks']);
+
+      return $adapted;
+    }
+
+    if ($node instanceof FieldData) {
+      $adapted['type'] = (string) ($adapted['type'] ?? $node->type);
+      $adapted['key'] = (string) ($adapted['key'] ?? $node->key ?? '');
+      $adapted['area'] = $area;
 
       if (self::isImageArray($adapted)) {
         return self::adaptImage($page, $adapted, $area);
@@ -96,15 +96,19 @@ class MarkdownNodeData
     }
 
     if ($node instanceof FieldContainer) {
-      if ($area !== '') {
-        $adapted['area'] = $area;
+      $adapted['key'] = (string) ($adapted['key'] ?? $node->key ?? '');
+      $adapted['area'] = $area;
+      $adapted['items'] = is_array($adapted['items'] ?? null) ? $adapted['items'] : [];
+
+      if (method_exists($node, 'fields')) {
+        foreach ($node->fields() as $name => $field) {
+          $childArea = self::joinArea($area, (string) $name);
+          $adapted[(string) $name] = self::adaptNode($page, $field, $adapted[$name] ?? $field->data(), $childArea);
+        }
       }
-      if (isset($adapted['images']) && is_array($adapted['images'])) {
-        $adapted['images'] = self::adaptImageList($page, $adapted['images'], self::joinArea($area, 'images'));
-      }
-      if (isset($adapted['links']) && is_array($adapted['links'])) {
-        $adapted['links'] = self::adaptLinkList($adapted['links'], self::joinArea($area, 'links'));
-      }
+
+      unset($adapted['blocks'], $adapted['subsections']);
+
       return $adapted;
     }
 

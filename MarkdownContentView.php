@@ -60,6 +60,11 @@ class MarkdownContentView extends ContentData implements MarkdownContentViewNode
   {
     return $this->nodeArea;
   }
+
+  public function data(): array
+  {
+    return MarkdownNodeData::adaptData($this->page, $this, parent::data(), $this->nodeArea);
+  }
 }
 
 class MarkdownSectionView extends Section implements MarkdownContentViewNode
@@ -224,8 +229,60 @@ class MarkdownFieldContainerView extends FieldContainer implements MarkdownConte
     return $this->nodeArea;
   }
 
+  public function __get($name)
+  {
+    $field = $this->field((string) $name);
+    if ($field !== null) {
+      return $field;
+    }
+
+    return parent::__get($name);
+  }
+
+  public function field(string $name): FieldData|FieldContainer|null
+  {
+    $field = parent::field($name);
+    return $field ? $this->wrapChildField($field, $name) : null;
+  }
+
+  public function fields(): array
+  {
+    $wrapped = [];
+    foreach (parent::fields() as $name => $field) {
+      $wrapped[(string) $name] = $this->wrapChildField($field, (string) $name);
+    }
+    return $wrapped;
+  }
+
   public function data(): array
   {
     return MarkdownNodeData::adaptData($this->page, $this, parent::data(), $this->nodeArea);
+  }
+
+  private function wrapChildField(FieldData|FieldContainer $field, string $name): FieldData|FieldContainer
+  {
+    $area = $this->joinArea($this->nodeArea, $name);
+
+    if ($field instanceof MarkdownContentViewNode && $field->area() === $area) {
+      return $field;
+    }
+
+    if ($field instanceof FieldData) {
+      return MarkdownFieldDataView::fromRaw($this->page, $field, $name, $area);
+    }
+
+    return MarkdownFieldContainerView::fromRaw($this->page, $field, $name, $area);
+  }
+
+  private function joinArea(string $base, string $segment): string
+  {
+    $segment = trim($segment, '/');
+    if ($segment === '') {
+      return $base;
+    }
+    if ($base === '') {
+      return $segment;
+    }
+    return $base . '/' . $segment;
   }
 }
