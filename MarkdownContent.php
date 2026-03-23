@@ -6,6 +6,7 @@ use LetMeDown\ContentData;
 
 require_once __DIR__ . '/MarkdownNodeData.php';
 require_once __DIR__ . '/MarkdownContentView.php';
+require_once __DIR__ . '/MarkdownDataSet.php';
 
 /**
  * MarkdownContent Trait

@@ -10,6 +10,7 @@ use LetMeDown\Section;
 interface MarkdownContentViewNode
 {
   public function area(): string;
+  public function dataSet(?string $mode = null): MarkdownDataSet;
 }
 
 class MarkdownContentView extends ContentData implements MarkdownContentViewNode
@@ -64,6 +65,12 @@ class MarkdownContentView extends ContentData implements MarkdownContentViewNode
   public function data(): array
   {
     return MarkdownNodeData::adaptData($this->page, $this, parent::data(), $this->nodeArea);
+  }
+
+  public function dataSet(?string $mode = null): MarkdownDataSet
+  {
+    $dataSet = new MarkdownDataSet($this->data());
+    return $dataSet->project($mode);
   }
 }
 
@@ -130,6 +137,12 @@ class MarkdownSectionView extends Section implements MarkdownContentViewNode
     return MarkdownNodeData::adaptData($this->page, $this, parent::data(), $this->nodeArea);
   }
 
+  public function dataSet(?string $mode = null): MarkdownDataSet
+  {
+    $dataSet = new MarkdownDataSet($this->data());
+    return $dataSet->project($mode);
+  }
+
   protected static function joinArea(string $base, string $segment): string
   {
     $segment = trim($segment, '/');
@@ -187,6 +200,12 @@ class MarkdownFieldDataView extends FieldData implements MarkdownContentViewNode
   public function data()
   {
     return MarkdownNodeData::adaptData($this->page, $this, parent::data(), $this->nodeArea);
+  }
+
+  public function dataSet(?string $mode = null): MarkdownDataSet
+  {
+    $dataSet = new MarkdownDataSet($this->data());
+    return $dataSet->project($mode);
   }
 }
 
@@ -257,6 +276,12 @@ class MarkdownFieldContainerView extends FieldContainer implements MarkdownConte
   public function data(): array
   {
     return MarkdownNodeData::adaptData($this->page, $this, parent::data(), $this->nodeArea);
+  }
+
+  public function dataSet(?string $mode = null): MarkdownDataSet
+  {
+    $dataSet = new MarkdownDataSet($this->data());
+    return $dataSet->project($mode);
   }
 
   private function wrapChildField(FieldData|FieldContainer $field, string $name): FieldData|FieldContainer

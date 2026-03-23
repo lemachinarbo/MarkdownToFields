@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.4
+
+- Templates can now call ->dataSet() on markdown content to get opinionated ProcessWire-friendly dataset objects and project content as HTML or plain text for easier rendering.
+
 ## v1.3.3
 
 - `content()->data()` is now a stable structural projection boundary for templates.
