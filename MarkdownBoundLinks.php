@@ -279,18 +279,23 @@ class MarkdownBoundLinks extends MarkdownFileIO
         $targetPage,
         $entryLanguage !== '' ? $entryLanguage : $languageCode,
       );
-      if ($resolvedHref === '' || $resolvedHref === $href) {
+      if ($resolvedHref === '') {
         continue;
       }
 
-      $replacements[$href] = $resolvedHref;
+      $replacementHref = self::replaceHrefPath($href, $resolvedHref);
+      if ($replacementHref === $href) {
+        continue;
+      }
+
+      $replacements[$href] = $replacementHref;
     }
 
     $oldHref = trim((string) ($oldUrlsByLanguage[$languageCode] ?? ''));
     if ($oldHref !== '') {
       $resolvedHref = self::pageUrlForLanguage($targetPage, $languageCode);
       if ($resolvedHref !== '' && $resolvedHref !== $oldHref) {
-        $replacements[$oldHref] = $resolvedHref;
+        $replacements[$oldHref] = self::replaceHrefPath($oldHref, $resolvedHref);
       }
     }
 
@@ -421,6 +426,25 @@ class MarkdownBoundLinks extends MarkdownFileIO
     }
 
     return $fallbackLanguage;
+  }
+
+  private static function replaceHrefPath(
+    string $originalHref,
+    string $replacementPath,
+  ): string {
+    $query = (string) parse_url($originalHref, PHP_URL_QUERY);
+    $fragment = (string) parse_url($originalHref, PHP_URL_FRAGMENT);
+
+    $href = $replacementPath;
+    if ($query !== '') {
+      $href .= '?' . $query;
+    }
+
+    if ($fragment !== '') {
+      $href .= '#' . $fragment;
+    }
+
+    return $href;
   }
 
   private static function pageUrlForLanguage(

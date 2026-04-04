@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.5
+
+- Fix broken links that lost query parameters or anchors during href replacement, ensuring links retain their queries and fragments.
+
 ## v1.3.4
 
 - Templates can now call ->dataSet() on markdown content to get opinionated ProcessWire-friendly dataset objects and project content as HTML or plain text for easier rendering.
