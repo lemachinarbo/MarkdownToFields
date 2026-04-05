@@ -3,6 +3,8 @@
 ## v1.3.5
 
 - Fix broken links that lost query parameters or anchors during href replacement, ensuring links retain their queries and fragments.
+- Fix ProcessWire page creation for templates with ID-based `contentSource()` overrides by falling back to the default page-name source until the page has been saved.
+- Fix false "missing markdown file" detection during auto-create on multilingual sites by checking normalized language codes, so existing default-language files are not overwritten with empty stubs.
 
 ## v1.3.4
 

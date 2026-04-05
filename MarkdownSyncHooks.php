@@ -362,8 +362,8 @@ class MarkdownSyncHooks
 
       $fileExists = false;
       if ($isMultilingual) {
-        foreach ($languages as $lang) {
-          $path = MarkdownFileIO::getMarkdownFilePath($page, $lang->name);
+        foreach (MarkdownLanguageResolver::availableLanguageCodes($page) as $languageCode) {
+          $path = MarkdownFileIO::getMarkdownFilePath($page, $languageCode);
           if (is_file($path)) {
             $fileExists = true;
             break;
