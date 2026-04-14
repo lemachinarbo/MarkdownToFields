@@ -247,16 +247,8 @@ class MarkdownSyncEngine extends MarkdownSessionManager
           $postedMarkdown = (string) $postedMarkdownMap[$languageCode];
 
           if ($postedMarkdown === '') {
-            $path = self::getMarkdownFilePath($page, $languageCode);
-            if (is_file($path)) {
-              try {
-                self::deleteLanguageMarkdown($page, $languageCode);
-                self::rememberFileHash($page, [$languageCode => null]);
-                $postedWrittenLanguages[] = $languageCode;
-              } catch (\Throwable $e) {
-              }
-            }
-
+            // Empty posted raw markdown can come from stale/partial form payloads.
+            // Ignore it here to avoid deleting existing markdown files.
             continue;
           }
 
@@ -603,17 +595,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
           self::saveLanguageMarkdown(
             $page,
             $document,
-            $isDefaultLanguage ? null : $language,
-          );
-        }
-      } else {
-        $hasFile =
-          $existingDocument !== null ||
-          self::hasLanguageMarkdown($page, $language);
-
-        if ($hasFile) {
-          self::deleteLanguageMarkdown(
-            $page,
             $isDefaultLanguage ? null : $language,
           );
         }
