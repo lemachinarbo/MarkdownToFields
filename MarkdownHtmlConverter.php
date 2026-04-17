@@ -306,6 +306,10 @@ class MarkdownHtmlConverter extends MarkdownFileIO
    */
   public static function resolveImageForInsertion(Page $page, string $imagePath): ?string
   {
+    if (!$page->id) {
+      return null;
+    }
+
     $config = self::config($page) ?? [];
     $sourcePaths = self::normalizeSourcePaths($config['imageSourcePaths'] ?? []);
     
