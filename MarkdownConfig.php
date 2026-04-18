@@ -4,6 +4,8 @@ namespace ProcessWire;
 
 class MarkdownConfig extends MarkdownLanguageResolver
 {
+  protected static array $configCache = [];
+
   /** Checks whether markdown sync is configured for the page. */
   public static function supportsPage(Page $page): bool
   {
@@ -16,12 +18,19 @@ class MarkdownConfig extends MarkdownLanguageResolver
 
   protected static function config(Page $page): ?array
   {
+    $pageId = (int) $page->id;
+    if ($pageId > 0 && array_key_exists($pageId, self::$configCache)) {
+      return self::$configCache[$pageId];
+    }
+
     if (!method_exists($page, 'getMarkdownSyncMap')) {
+      if ($pageId > 0) self::$configCache[$pageId] = null;
       return null;
     }
 
     $map = $page->getMarkdownSyncMap();
     if (!is_array($map)) {
+      if ($pageId > 0) self::$configCache[$pageId] = null;
       return null;
     }
 
@@ -32,10 +41,11 @@ class MarkdownConfig extends MarkdownLanguageResolver
     $markdownField = trim((string) ($map['markdownField'] ?? ''));
 
     if ($path === '' || $markdownField === '') {
+      if ($pageId > 0) self::$configCache[$pageId] = null;
       return null;
     }
 
-    return [
+    $config = [
       'source' => [
         'path' => self::withTrailingSlash($path),
         'pageField' => self::normalizeFieldName($source['pageField'] ?? null),
@@ -47,6 +57,12 @@ class MarkdownConfig extends MarkdownLanguageResolver
       'imageBaseUrl' => self::normalizeUrlBase($map['imageBaseUrl'] ?? null),
       'imageSourcePaths' => self::normalizeSourcePaths($map['imageSourcePaths'] ?? null),
     ];
+
+    if ($pageId > 0) {
+      self::$configCache[$pageId] = $config;
+    }
+
+    return $config;
   }
 
   public static function isLinkSyncEnabled(Page $page): bool
@@ -106,6 +122,12 @@ class MarkdownConfig extends MarkdownLanguageResolver
       $paths = [$paths];
     }
 
+    static $cache = [];
+    $cacheKey = serialize($paths);
+    if (isset($cache[$cacheKey])) {
+      return $cache[$cacheKey];
+    }
+
     $config = wire('config');
     $normalized = [];
 
@@ -123,13 +145,40 @@ class MarkdownConfig extends MarkdownLanguageResolver
       $normalized[] = self::withTrailingSlash($p);
     }
 
-    return array_values(array_unique($normalized));
+    $result = array_values(array_unique($normalized));
+    $cache[$cacheKey] = $result;
+    return $result;
   }
 
   protected static function normalizeFrontmatter($frontmatter): array
   {
+    static $cache = [];
+
+    if (is_string($frontmatter)) {
+      if (isset($cache[$frontmatter])) {
+        return $cache[$frontmatter];
+      }
+
+      $rawString = $frontmatter;
+      $lines = explode("\n", $frontmatter);
+      $frontmatter = [];
+      foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '' || strpos($line, ':') === false) continue;
+        [$field, $key] = explode(':', $line, 2);
+        $frontmatter[trim($field)] = trim($key);
+      }
+    } else {
+      $rawString = null;
+    }
+
     if (!is_array($frontmatter)) {
       return [];
+    }
+
+    $cacheKey = $rawString ?? serialize($frontmatter);
+    if (isset($cache[$cacheKey])) {
+      return $cache[$cacheKey];
     }
 
     $normalized = [];
@@ -144,6 +193,7 @@ class MarkdownConfig extends MarkdownLanguageResolver
       $normalized[$fieldName] = $frontKey;
     }
 
+    $cache[$cacheKey] = $normalized;
     return $normalized;
   }
 

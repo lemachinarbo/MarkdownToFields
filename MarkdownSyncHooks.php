@@ -201,6 +201,8 @@ class MarkdownSyncHooks
       return;
     }
 
+    self::assertUniqueMarkdownSource($page);
+
     // Auto-create markdown file on first save if it doesn't exist
     self::ensureMarkdownFileExists($page, $event);
 
@@ -362,8 +364,8 @@ class MarkdownSyncHooks
 
       $fileExists = false;
       if ($isMultilingual) {
-        foreach ($languages as $lang) {
-          $path = MarkdownFileIO::getMarkdownFilePath($page, $lang->name);
+        foreach (MarkdownLanguageResolver::availableLanguageCodes($page) as $languageCode) {
+          $path = MarkdownFileIO::getMarkdownFilePath($page, $languageCode);
           if (is_file($path)) {
             $fileExists = true;
             break;
@@ -444,5 +446,69 @@ class MarkdownSyncHooks
     }
 
     return false;
+  }
+
+  private static function assertUniqueMarkdownSource(Page $page): void
+  {
+    $templates = wire('modules')->getConfig('MarkdownToFields')['templates'] ?? [];
+    if (!is_array($templates) || !$templates) {
+      return;
+    }
+
+    $selector = 'include=all';
+    if ($page->id) {
+      $selector .= ', id!=' . (int) $page->id;
+    }
+    $selector .= ', template=' . implode('|', $templates);
+
+    $currentPaths = [];
+    foreach (MarkdownLanguageResolver::availableLanguageCodes($page) as $languageCode) {
+      $currentPaths[$languageCode] = MarkdownFileIO::getMarkdownFilePath($page, $languageCode);
+    }
+
+    foreach ($page->wire('pages')->find($selector) as $candidate) {
+      if (!$candidate instanceof Page || $candidate->isTrash()) {
+        continue;
+      }
+
+      if (!MarkdownConfig::supportsPage($candidate)) {
+        continue;
+      }
+
+      foreach ($currentPaths as $languageCode => $currentPath) {
+        $candidatePath = MarkdownFileIO::getMarkdownFilePath($candidate, $languageCode);
+        if ($candidatePath !== $currentPath) {
+          continue;
+        }
+
+        throw new WireException(
+          sprintf(
+            'Markdown source collision: page %s and page %s both resolve to %s for language %s. Rename one page or override contentSource() to a unique file.',
+            $page->path,
+            $candidate->path,
+            $currentPath,
+            $languageCode,
+          ),
+        );
+      }
+    }
+
+    // Also guard against renaming onto an existing markdown file that no current
+    // managed page uses (e.g. an orphan left by a previously-renamed page).
+    // When 'name' changes, the new source path is different: any file already
+    // there does not belong to this page.
+    if ($page->id && $page->isChanged('name')) {
+      $defaultCode = MarkdownLanguageResolver::getDefaultLanguageCode($page);
+      $defaultPath = $currentPaths[$defaultCode] ?? null;
+      if ($defaultPath !== null && is_file($defaultPath)) {
+        throw new WireException(
+          sprintf(
+            'Markdown source collision: renaming to "%s" would overwrite the existing file at %s. Use a different name or remove the conflicting file first.',
+            (string) $page->name,
+            $defaultPath,
+          ),
+        );
+      }
+    }
   }
 }

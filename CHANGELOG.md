@@ -1,8 +1,27 @@
 # Changelog
 
+## v1.3.7
+
+- Refactor `renderConfigurationReference()` into smaller focused methods for easier maintenance.
+- Refactor `doSyncFromMarkdown()` into clearer sub-responsibilities to improve readability and reduce method complexity.
+- Optimize field map configuration parsing in `MarkdownConfig` with caching to reduce repeated parse overhead.
+
+## v1.3.6 — Data-loss prevention
+
+- Fix page creation errors on unsaved pages by skipping page file access until the page has an ID.
+
+- Fixes four separate ways a page save could silently destroy markdown content:
+
+  - **Empty post payload**: empty raw markdown submitted by the form no longer deletes the existing file.
+  - **Empty computed document**: clearing all fields no longer removes the file; files are preserved by default.
+  - **Source path collision (pages)**: saving is blocked when two managed pages resolve to the same markdown file path.
+  - **Source path collision (orphans)**: renaming a page onto a slug whose markdown file already exists is also blocked, preventing silent overwrites of orphaned files.
+
 ## v1.3.5
 
 - Fix broken links that lost query parameters or anchors during href replacement, ensuring links retain their queries and fragments.
+- Fix ProcessWire page creation for templates with ID-based `contentSource()` overrides by falling back to the default page-name source until the page has been saved.
+- Fix false "missing markdown file" detection during auto-create on multilingual sites by checking normalized language codes, so existing default-language files are not overwritten with empty stubs.
 
 ## v1.3.4
 

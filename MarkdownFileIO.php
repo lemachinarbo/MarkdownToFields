@@ -230,6 +230,10 @@ class MarkdownFileIO extends MarkdownConfig
     Page $page,
     string $markdown,
   ): string {
+    if (!$page->id) {
+      return $markdown;
+    }
+
     $config = self::requireConfig($page);
     $imageSources = $config['imageSourcePaths'] ?? [];
     $imageBaseUrl = $config['imageBaseUrl'] ?? null;

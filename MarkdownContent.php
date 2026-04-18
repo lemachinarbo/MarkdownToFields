@@ -106,10 +106,20 @@ trait MarkdownContent {
       }
     }
 
+    $fallbackSource = $this->defaultContentSource();
+    try {
+      $source = $this->contentSource();
+      if (is_string($source) && trim($source) !== '') {
+        $fallbackSource = $source;
+      }
+    } catch (\Throwable $e) {
+      // Unsaved pages can hit page-class overrides before IDs exist.
+    }
+
     $map = [
       'source' => [
         'path' => $path,
-        'fallback' => $this->contentSource(),
+        'fallback' => $fallbackSource,
       ],
       'markdownField' => $mdConfig['markdownField'] ?? 'md_markdown',
       'hashField' => $mdConfig['hashField'] ?? 'md_markdown_hash',
@@ -135,17 +145,19 @@ trait MarkdownContent {
     return $syncerClass::loadMarkdown($this, $source, $lang);
   }
 
-  /** Returns the default markdown filename for this page. */
-  public function contentSource(): string {
+  protected function defaultContentSource(): string {
     $name = trim((string) $this->name);
-    
-    // If name is empty (database state before frontmatter sync), derive from path
+
     if ($name === '') {
-      // Root page → 'home', others → last path segment
       $name = $this->path === '/' ? 'home' : basename(rtrim($this->path, '/'));
     }
-    
+
     return $name . '.md';
+  }
+
+  /** Returns the default markdown filename for this page. */
+  public function contentSource(): string {
+    return $this->defaultContentSource();
   }
 
   /** Loads parsed markdown content using the default source. */
