@@ -613,7 +613,7 @@ class MarkdownFileIO extends MarkdownConfig
     }
 
     // Attach Pageimage objects (asset binding)
-    $attachedImages = self::walkContent($page, $content, $imageSources, $imageBaseUrl);
+    self::walkContent($page, $content, $imageSources, $imageBaseUrl);
 
     // Rewrite HTML properties for writable elements. Readonly elements are
     // intentionally created with final HTML (see processing before parse).
