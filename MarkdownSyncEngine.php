@@ -45,8 +45,25 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     $page->of(false);
 
     $markdownField = $config['markdownField'];
-    $dirtyFields = [];
+    $dirtyFields = self::processLanguagesForSync($page, $markdownField);
 
+    if (!$dirtyFields) {
+      return [];
+    }
+
+    $failedFields = [];
+    $savedFields = self::saveDirtyFields($page, $dirtyFields, $failedFields);
+
+    if ($failedFields) {
+      self::handleFailedFields($page, $failedFields);
+    }
+
+    return $savedFields;
+  }
+
+  private static function processLanguagesForSync(Page $page, string $markdownField): array
+  {
+    $dirtyFields = [];
     $languageCodes = self::availableLanguageCodes($page);
     $defaultCode = self::getDefaultLanguageCode($page);
 
@@ -122,15 +139,14 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         );
         $dirtyFields[] = $markdownField;
       }
-
     }
 
-    if (!$dirtyFields) {
-      return [];
-    }
+    return $dirtyFields;
+  }
 
+  private static function saveDirtyFields(Page $page, array $dirtyFields, array &$failedFields): array
+  {
     $savedFields = [];
-    $failedFields = [];
 
     foreach (array_unique($dirtyFields) as $field) {
       $supports = self::pageSupportsMappedField($page, $field);
@@ -163,31 +179,33 @@ class MarkdownSyncEngine extends MarkdownSessionManager
       }
     }
 
-    if ($failedFields) {
-      $protectedFields = array_intersect(
-        ['name', 'title'],
-        array_keys($failedFields),
-      );
-      if ($protectedFields) {
-        $firstError = reset($failedFields);
-        $errorPreview = is_string($firstError)
-          ? (strlen($firstError) > 200
-            ? substr($firstError, 0, 200) . '...'
-            : $firstError)
-          : json_encode($firstError);
-
-        $errorMsg = sprintf(
-          'Failed to save protected fields (%s) during markdown sync: %s',
-          implode(', ', $protectedFields),
-          $errorPreview,
-        );
-
-        self::logInfo($page, $errorMsg);
-        throw new WireException($errorMsg);
-      }
-    }
-
     return $savedFields;
+  }
+
+  private static function handleFailedFields(Page $page, array $failedFields): void
+  {
+    $protectedFields = array_intersect(
+      ['name', 'title'],
+      array_keys($failedFields),
+    );
+
+    if ($protectedFields) {
+      $firstError = reset($failedFields);
+      $errorPreview = is_string($firstError)
+        ? (strlen($firstError) > 200
+          ? substr($firstError, 0, 200) . '...'
+          : $firstError)
+        : json_encode($firstError);
+
+      $errorMsg = sprintf(
+        'Failed to save protected fields (%s) during markdown sync: %s',
+        implode(', ', $protectedFields),
+        $errorPreview,
+      );
+
+      self::logInfo($page, $errorMsg);
+      throw new WireException($errorMsg);
+    }
   }
 
   /** Syncs page fields to markdown files. */
@@ -247,16 +265,8 @@ class MarkdownSyncEngine extends MarkdownSessionManager
           $postedMarkdown = (string) $postedMarkdownMap[$languageCode];
 
           if ($postedMarkdown === '') {
-            $path = self::getMarkdownFilePath($page, $languageCode);
-            if (is_file($path)) {
-              try {
-                self::deleteLanguageMarkdown($page, $languageCode);
-                self::rememberFileHash($page, [$languageCode => null]);
-                $postedWrittenLanguages[] = $languageCode;
-              } catch (\Throwable $e) {
-              }
-            }
-
+            // Empty posted raw markdown can come from stale/partial form payloads.
+            // Ignore it here to avoid deleting existing markdown files.
             continue;
           }
 
@@ -603,17 +613,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
           self::saveLanguageMarkdown(
             $page,
             $document,
-            $isDefaultLanguage ? null : $language,
-          );
-        }
-      } else {
-        $hasFile =
-          $existingDocument !== null ||
-          self::hasLanguageMarkdown($page, $language);
-
-        if ($hasFile) {
-          self::deleteLanguageMarkdown(
-            $page,
             $isDefaultLanguage ? null : $language,
           );
         }

@@ -315,6 +315,11 @@ class MarkdownUtilities
    */
   public static function pageimage(Page $page, $srcOrElement): ?Pageimage
   {
+    // New pages in ProcessPageAdd have no ID yet, so page files are unavailable.
+    if (!$page->id) {
+      return null;
+    }
+
     // Extract src from string or element.data['src']
     $src = is_string($srcOrElement) ? $srcOrElement : null;
     if (!$src && is_object($srcOrElement) && isset($srcOrElement->data['src'])) {
@@ -325,7 +330,17 @@ class MarkdownUtilities
     }
 
     // Build full path and verify file exists
-    $fullPath = $page->filesManager()->path() . basename($src);
+    try {
+      $filesManager = $page->filesManager();
+    } catch (\Throwable) {
+      return null;
+    }
+
+    if (!$filesManager) {
+      return null;
+    }
+
+    $fullPath = $filesManager->path() . basename($src);
     if (!is_file($fullPath)) {
       return null;
     }

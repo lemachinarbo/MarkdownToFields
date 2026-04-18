@@ -61,7 +61,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   {
     return [
       'title' => 'Markdown to fields',
-      'version' => '1.3.5',
+      'version' => '1.3.7',
       'summary' => 'Markdown files as your content source of truth',
       'description' =>
         'Use markdown as your content. Structure it with simple tags, and enjoy the markdown <-> ProcessWire fields sync',
@@ -327,7 +327,26 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   }
 
   /** Render-only HTML for the configuration reference and current typed values. */
+  /** Render-only HTML for the configuration reference and current typed values. */
   private function renderConfigurationReference(array $settings): string {
+    $html = $this->renderConfigExample();
+
+    $html .= '<h4>Current values:</h4>';
+    $html .= '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
+    $html .= '<tr style="background:#f5f5f5;">';
+    $html .= '<th style="text-align:left; padding:8px; border:1px solid #ddd;">Setting</th>';
+    $html .= '<th style="text-align:left; padding:8px; border:1px solid #ddd;">Value</th>';
+    $html .= '<th style="text-align:center; padding:8px; border:1px solid #ddd; width:100px;">Status</th>';
+    $html .= '</tr>';
+
+    foreach ($settings as $key => $value) {
+      $html .= $this->renderSettingRow($key, $value);
+    }
+
+    return $html . '</table>';
+  }
+
+  private function renderConfigExample(): string {
     $html = '<p>All settings are managed in <code>/site/config.php</code>. Add or adjust:</p>';
     $html .= '<pre style="background:#f0f0f0; padding:12px; border-radius:4px; overflow-x:auto; font-size:11px;">';
     $html .= "\$config->MarkdownToFields = [\n";
@@ -354,66 +373,63 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $html .= "  // debug\n";
     $html .= "  'debug' => true,\n";
     $html .= "];\n</pre>";
+    return $html;
+  }
 
-    $html .= '<h4>Current values:</h4>';
-    $html .= '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
-    $html .= '<tr style="background:#f5f5f5;">';
-    $html .= '<th style="text-align:left; padding:8px; border:1px solid #ddd;">Setting</th>';
-    $html .= '<th style="text-align:left; padding:8px; border:1px solid #ddd;">Value</th>';
-    $html .= '<th style="text-align:center; padding:8px; border:1px solid #ddd; width:100px;">Status</th>';
-    $html .= '</tr>';
-
-    foreach ($settings as $key => $value) {
-      if (is_bool($value)) {
-        $display = $value ? 'true' : 'false';
-      } elseif (is_array($value)) {
-        $display = '[' . implode(', ', array_map('strval', $value)) . ']';
-      } else {
-        $display = (string) $value;
-      }
-      
-      // Determine if setting is custom or default
-      $isDefault = false;
-      
-      // Check all defaults against module's getNormalizedSettings defaults
-      if ($key === 'linkSync' && $display === 'false') {
-        $isDefault = true;
-      } elseif ($key === 'markdownField' && $display === 'md_markdown') {
-        $isDefault = true;
-      } elseif ($key === 'hashField' && $display === 'md_markdown_hash') {
-        $isDefault = true;
-      } elseif ($key === 'sourcePath' && $display === 'content/') {
-        $isDefault = true;
-      } elseif ($key === 'autoSyncFrontmatter' && $display === 'true') {
-        $isDefault = true;
-      } elseif ($key === 'excludeFrontmatterFields' && $display === '[name]') {
-        $isDefault = true;
-      } elseif ($key === 'enabledTemplates' && $display === '[]') {
-        $isDefault = true;
-      } elseif ($key === 'includeFrontmatterFields' && $display === '[]') {
-        $isDefault = true;
-      } elseif ($key === 'imageBaseUrl' && $display === '') {
-        $display = $this->wire('config')->urls->files . '{pageId}/';
-        $isDefault = true;
-      } elseif ($key === 'imageSourcePaths' && $display === '[]') {
-        $display = $this->wire('config')->paths->site . 'images/';
-        $isDefault = true;
-      } elseif ($key === 'debug' && $display === 'false') {
-        $isDefault = true;
-      }
-      
-      $status = $isDefault ? 'Default' : 'Custom';
-      $statusBg = $isDefault ? '#e8f5e9' : '#fff3e0';
-      $statusColor = $isDefault ? '#2e7d32' : '#e65100';
-      
-      $html .= '<tr>';
-      $html .= '<td style="padding:8px; border:1px solid #ddd;"><code>' . htmlspecialchars($key) . '</code></td>';
-      $html .= '<td style="padding:8px; border:1px solid #ddd;"><code>' . htmlspecialchars($display) . '</code></td>';
-      $html .= '<td style="padding:8px; border:1px solid #ddd; text-align:center; background:' . $statusBg . '; color:' . $statusColor . '; font-weight:500;">' . $status . '</td>';
-      $html .= '</tr>';
+  private function formatSettingValue($value): string {
+    if (is_bool($value)) {
+      return $value ? 'true' : 'false';
     }
+    if (is_array($value)) {
+      return '[' . implode(', ', array_map('strval', $value)) . ']';
+    }
+    return (string) $value;
+  }
 
-    return $html . '</table>';
+  private function isDefaultSetting(string $key, string &$display): bool {
+    $isDefault = false;
+    if ($key === 'linkSync' && $display === 'false') {
+      $isDefault = true;
+    } elseif ($key === 'markdownField' && $display === 'md_markdown') {
+      $isDefault = true;
+    } elseif ($key === 'hashField' && $display === 'md_markdown_hash') {
+      $isDefault = true;
+    } elseif ($key === 'sourcePath' && $display === 'content/') {
+      $isDefault = true;
+    } elseif ($key === 'autoSyncFrontmatter' && $display === 'true') {
+      $isDefault = true;
+    } elseif ($key === 'excludeFrontmatterFields' && $display === '[name]') {
+      $isDefault = true;
+    } elseif ($key === 'enabledTemplates' && $display === '[]') {
+      $isDefault = true;
+    } elseif ($key === 'includeFrontmatterFields' && $display === '[]') {
+      $isDefault = true;
+    } elseif ($key === 'imageBaseUrl' && $display === '') {
+      $display = $this->wire('config')->urls->files . '{pageId}/';
+      $isDefault = true;
+    } elseif ($key === 'imageSourcePaths' && $display === '[]') {
+      $display = $this->wire('config')->paths->site . 'images/';
+      $isDefault = true;
+    } elseif ($key === 'debug' && $display === 'false') {
+      $isDefault = true;
+    }
+    return $isDefault;
+  }
+
+  private function renderSettingRow(string $key, $value): string {
+    $display = $this->formatSettingValue($value);
+    $isDefault = $this->isDefaultSetting($key, $display);
+
+    $status = $isDefault ? 'Default' : 'Custom';
+    $statusBg = $isDefault ? '#e8f5e9' : '#fff3e0';
+    $statusColor = $isDefault ? '#2e7d32' : '#e65100';
+
+    $html = '<tr>';
+    $html .= '<td style="padding:8px; border:1px solid #ddd;"><code>' . htmlspecialchars($key) . '</code></td>';
+    $html .= '<td style="padding:8px; border:1px solid #ddd;"><code>' . htmlspecialchars($display) . '</code></td>';
+    $html .= '<td style="padding:8px; border:1px solid #ddd; text-align:center; background:' . $statusBg . '; color:' . $statusColor . '; font-weight:500;">' . $status . '</td>';
+    $html .= '</tr>';
+    return $html;
   }
 
   /** Remove module fields and clean up configuration. */
