@@ -11,6 +11,7 @@ interface MarkdownContentViewNode
 {
   public function area(): string;
   public function dataSet(?string $mode = null): MarkdownDataSet;
+  public function data(): array;
 }
 
 class MarkdownContentView extends ContentData implements MarkdownContentViewNode
@@ -64,7 +65,9 @@ class MarkdownContentView extends ContentData implements MarkdownContentViewNode
 
   public function data(): array
   {
-    return MarkdownNodeData::adaptData($this->page, $this, parent::data(), $this->nodeArea);
+    // ContentData doesn't have a $data property, its data is the sections etc.
+    // However, the adaptData usually looks at the frontmatter for the root.
+    return MarkdownNodeData::adaptData($this->page, $this, $this->getFrontmatter() ?: [], $this->nodeArea);
   }
 
   public function dataSet(?string $mode = null): MarkdownDataSet
@@ -98,12 +101,18 @@ class MarkdownSectionView extends Section implements MarkdownContentViewNode
       $wrappedSubsections[$name] = self::fromRaw($page, $subsection, (string) $name, self::joinArea($area, (string) $name));
     }
 
+    $wrappedBlocks = [];
+    foreach ($section->getRealBlocks() as $index => $block) {
+      $blockArea = self::joinArea($area, "block_" . $index);
+      $wrappedBlocks[] = MarkdownBlockView::fromRaw($page, $block, $blockArea);
+    }
+
     return new self(
       $page,
       $section->html,
       $section->text,
       $section->markdown,
-      $section->getRealBlocks(),
+      $wrappedBlocks,
       $wrappedFields,
       $wrappedSubsections,
       $key,
@@ -134,7 +143,7 @@ class MarkdownSectionView extends Section implements MarkdownContentViewNode
 
   public function data(): array
   {
-    return MarkdownNodeData::adaptData($this->page, $this, parent::data(), $this->nodeArea);
+    return MarkdownNodeData::adaptData($this->page, $this, $this->frontmatter ?: [], $this->nodeArea);
   }
 
   public function dataSet(?string $mode = null): MarkdownDataSet
@@ -153,6 +162,54 @@ class MarkdownSectionView extends Section implements MarkdownContentViewNode
       return $segment;
     }
     return $base . '/' . $segment;
+  }
+}
+
+class MarkdownBlockView extends \LetMeDown\Block implements MarkdownContentViewNode
+{
+  protected Page $page;
+  protected string $nodeArea;
+
+  public static function fromRaw(Page $page, \LetMeDown\Block $block, string $area = ''): self
+  {
+    return new self($page, $block, $area);
+  }
+
+  public function __construct(Page $page, \LetMeDown\Block $block, string $area = '')
+  {
+    $this->page = $page;
+    $this->nodeArea = $area;
+
+    parent::__construct(
+      $block->heading,
+      $block->level,
+      $block->content,
+      $block->html,
+      $block->text,
+      $block->markdown,
+      $block->paragraphs,
+      $block->images,
+      $block->links,
+      $block->lists,
+      $block->children,
+      $block->fields
+    );
+  }
+
+  public function area(): string
+  {
+    return $this->nodeArea;
+  }
+
+  public function data(): array
+  {
+    return MarkdownNodeData::adaptData($this->page, $this, $this->fields, $this->nodeArea);
+  }
+
+  public function dataSet(?string $mode = null): MarkdownDataSet
+  {
+    $dataSet = new MarkdownDataSet($this->data());
+    return $dataSet->project($mode);
   }
 }
 
@@ -197,9 +254,9 @@ class MarkdownFieldDataView extends FieldData implements MarkdownContentViewNode
     return $this->nodeArea;
   }
 
-  public function data()
+  public function data(): array
   {
-    return MarkdownNodeData::adaptData($this->page, $this, parent::data(), $this->nodeArea);
+    return MarkdownNodeData::adaptData($this->page, $this, $this->data, $this->nodeArea);
   }
 
   public function dataSet(?string $mode = null): MarkdownDataSet
@@ -275,7 +332,8 @@ class MarkdownFieldContainerView extends FieldContainer implements MarkdownConte
 
   public function data(): array
   {
-    return MarkdownNodeData::adaptData($this->page, $this, parent::data(), $this->nodeArea);
+    // Containers hold their fields as data
+    return MarkdownNodeData::adaptData($this->page, $this, $this->fields, $this->nodeArea);
   }
 
   public function dataSet(?string $mode = null): MarkdownDataSet

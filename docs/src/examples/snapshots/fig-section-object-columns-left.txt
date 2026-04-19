@@ -8,7 +8,7 @@ ProcessWire\MarkdownSectionView
        
        <!-- sub:left --><!-- sub:right -->'
   blocks: array (1)
-    0 => LetMeDown\Block [...]
+    0 => ProcessWire\MarkdownBlockView [...]
   fields: array (0)
   subsections: array (2)
     left => ProcessWire\MarkdownSectionView [...]

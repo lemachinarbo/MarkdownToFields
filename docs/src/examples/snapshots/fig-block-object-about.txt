@@ -1,4 +1,6 @@
-LetMeDown\Block
+ProcessWire\MarkdownBlockView
+  page: ProcessWire\Page
+  nodeArea: 'about/block_0'
   heading: LetMeDown\HeadingElement
     text: 'About Us'
     html: '<h1>About Us</h1>'

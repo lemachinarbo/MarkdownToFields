@@ -578,7 +578,7 @@ ProcessWire\MarkdownSectionView
        
        <!-- sub:left --><!-- sub:right -->'
   blocks: array (1)
-    0 => LetMeDown\Block [...]
+    0 => ProcessWire\MarkdownBlockView [...]
   fields: array (0)
   subsections: array (2)
     left => ProcessWire\MarkdownSectionView [...]
@@ -685,6 +685,9 @@ namespace ProcessWire;
 | `$lists` | `LetMeDown\ContentElementCollection` | Collection of list elements |
 | `$children` | `array` | Hierarchical child blocks |
 | `$fields` | `array` | Tagged fields inside this block |
+| `area()` | `method` |  |
+| `data()` | `method` |  |
+| `dataSet($mode?)` | `method` |  |
 | `field($name)` | `method` | Get a field by name / |
 
 
@@ -693,7 +696,9 @@ namespace ProcessWire;
 
 
 ```php
-LetMeDown\Block
+ProcessWire\MarkdownBlockView
+  page: ProcessWire\Page
+  nodeArea: 'about/block_0'
   heading: LetMeDown\HeadingElement
     text: 'About Us'
     html: '<h1>About Us</h1>'
