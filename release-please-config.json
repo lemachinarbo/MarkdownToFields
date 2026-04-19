@@ -1,0 +1,14 @@
+{
+  "target-branch": "master",
+  "packages": {
+    ".": {
+      "release-type": "php",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "MarkdownToFields.module.php"
+        }
+      ]
+    }
+  }
+}
