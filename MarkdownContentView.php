@@ -16,7 +16,17 @@ interface MarkdownContentViewNode
    * @return string
    */
   public function area(): string;
+
+  /**
+   * Returns a WireData wrapper for fluent data access. 
+   * Accepts 'html' or 'text' to automatically collapse simple fields 
+   * to their respective string values.
+   */
   public function dataSet(?string $mode = null): MarkdownDataSet;
+
+  /**
+   * Returns the node data as a plain associative array.
+   */
   public function data(): array;
 }
 
@@ -72,6 +82,9 @@ class MarkdownContentView extends ContentData implements MarkdownContentViewNode
     return $this->nodeArea;
   }
 
+  /**
+   * Returns the node data as a plain associative array.
+   */
   public function data(): array
   {
     // ContentData doesn't have a $data property, its data is the sections etc.
@@ -79,6 +92,11 @@ class MarkdownContentView extends ContentData implements MarkdownContentViewNode
     return MarkdownNodeData::adaptData($this->page, $this, $this->getFrontmatter() ?: [], $this->nodeArea);
   }
 
+  /**
+   * Returns a WireData wrapper for fluent data access. 
+   * Accepts 'html' or 'text' to automatically collapse simple fields 
+   * to their respective string values.
+   */
   public function dataSet(?string $mode = null): MarkdownDataSet
   {
     $dataSet = new MarkdownDataSet($this->data());
@@ -153,11 +171,19 @@ class MarkdownSectionView extends Section implements MarkdownContentViewNode
     return $this->nodeArea;
   }
 
+  /**
+   * Returns the node data as a plain associative array.
+   */
   public function data(): array
   {
     return MarkdownNodeData::adaptData($this->page, $this, $this->frontmatter ?: [], $this->nodeArea);
   }
 
+  /**
+   * Returns a WireData wrapper for fluent data access. 
+   * Accepts 'html' or 'text' to automatically collapse simple fields 
+   * to their respective string values.
+   */
   public function dataSet(?string $mode = null): MarkdownDataSet
   {
     $dataSet = new MarkdownDataSet($this->data());
@@ -216,11 +242,19 @@ class MarkdownBlockView extends \LetMeDown\Block implements MarkdownContentViewN
     return $this->nodeArea;
   }
 
+  /**
+   * Returns the node data as a plain associative array.
+   */
   public function data(): array
   {
     return MarkdownNodeData::adaptData($this->page, $this, $this->fields, $this->nodeArea);
   }
 
+  /**
+   * Returns a WireData wrapper for fluent data access. 
+   * Accepts 'html' or 'text' to automatically collapse simple fields 
+   * to their respective string values.
+   */
   public function dataSet(?string $mode = null): MarkdownDataSet
   {
     $dataSet = new MarkdownDataSet($this->data());
@@ -272,11 +306,19 @@ class MarkdownFieldDataView extends FieldData implements MarkdownContentViewNode
     return $this->nodeArea;
   }
 
+  /**
+   * Returns the node data as a plain associative array.
+   */
   public function data(): array
   {
     return MarkdownNodeData::adaptData($this->page, $this, $this->data, $this->nodeArea);
   }
 
+  /**
+   * Returns a WireData wrapper for fluent data access. 
+   * Accepts 'html' or 'text' to automatically collapse simple fields 
+   * to their respective string values.
+   */
   public function dataSet(?string $mode = null): MarkdownDataSet
   {
     $dataSet = new MarkdownDataSet($this->data());
@@ -351,12 +393,20 @@ class MarkdownFieldContainerView extends FieldContainer implements MarkdownConte
     return $wrapped;
   }
 
+  /**
+   * Returns the node data as a plain associative array.
+   */
   public function data(): array
   {
     // Containers hold their fields as data
     return MarkdownNodeData::adaptData($this->page, $this, $this->fields, $this->nodeArea);
   }
 
+  /**
+   * Returns a WireData wrapper for fluent data access. 
+   * Accepts 'html' or 'text' to automatically collapse simple fields 
+   * to their respective string values.
+   */
   public function dataSet(?string $mode = null): MarkdownDataSet
   {
     $dataSet = new MarkdownDataSet($this->data());

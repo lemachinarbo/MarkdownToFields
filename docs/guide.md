@@ -686,8 +686,8 @@ namespace ProcessWire;
 | `$children` | `array` | Hierarchical child blocks |
 | `$fields` | `array` | Tagged fields inside this block |
 | `area()` | `method` | Returns the canonical area path string for this node. / |
-| `data()` | `method` |  |
-| `dataSet($mode?)` | `method` |  |
+| `data()` | `method` | Returns the node data as a plain associative array. / |
+| `dataSet($mode?)` | `method` | Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values. / |
 | `field($name)` | `method` | Get a field by name / |
 
 
