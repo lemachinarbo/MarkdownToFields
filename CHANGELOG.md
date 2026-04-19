@@ -6,7 +6,7 @@
 - Refactor `doSyncFromMarkdown()` into clearer sub-responsibilities to improve readability and reduce method complexity.
 - Optimize field map configuration parsing in `MarkdownConfig` with caching to reduce repeated parse overhead.
 
-## v1.3.6 — Data-loss prevention
+## v1.3.6
 
 - Fix page creation errors on unsaved pages by skipping page file access until the page has an ID.
 
