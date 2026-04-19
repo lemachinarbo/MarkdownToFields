@@ -239,7 +239,7 @@ You only need to figure out which content tag best represents the structure youâ
 Sections are top-level containers defined with `<!-- section:name -->`.  
 They group related content and can be rendered independently.
 
-Each section is represented by a `Section` object with these properties:
+Each section is represented by a `Section` object with these members:
 
 [[REFLECT:Section]]
 

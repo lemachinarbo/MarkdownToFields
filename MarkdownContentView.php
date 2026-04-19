@@ -9,6 +9,12 @@ use LetMeDown\Section;
 
 interface MarkdownContentViewNode
 {
+  /**
+   * Returns the canonical area path string for this node.
+   * Used for identifying targets in front-end editing integrations.
+   * 
+   * @return string
+   */
   public function area(): string;
   public function dataSet(?string $mode = null): MarkdownDataSet;
   public function data(): array;
@@ -58,6 +64,9 @@ class MarkdownContentView extends ContentData implements MarkdownContentViewNode
     ]);
   }
 
+  /**
+   * Returns the canonical area path string for this node.
+   */
   public function area(): string
   {
     return $this->nodeArea;
@@ -136,6 +145,9 @@ class MarkdownSectionView extends Section implements MarkdownContentViewNode
     parent::__construct($html, $text, $markdown, $blocks, $fields, $subsections, $key);
   }
 
+  /**
+   * Returns the canonical area path string for this node.
+   */
   public function area(): string
   {
     return $this->nodeArea;
@@ -196,6 +208,9 @@ class MarkdownBlockView extends \LetMeDown\Block implements MarkdownContentViewN
     );
   }
 
+  /**
+   * Returns the canonical area path string for this node.
+   */
   public function area(): string
   {
     return $this->nodeArea;
@@ -249,6 +264,9 @@ class MarkdownFieldDataView extends FieldData implements MarkdownContentViewNode
     parent::__construct($name, $markdown, $html, $text, $type, $data, $key);
   }
 
+  /**
+   * Returns the canonical area path string for this node.
+   */
   public function area(): string
   {
     return $this->nodeArea;
@@ -300,6 +318,9 @@ class MarkdownFieldContainerView extends FieldContainer implements MarkdownConte
     parent::__construct($name, $markdown, $html, $text, $blocks, $key);
   }
 
+  /**
+   * Returns the canonical area path string for this node.
+   */
   public function area(): string
   {
     return $this->nodeArea;
