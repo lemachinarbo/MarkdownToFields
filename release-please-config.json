@@ -1,5 +1,5 @@
 {
-  "target-branch": "master",
+  "target-branch": "main",
   "packages": {
     ".": {
       "release-type": "php",
