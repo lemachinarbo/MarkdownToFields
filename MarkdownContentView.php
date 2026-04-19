@@ -87,8 +87,6 @@ class MarkdownContentView extends ContentData implements MarkdownContentViewNode
    */
   public function data(): array
   {
-    // ContentData doesn't have a $data property, its data is the sections etc.
-    // However, the adaptData usually looks at the frontmatter for the root.
     return MarkdownNodeData::adaptData($this->page, $this, $this->getFrontmatter() ?: [], $this->nodeArea);
   }
 
@@ -398,7 +396,6 @@ class MarkdownFieldContainerView extends FieldContainer implements MarkdownConte
    */
   public function data(): array
   {
-    // Containers hold their fields as data
     return MarkdownNodeData::adaptData($this->page, $this, $this->fields, $this->nodeArea);
   }
 

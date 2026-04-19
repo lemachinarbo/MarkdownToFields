@@ -298,7 +298,7 @@ class DocBuilder {
                 'sections' => 'Array of all sections in the document',
                 'frontmatter' => 'Parsed frontmatter data',
                 'data' => 'Returns a plain array of the content dataset',
-                'dataSet' => 'Returns a WireData wrapper for fluent data access'
+                'dataSet' => "Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values."
             ],
             'Section' => [
                 'html' => 'Rendered HTML of the section content',
@@ -309,7 +309,7 @@ class DocBuilder {
                 'subsections' => 'Nested subsections (not supported inside subsections themselves)',
                 'frontmatter' => 'Frontmatter data for this section (if available)',
                 'data' => 'Returns a plain array of the section dataset',
-                'dataSet' => 'Returns a WireData wrapper for fluent data access',
+                'dataSet' => "Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values.",
                 'subsection' => 'Access a nested subsection by name'
             ],
             'Block' => [
@@ -334,11 +334,11 @@ class DocBuilder {
             ],
             'FieldData' => [
                'data' => 'Returns a plain array of the field dataset',
-               'dataSet' => 'Returns a WireData wrapper for fluent data access'
+               'dataSet' => "Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values."
             ],
             'FieldContainer' => [
                'data' => 'Returns a plain array of the container dataset',
-               'dataSet' => 'Returns a WireData wrapper for fluent data access'
+               'dataSet' => "Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values."
             ]
         ];
 

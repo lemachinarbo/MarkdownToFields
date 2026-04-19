@@ -363,7 +363,7 @@ Each section is represented by a `Section` object with these members:
 | `$frontmatter` | `array|string|null` | Frontmatter data for this section (if available) |
 | `area()` | `method` | Returns the canonical area path string for this node. / |
 | `data()` | `method` | Returns a plain array of the section dataset |
-| `dataSet($mode?)` | `method` | Returns a WireData wrapper for fluent data access |
+| `dataSet($mode?)` | `method` | Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values. |
 | `subsection($name)` | `method` | Access a nested subsection by name |
 | `field($name)` | `method` | Get a field by name / |
 
@@ -560,7 +560,7 @@ Subsections are returned as `Section` objects with the same core properties:
 | `$frontmatter` | `array|string|null` | Frontmatter data for this section (if available) |
 | `area()` | `method` | Returns the canonical area path string for this node. / |
 | `data()` | `method` | Returns a plain array of the section dataset |
-| `dataSet($mode?)` | `method` | Returns a WireData wrapper for fluent data access |
+| `dataSet($mode?)` | `method` | Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values. |
 | `subsection($name)` | `method` | Access a nested subsection by name |
 | `field($name)` | `method` | Get a field by name / |
 
