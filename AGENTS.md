@@ -42,6 +42,7 @@ MarkdownToFields is a ProcessWire module that allows using Markdown files as the
 
 
 ## Git & Commit Standards
+- **No Auto-Committing**: Never run `git commit` autonomously. Instead, suggest that changes are ready and propose exactly what the commit message should be in a code block for the user to execute manually.
 - **Flat History Only**: Never create merge commits. Always squash or rebase to maintain a linear timeline.
 - **Commit Format**: Strictly follow the Conventional Commits specification. This drives the automated changelog.
 - **Translation Logic (Strict Mapping)**:
