@@ -20,7 +20,14 @@ if (!class_exists('ProcessWire\Wire')) {
 }
 if (!class_exists('ProcessWire\WireData')) { 
     class WireData extends Wire { 
+        protected $data = [];
         public function project(?string $m = null): mixed { return $this; } 
+        public function get($key) { return $this->data[$key] ?? null; }
+        public function set($key, $val) { $this->data[$key] = $val; return $this; }
+        public function remove($key) { unset($this->data[$key]); return $this; }
+        public function getArray() { return $this->data; }
+        public function __get($key) { return $this->get($key); }
+        public function __set($key, $val) { $this->set($key, $val); }
     } 
 }
 if (!class_exists('ProcessWire\WireArray')) { 
@@ -36,6 +43,7 @@ if (!class_exists('ProcessWire\Page')) {
 }
 
 // 3. Module files that depend on the mocks
+require_once __DIR__ . '/../../MarkdownUtilities.php';
 require_once __DIR__ . '/../../MarkdownContentView.php';
 require_once __DIR__ . '/../../MarkdownDataSet.php';
 require_once __DIR__ . '/../../MarkdownNodeData.php';
