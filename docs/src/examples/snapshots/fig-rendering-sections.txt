@@ -1,0 +1,44 @@
+ProcessWire\MarkdownContentView
+  page: ProcessWire\Page
+  nodeArea: ''
+  text: 
+      'Hello
+       
+       Intro text for hello section.
+       
+       Hello foo
+       
+       One foo
+       
+       One bar
+       Bye
+       
+       Short bye text.'
+  html: 
+      '<h1>Hello</h1>
+       <p>Intro text for hello section.</p>
+       <h2>Hello foo</h2>
+       <ul>
+       <li>One foo</li>
+       <li>One bar</li>
+       </ul>
+       <h1>Bye</h1>
+       <p>Short bye text....'
+  markdown: 
+      '<!-- section:hello -->
+       
+       # Hello
+       
+       Intro text for hello section.
+       
+       ## Hello foo
+       
+       - One foo
+       - One bar
+       
+       <!-- section:bye -->
+       
+       # Bye
+       
+       Short bye text.'
+  frontmatter: null

@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.1"
+
+      - name: Install Composer dependencies (for tests)
+        run: composer install --prefer-dist --no-interaction
+
+      - name: Validate test contract and run tests
+        run: |
+          # Strict policy: if there are tests present, the repository MUST provide:
+          #  - phpunit.xml or phpunit.xml.dist
+          #  - a composer "scripts.test" entry
+          #  - phpunit installed in vendor (dev deps installed by the previous step)
+          set -euo pipefail
+
+          if [ -d tests ] && [ "$(ls -A tests)" ]; then
+            echo "Tests detected — enforcing test contract..."
+
+            if [ ! -f phpunit.xml ] && [ ! -f phpunit.xml.dist ]; then
+              echo "ERROR: phpunit.xml or phpunit.xml.dist not found but tests/ exists." >&2
+              exit 1
+            fi
+
+            if ! php -r "exit(!isset(json_decode(file_get_contents('composer.json'), true)['scripts']['test']));"; then
+              echo "ERROR: composer.json must include a 'scripts.test' entry (e.g. 'test': 'phpunit --configuration phpunit.xml')." >&2
+              exit 1
+            fi
+
+            if [ ! -x vendor/bin/phpunit ]; then
+              echo "ERROR: vendor/bin/phpunit is not present or not executable. Ensure phpunit is required as a dev dependency." >&2
+              exit 1
+            fi
+
+            echo "Running tests via 'composer test'..."
+            composer test --no-interaction
+          else
+            echo "No tests directory detected; skipping test enforcement."
+          fi
+
+      - name: Prepare release artifact (zip)
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF#refs/tags/}"
+          RELEASE_NAME="LetMeDown-${VERSION}"
+          RELEASE_DIR="${RELEASE_NAME}"
+
+          mkdir -p "$RELEASE_DIR"
+
+          # Copy repository while excluding development-only files, CI metadata and any pre-existing vendor
+          rsync -av --exclude=.git --exclude=.github --exclude=.vscode --exclude=tests --exclude=.env --exclude='*.log' --exclude=vendor . "$RELEASE_DIR/"
+
+          # Install production deps inside a clean packaged dir (no vendor artifacts carried over)
+          (cd "$RELEASE_DIR" && composer install --no-dev --optimize-autoloader --no-interaction)
+
+          zip -r "${RELEASE_NAME}.zip" "$RELEASE_DIR"
+
+          # Clean up temp dir
+          rm -rf "$RELEASE_DIR"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: LetMeDown-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

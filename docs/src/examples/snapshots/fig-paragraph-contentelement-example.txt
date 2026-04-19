@@ -1,0 +1,31 @@
+ProcessWire\MarkdownContentView
+  page: ProcessWire\Page
+  nodeArea: ''
+  text: 
+      'Digital Studio
+       
+       Welcome to our studio! We create digital experiences for brands like:
+       
+       Ramason
+       
+       Emtibi
+       
+       Feel free to call us, visit us, or drop us ...'
+  html: 
+      '<h1>Digital Studio</h1>
+       <p>Welcome to our studio! We create digital experiences for brands like:</p>
+       <ul>
+       <li>Ramason</li>
+       <li>Emtibi</li>
+       </ul>
+       <p...'
+  markdown: 
+      '# Digital Studio
+       
+       Welcome to our studio! We create digital experiences for brands like:
+       
+       - Ramason
+       - Emtibi
+       
+       Feel free to [call us](#), [visit us](...'
+  frontmatter: null

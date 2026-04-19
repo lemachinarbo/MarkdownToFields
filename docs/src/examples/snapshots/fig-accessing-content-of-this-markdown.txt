@@ -1,0 +1,26 @@
+ProcessWire\MarkdownContentView
+  page: ProcessWire\Page
+  nodeArea: ''
+  text: 
+      'The Urban Farm
+       
+       We grow food and ideas in the city.
+       From rooftop gardens to indoor farms, we craft systems that actually produce.
+       
+       We work where so...'
+  html: 
+      '<h1>The Urban Farm</h1>
+       <p>We grow food and ideas in the city.
+       From rooftop gardens to indoor farms, we craft systems that actually produce.</p>
+       <p...'
+  markdown: 
+      '<!-- section:hero -->
+       
+       <!-- title -->
+         # The Urban Farm
+       
+       <!-- intro... -->
+         We grow food and ideas in the city.
+         From rooftop gardens to indoor ...'
+  frontmatter: array (1)
+    title => 'The Urban Farm Studio.'

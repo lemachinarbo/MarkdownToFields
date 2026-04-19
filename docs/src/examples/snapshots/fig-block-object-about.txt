@@ -1,0 +1,37 @@
+LetMeDown\Block
+  heading: LetMeDown\HeadingElement
+    text: 'About Us'
+    html: '<h1>About Us</h1>'
+  level: 1  content: '<p>Welcome to our studio! We create digital experiences for modern brands.</p>'
+  html: 
+      '<h1>About Us</h1><p>Welcome to our studio! We create digital experiences for modern brands.</p><h2>Our Services</h2><ul>
+       <li>Web design</li>
+       <li>Ap...'
+  text: 
+      'About Us
+       
+       Welcome to our studio! We create digital experiences for modern brands.
+       Our Services
+       
+       Web design
+       
+       App development
+       
+       Content strategy'
+  markdown: 
+      '# About Us
+       
+       Welcome to our studio! We create digital experiences for modern brands.
+       
+       ## Our Services
+       
+       - Web design
+       - App development
+       - Content stra...'
+  paragraphs: LetMeDown\ContentElementCollection
+  images: LetMeDown\ContentElementCollection
+  links: LetMeDown\ContentElementCollection
+  lists: LetMeDown\ContentElementCollection
+  children: array (1)
+    0 => LetMeDown\Block [...]
+  fields: array (0)

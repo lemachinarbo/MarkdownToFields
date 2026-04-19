@@ -1,0 +1,16 @@
+ProcessWire\MarkdownContentView
+  page: ProcessWire\Page
+  nodeArea: ''
+  text: 'Our Team'
+  html: '<h1>Our Team</h1>'
+  markdown: 
+      '<!-- section:columns -->
+       
+       # Our Team
+       
+       <!-- sub:left -->
+       
+       ### Jane Doe
+       
+       Jane is our lead horticulturist with 10+ years of experience in urban farmin...'
+  frontmatter: null

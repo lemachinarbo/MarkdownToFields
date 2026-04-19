@@ -1,0 +1,36 @@
+ProcessWire\MarkdownContentView
+  page: ProcessWire\Page
+  nodeArea: ''
+  text: 
+      'About Us
+       
+       Welcome to our studio! We create digital experiences for modern brands.
+       
+       Our Services
+       
+       Web design
+       
+       App development
+       
+       Content strategy
+       
+       Wha...'
+  html: 
+      '<h1>About Us</h1>
+       <p>Welcome to our studio! We create digital experiences for modern brands.</p>
+       <h2>Our Services</h2>
+       <ul>
+       <li>Web design</li>
+       <li...'
+  markdown: 
+      '<!-- section:about -->
+       
+       # About Us
+       
+       Welcome to our studio! We create digital experiences for modern brands.
+       
+       ## Our Services
+       
+       - Web design
+       - App de...'
+  frontmatter: null

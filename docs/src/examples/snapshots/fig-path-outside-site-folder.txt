@@ -1,0 +1,22 @@
+ProcessWire\MarkdownContentView
+  page: ProcessWire\Page
+  nodeArea: ''
+  text: 
+      'site
+       &#x251C;&#x2500;&#x2500; templates
+       src
+       &#x2514;&#x2500;&#x2500; content
+       &#x2514;&#x2500;&#x2500; about.md'
+  html: 
+      '<p>site
+       &#x251C;&#x2500;&#x2500; templates
+       src
+       &#x2514;&#x2500;&#x2500; content
+       &#x2514;&#x2500;&#x2500; about.md</p>'
+  markdown: 
+      'site
+       ├── templates
+       src
+       └── content
+           └── about.md'
+  frontmatter: null

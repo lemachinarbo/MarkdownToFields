@@ -1,0 +1,16 @@
+ProcessWire\MarkdownSectionView
+  page: ProcessWire\Page
+  nodeArea: 'columns'
+  html: '<h1>Our Team</h1>'
+  text: 'Our Team'
+  markdown: 
+      '# Our Team
+       
+       <!-- sub:left --><!-- sub:right -->'
+  blocks: array (1)
+    0 => LetMeDown\Block [...]
+  fields: array (0)
+  subsections: array (2)
+    left => ProcessWire\MarkdownSectionView [...]
+    right => ProcessWire\MarkdownSectionView [...]
+  frontmatter: 'columns'

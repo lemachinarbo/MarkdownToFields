@@ -1,0 +1,24 @@
+ProcessWire\MarkdownContentView
+  page: ProcessWire\Page
+  nodeArea: ''
+  text: 
+      'Hello
+       
+       Intro text for hello section.'
+  html: 
+      '<h1>Hello</h1>
+       <p>Intro text for hello section.</p>'
+  markdown: 
+      '<!-- section:hello -->
+       
+       # Hello
+       
+       <!-- intro -->
+       Intro text for hello section.
+       
+       <!-- sub:foo -->
+       ## Hello foo
+       
+       - One foo
+       - One bar'
+  frontmatter: null
