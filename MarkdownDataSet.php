@@ -6,7 +6,7 @@ namespace ProcessWire;
  * ProcessWire-native mutable view over data() output.
  *
  * data() stays a plain-array serializer. dataSet() wraps that array into
- * WireData / WireArray objects so templates and page classes can use ProcessWire
+ * WireData objects so templates and page classes can use ProcessWire
  * ergonomics for light reshaping.
  */
 class MarkdownDataSet extends WireData
@@ -19,6 +19,7 @@ class MarkdownDataSet extends WireData
     'text',
     'markdown',
     'items',
+    'blocks',
     'subsections',
     'href',
     'src',
@@ -34,7 +35,6 @@ class MarkdownDataSet extends WireData
 
   public function __construct(array $data = [])
   {
-    parent::__construct();
     $this->setArray($data);
   }
 
@@ -74,7 +74,8 @@ class MarkdownDataSet extends WireData
     }
 
     if (count($path) === 1) {
-      return parent::set($path[0], $this->wrapValue($value));
+      parent::set($path[0], $this->wrapValue($value));
+      return $this;
     }
 
     $this->setByPath($path, $value);
@@ -84,9 +85,8 @@ class MarkdownDataSet extends WireData
   public function setArray(array $data): self
   {
     foreach ($data as $key => $value) {
-      parent::set((string) $key, $this->wrapValue($value));
+      $this->set((string) $key, $value);
     }
-
     return $this;
   }
 
@@ -120,11 +120,6 @@ class MarkdownDataSet extends WireData
 
   /**
    * Map an iterable value at a dot-notation path and replace it with the result.
-   *
-   * The callback receives:
-   *  - current item
-   *  - item index/key
-   *  - the full root dataset
    */
   public function map(string $path, callable $callback): self
   {
@@ -168,12 +163,18 @@ class MarkdownDataSet extends WireData
   {
     $projected = $this->projectValue($this->toArray(), $key);
 
-    foreach (array_keys($this->getArray()) as $existingKey) {
-      parent::remove($existingKey);
+    $keys = [];
+    foreach ($this->getArray() as $existingKey => $_) {
+      $keys[] = (string) $existingKey;
+    }
+    foreach ($keys as $existingKey) {
+      $this->remove($existingKey);
     }
 
     if (is_array($projected)) {
       $this->setArray($projected);
+    } else {
+      $this->set('_value', $projected);
     }
 
     return $this;
@@ -187,20 +188,26 @@ class MarkdownDataSet extends WireData
     }
 
     $container = $this->ensureContainer($path, $last);
-    $currentValue = $this->readContainerValue($container, $last);
+    
+    // Support path reading safely
+    $currentValue = null;
+    if ($container instanceof WireData) {
+        $currentValue = $container->get($last);
+    } elseif ($container instanceof WireArray && ctype_digit((string)$last)) {
+        $currentValue = $container->get((int)$last);
+    }
+
     $nextValue = is_callable($value)
       ? $value($currentValue, $container, $this)
       : $value;
 
     $wrapped = $this->wrapValue($nextValue);
-
+    
+    // Support path writing safely
     if ($container instanceof WireData) {
-      $container->set($last, $wrapped);
-      return;
-    }
-
-    if ($container instanceof WireArray && ctype_digit($last)) {
-      $container->set((int) $last, $wrapped);
+        $container->set($last, $wrapped);
+    } elseif ($container instanceof WireArray && ctype_digit((string)$last)) {
+        $container->set((int)$last, $wrapped);
     }
   }
 
@@ -218,9 +225,9 @@ class MarkdownDataSet extends WireData
         $current = $current->get($segment);
         continue;
       }
-
-      if ($current instanceof WireArray && ctype_digit($segment)) {
-        $current = $current->get((int) $segment);
+      
+      if ($current instanceof WireArray && ctype_digit((string)$segment)) {
+        $current = $current->get((int)$segment);
         continue;
       }
 
@@ -236,7 +243,13 @@ class MarkdownDataSet extends WireData
 
     foreach ($path as $index => $segment) {
       $next = $path[$index + 1] ?? $last;
-      $existing = $this->readContainerValue($container, $segment);
+      
+      $existing = null;
+      if ($container instanceof WireData) {
+        $existing = $container->get($segment);
+      } elseif ($container instanceof WireArray && ctype_digit((string)$segment)) {
+        $existing = $container->get((int)$segment);
+      }
 
       if (!$existing instanceof WireData && !$existing instanceof WireArray) {
         $existing = $this->isNumericSegment($next)
@@ -245,8 +258,8 @@ class MarkdownDataSet extends WireData
 
         if ($container instanceof WireData) {
           $container->set($segment, $existing);
-        } elseif ($container instanceof WireArray && ctype_digit($segment)) {
-          $container->set((int) $segment, $existing);
+        } elseif ($container instanceof WireArray && ctype_digit((string)$segment)) {
+          $container->set((int)$segment, $existing);
         }
       }
 
@@ -254,19 +267,6 @@ class MarkdownDataSet extends WireData
     }
 
     return $container;
-  }
-
-  private function readContainerValue(WireData|WireArray $container, string $segment)
-  {
-    if ($container instanceof WireData) {
-      return $container->get($segment);
-    }
-
-    if ($container instanceof WireArray && ctype_digit($segment)) {
-      return $container->get((int) $segment);
-    }
-
-    return null;
   }
 
   private function wrapValue($value)
@@ -302,8 +302,12 @@ class MarkdownDataSet extends WireData
     return $out;
   }
 
-  private function isList(array $value): bool
+  private function isList($value): bool
   {
+    if (!is_array($value)) {
+      return false;
+    }
+
     if (function_exists('array_is_list')) {
       return array_is_list($value);
     }
@@ -354,8 +358,12 @@ class MarkdownDataSet extends WireData
     return $out;
   }
 
-  private function shouldCollapseNode(array $node, string $key): bool
+  private function shouldCollapseNode($node, string $key): bool
   {
+    if (!is_array($node)) {
+      return false;
+    }
+
     if (!array_key_exists($key, $node) || !is_scalar($node[$key]) || $node[$key] === '') {
       return false;
     }
@@ -385,13 +393,12 @@ class MarkdownDataArray extends WireArray
 {
   public function __construct(array $items = [])
   {
-    parent::__construct();
     $this->setArray($items);
   }
 
   public function isValidItem($item)
   {
-    return true;
+    return true; // We store primitives and data objects
   }
 
   public function set($key, $value): self
@@ -442,8 +449,12 @@ class MarkdownDataArray extends WireArray
       : new MarkdownDataSet($value);
   }
 
-  private function isList(array $value): bool
+  private function isList($value): bool
   {
+    if (!is_array($value)) {
+      return false;
+    }
+
     if (function_exists('array_is_list')) {
       return array_is_list($value);
     }

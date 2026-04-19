@@ -87,7 +87,11 @@ class MarkdownContentView extends ContentData implements MarkdownContentViewNode
    */
   public function data(): array
   {
-    return MarkdownNodeData::adaptData($this->page, $this, $this->getFrontmatter() ?: [], $this->nodeArea);
+    $data = $this->getFrontmatter() ?: [];
+    if (!is_array($data)) {
+      $data = ['_frontmatter' => $data];
+    }
+    return MarkdownNodeData::adaptData($this->page, $this, $data, $this->nodeArea);
   }
 
   /**
@@ -174,7 +178,18 @@ class MarkdownSectionView extends Section implements MarkdownContentViewNode
    */
   public function data(): array
   {
-    return MarkdownNodeData::adaptData($this->page, $this, $this->frontmatter ?: [], $this->nodeArea);
+    $data = $this->frontmatter ?: [];
+    if (!is_array($data)) {
+      $data = ['_frontmatter' => $data];
+    }
+
+    $data = array_merge([
+      'html' => $this->html,
+      'text' => $this->text,
+      'markdown' => $this->markdown,
+    ], $data);
+
+    return MarkdownNodeData::adaptData($this->page, $this, $data, $this->nodeArea);
   }
 
   /**
@@ -240,12 +255,20 @@ class MarkdownBlockView extends \LetMeDown\Block implements MarkdownContentViewN
     return $this->nodeArea;
   }
 
-  /**
-   * Returns the node data as a plain associative array.
-   */
   public function data(): array
   {
-    return MarkdownNodeData::adaptData($this->page, $this, $this->fields, $this->nodeArea);
+    $data = $this->fields ?: [];
+    if (!is_array($data)) {
+      $data = ['_fields' => $data];
+    }
+
+    $data = array_merge([
+      'html' => $this->html,
+      'text' => $this->text,
+      'markdown' => $this->markdown,
+    ], $data);
+
+    return MarkdownNodeData::adaptData($this->page, $this, $data, $this->nodeArea);
   }
 
   /**
@@ -304,12 +327,20 @@ class MarkdownFieldDataView extends FieldData implements MarkdownContentViewNode
     return $this->nodeArea;
   }
 
-  /**
-   * Returns the node data as a plain associative array.
-   */
   public function data(): array
   {
-    return MarkdownNodeData::adaptData($this->page, $this, $this->data, $this->nodeArea);
+    $data = $this->data ?: [];
+    if (!is_array($data)) {
+      $data = ['_value' => $data];
+    }
+
+    $data = array_merge([
+      'html' => $this->html,
+      'text' => $this->text,
+      'markdown' => $this->markdown,
+    ], $data);
+
+    return MarkdownNodeData::adaptData($this->page, $this, $data, $this->nodeArea);
   }
 
   /**
@@ -366,37 +397,17 @@ class MarkdownFieldContainerView extends FieldContainer implements MarkdownConte
     return $this->nodeArea;
   }
 
-  public function __get($name)
-  {
-    $field = $this->field((string) $name);
-    if ($field !== null) {
-      return $field;
-    }
-
-    return parent::__get($name);
-  }
-
-  public function field(string $name): FieldData|FieldContainer|null
-  {
-    $field = parent::field($name);
-    return $field ? $this->wrapChildField($field, $name) : null;
-  }
-
-  public function fields(): array
-  {
-    $wrapped = [];
-    foreach (parent::fields() as $name => $field) {
-      $wrapped[(string) $name] = $this->wrapChildField($field, (string) $name);
-    }
-    return $wrapped;
-  }
-
   /**
    * Returns the node data as a plain associative array.
    */
   public function data(): array
   {
-    return MarkdownNodeData::adaptData($this->page, $this, $this->fields, $this->nodeArea);
+    $data = [
+      'html' => $this->html,
+      'text' => $this->text,
+      'markdown' => $this->markdown,
+    ];
+    return MarkdownNodeData::adaptData($this->page, $this, $data, $this->nodeArea);
   }
 
   /**
@@ -408,21 +419,6 @@ class MarkdownFieldContainerView extends FieldContainer implements MarkdownConte
   {
     $dataSet = new MarkdownDataSet($this->data());
     return $dataSet->project($mode);
-  }
-
-  private function wrapChildField(FieldData|FieldContainer $field, string $name): FieldData|FieldContainer
-  {
-    $area = $this->joinArea($this->nodeArea, $name);
-
-    if ($field instanceof MarkdownContentViewNode && $field->area() === $area) {
-      return $field;
-    }
-
-    if ($field instanceof FieldData) {
-      return MarkdownFieldDataView::fromRaw($this->page, $field, $name, $area);
-    }
-
-    return MarkdownFieldContainerView::fromRaw($this->page, $field, $name, $area);
   }
 
   private function joinArea(string $base, string $segment): string
