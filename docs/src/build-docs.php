@@ -165,6 +165,15 @@ class DocBuilder {
              $section = count($content->sections) ? $content->sections[0] : null;
              $block = ($section && count($section->blocks)) ? $section->blocks[0] : null;
              $dumpObj = $block ? $block->heading : $content;
+        } elseif (str_contains($name, 'contentelement-example')) {
+             $section = count($content->sections) ? $content->sections[0] : null;
+             $block = ($section && count($section->blocks)) ? $section->blocks[0] : null;
+             if ($block) {
+                 if (str_contains($name, 'image')) $dumpObj = count($block->images) ? $block->images[0] : $content;
+                 elseif (str_contains($name, 'link')) $dumpObj = count($block->links) ? $block->links[0] : $content;
+                 elseif (str_contains($name, 'list')) $dumpObj = count($block->lists) ? $block->lists[0] : $content;
+                 elseif (str_contains($name, 'paragraph')) $dumpObj = count($block->paragraphs) ? $block->paragraphs[0] : $content;
+             }
         }
 
         $actualTxt = $this->prettyPrint($dumpObj);

@@ -1,31 +1,12 @@
-ProcessWire\MarkdownContentView
-  page: ProcessWire\Page
-  nodeArea: ''
+LetMeDown\ContentElement
   text: 
-      'Digital Studio
-       
-       Welcome to our studio! We create digital experiences for brands like:
-       
-       Ramason
-       
-       Emtibi
-       
-       Feel free to call us, visit us, or drop us ...'
+      'Ramason
+       Emtibi'
   html: 
-      '<h1>Digital Studio</h1>
-       <p>Welcome to our studio! We create digital experiences for brands like:</p>
-       <ul>
+      '<ul>
        <li>Ramason</li>
        <li>Emtibi</li>
-       </ul>
-       <p...'
-  markdown: 
-      '# Digital Studio
-       
-       Welcome to our studio! We create digital experiences for brands like:
-       
-       - Ramason
-       - Emtibi
-       
-       Feel free to [call us](#), [visit us](...'
-  frontmatter: null
+       </ul>'
+  data: array (2)
+    type => 'ul'
+    items => array (2) [ ... ]

@@ -100,7 +100,14 @@ Those markdown files are mapped per **ProcessWire page** using the `page name` (
 
 <a id="fig-markdown-files-per-page"></a> **FIG:** Markdown files per page
 
-[[EXAMPLE:fig-markdown-files-per-page:md]]
+```markdown
+site
+├── templates
+├── content
+│   ├── about.md      # used by page name 'about'
+│   ├── home.md       # used by page name 'home'
+│   └── services.md   # used by page name 'services'
+```
 
 You can add content files at any time, even empty ones.
 
@@ -145,13 +152,24 @@ For example, to use `site/templates/markdown` you can do:
 
 <a id="fig-custom-content-folder-source-path"></a> **FIG:** Custom content folder source path
 
-[[EXAMPLE:fig-custom-content-folder-source-path:php]]
+```php
+<?php
+$config->MarkdownToFields = [
+  'sourcePath' => 'templates/markdown/',
+];
+```
 
 `site/` is used as the root by default, but you’re not limited to it. You can point outside the site folder if you want. For example, `../src/content` will resolve to:
 
 <a id="fig-path-outside-site-folder"></a> **FIG:** Path outside site folder
 
-[[EXAMPLE:fig-path-outside-site-folder:md]]
+```markdown
+site
+├── templates
+src
+└── content
+    └── about.md
+```
 
 It’s obvious, but worth to mention it.
 
@@ -161,13 +179,40 @@ The module uses `contentSource()` to get your markdown files, and by default use
 
 <a id="fig-customizing-content-file-path-page-class"></a> **FIG:** Customizing the content file path in a Page Class
 
-[[EXAMPLE:fig-customizing-content-file-path-page-class:php]]
+```php
+<?php
+class AboutPage extends DefaultPage {
+  public function contentSource(): string {
+    return 'src/about/us/theaboutpage.md';
+  }
+}
+```
 
 Or, if multiple pages use the same template:
 
 <a id="fig-dynamic-content-path-based-on-page-name"></a> **FIG:** Dynamic content file path based on page name
 
-[[EXAMPLE:fig-dynamic-content-path-based-on-page-name:php]]
+```php
+<?php
+class AboutPage extends DefaultPage {
+  public function contentSource(): string {
+    return 'src/about/' . $this->name . '.md';
+  }
+}
+```
+
+Alternatively, if you want to group pages into a custom directory without losing the automatic page-name resolution, call `$this->defaultContentSource()`:
+
+<a id="fig-dynamic-content-path-with-default"></a> **FIG:** Dynamic content file path combining directories with default rules
+
+```php
+<?php
+class AboutPage extends DefaultPage {
+  public function contentSource(): string {
+    return 'src/about/' . $this->defaultContentSource();
+  }
+}
+```
 
 Logic, names, and folder structure are totally up to you.
 
@@ -945,7 +990,31 @@ This config goes in your `config.php` file. It controls how markdown is found, p
 
 <a id="fig-example-config-file"></a> **FIG:** Example config file with all properties
 
-[[EXAMPLE:fig-example-config-file:php]]
+```php
+<?php
+$config->MarkdownToFields = [
+  // templates
+  'enabledTemplates' => ['home', 'about'],
+
+  // fields
+  'markdownField' => 'md_markdown',
+  'hashField' => 'md_markdown_hash',
+  'linkSync' => false,
+
+  // content
+  'sourcePath' => 'content/',
+  'imageBaseUrl' => $config->urls->files . '{pageId}/',
+  'imageSourcePaths' => $config->paths->site . 'images/',
+
+  // frontmatter
+  'autoSyncFrontmatter' => true,
+  'includeFrontmatterFields' => ['name', 'summary', 'bio'],
+  'excludeFrontmatterFields' => ['description'],
+
+  // debug
+  'debug' => true,
+];
+```
 
 
 - **enabledTemplates**

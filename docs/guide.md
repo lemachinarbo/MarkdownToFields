@@ -160,7 +160,6 @@ site
 │   ├── about.md      # used by page name 'about'
 │   ├── home.md       # used by page name 'home'
 │   └── services.md   # used by page name 'services'
-
 ```
 
 You can add content files at any time, even empty ones.
@@ -236,11 +235,9 @@ The module uses `contentSource()` to get your markdown files, and by default use
 ```php
 <?php
 class AboutPage extends DefaultPage {
-
   public function contentSource(): string {
     return 'src/about/us/theaboutpage.md';
   }
-
 }
 ```
 
@@ -251,11 +248,22 @@ Or, if multiple pages use the same template:
 ```php
 <?php
 class AboutPage extends DefaultPage {
-
- public function contentSource(): string {
+  public function contentSource(): string {
     return 'src/about/' . $this->name . '.md';
   }
+}
+```
 
+Alternatively, if you want to group pages into a custom directory without losing the automatic page-name resolution, call `$this->defaultContentSource()`:
+
+<a id="fig-dynamic-content-path-with-default"></a> **FIG 9:** Dynamic content file path combining directories with default rules
+
+```php
+<?php
+class AboutPage extends DefaultPage {
+  public function contentSource(): string {
+    return 'src/about/' . $this->defaultContentSource();
+  }
 }
 ```
 
@@ -270,7 +278,7 @@ Once you have a markdown file, a template, and a page, the next step is to acces
 
 This trait adds the `content()` method to your Page class, so any template that extends `DefaultPage` can read markdown content using `$page->content()`.
 
-<a id="fig-accessing-content-of-this-markdown"></a> **FIG 9:** Accessing the content of [this markdown](#fig-markdown-example)
+<a id="fig-accessing-content-of-this-markdown"></a> **FIG 10:** Accessing the content of [this markdown](#fig-markdown-example)
 
 /site/classes/DefaultPage.php
 ```php
@@ -368,7 +376,7 @@ Each section is represented by a `Section` object with these members:
 | `field($name)` | `method` | Get a field by name / |
 
 
-<a id="fig-markdown-with-two-sections"></a> **FIG 10:** Markdown with two sections
+<a id="fig-markdown-with-two-sections"></a> **FIG 11:** Markdown with two sections
 
 ```markdown
 <!-- section:hello -->
@@ -389,7 +397,7 @@ Intro text for hello section.
 Short bye text.
 ```
 
-<a id="fig-rendering-sections"></a> **FIG 11:** Rendering sections
+<a id="fig-rendering-sections"></a> **FIG 12:** Rendering sections
 
 ```php
 <?php
@@ -419,7 +427,7 @@ Starting a new `<!-- section:foo -->` implicitly closes the previous section. Al
 If content appears **before the first section tag**, it is collected into an **orphan section**.
 This orphan section has no name and is accessible by index.
 
-<a id="fig-content-without-section"></a> **FIG 12:** Content without a section
+<a id="fig-content-without-section"></a> **FIG 13:** Content without a section
 
 ```markdown
 # No content tag before this title
@@ -433,7 +441,7 @@ Intro text outside any section.
 Short text.
 ```
 
-<a id="fig-rendering-orphan-section"></a> **FIG 13:** Rendering an orphan section
+<a id="fig-rendering-orphan-section"></a> **FIG 14:** Rendering an orphan section
 
 ```php
 <?php
@@ -451,7 +459,7 @@ namespace ProcessWire;
 
 The section object also gives you access to any block field of subsection inside. For example if we add an `<!-- intro -->` [tag field](#field-tags) and a `<!-- sub:foo -->` [subsection](#subsections) to the `<!-- section:hello -->`:
 
-<a id="fig-section-with-tag-field-subsection"></a> **FIG 14:** Section with a tag field and a subsection
+<a id="fig-section-with-tag-field-subsection"></a> **FIG 15:** Section with a tag field and a subsection
 
 ```markdown
 <!-- section:hello -->
@@ -505,7 +513,7 @@ A `subsection` captures all content until the next `subsection` or `section` tag
 
 Example:
 
-<a id="fig-content-with-subsections"></a> **FIG 15:** Content with subsections
+<a id="fig-content-with-subsections"></a> **FIG 16:** Content with subsections
 
 ```markdown
 <!-- section:columns -->
@@ -533,7 +541,7 @@ John manages our technology and automation.
 Always ready to help troubleshoot or optimize a setup!
 ```
 
-<a id="fig-rendering-html-subsections"></a> **FIG 16:** Rendering HTML of subsections
+<a id="fig-rendering-html-subsections"></a> **FIG 17:** Rendering HTML of subsections
 
 ```php
 <?php
@@ -565,7 +573,7 @@ Subsections are returned as `Section` objects with the same core properties:
 | `field($name)` | `method` | Get a field by name / |
 
 
-<a id="fig-section-object-columns-left"></a> **FIG 17:** Example of section object for `$jane` aka: `$page->content()->columns->left`
+<a id="fig-section-object-columns-left"></a> **FIG 18:** Example of section object for `$jane` aka: `$page->content()->columns->left`
 
 ```php
 ProcessWire\MarkdownSectionView
@@ -597,7 +605,7 @@ Each heading starts a **block**.
 - A higher-level heading becomes a **parent block**
 - Lower-level headings under it become **child blocks**
 
-<a id="fig-content-with-blocks-and-children"></a> **FIG 18:** Content example with blocks and childs
+<a id="fig-content-with-blocks-and-children"></a> **FIG 19:** Content example with blocks and childs
 
 ```markdown
 <!-- section:about -->
@@ -634,7 +642,7 @@ This produces **two top-level blocks** inside the `about` section:
 
 To access them you can use:
 
-<a id="fig-getting-blocks-of-section"></a> **FIG 19:** Getting the blocks of a section
+<a id="fig-getting-blocks-of-section"></a> **FIG 20:** Getting the blocks of a section
 
 ```php
 <?php
@@ -652,7 +660,7 @@ namespace ProcessWire;
 
 Or, you can also access blocks by index:
 
-<a id="fig-getting-section-blocks-by-index"></a> **FIG 20:** Getting section and blocks by index
+<a id="fig-getting-section-blocks-by-index"></a> **FIG 21:** Getting section and blocks by index
 
 ```php
 <?php
@@ -686,13 +694,13 @@ namespace ProcessWire;
 | `$children` | `array` | Hierarchical child blocks |
 | `$fields` | `array` | Tagged fields inside this block |
 | `area()` | `method` | Returns the canonical area path string for this node. / |
-| `data()` | `method` | Returns the node data as a plain associative array. / |
+| `data()` | `method` |  |
 | `dataSet($mode?)` | `method` | Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values. / |
 | `field($name)` | `method` | Get a field by name / |
 
 
 
-<a id="fig-block-object-about"></a> **FIG 21:** Output of Block object `$about` from the markdown in [Content example with blocks and childs](#fig-content-with-blocks-and-children) 
+<a id="fig-block-object-about"></a> **FIG 22:** Output of Block object `$about` from the markdown in [Content example with blocks and childs](#fig-content-with-blocks-and-children) 
 
 
 ```php
@@ -743,7 +751,7 @@ ProcessWire\MarkdownBlockView
 Any heading under another becomes a child block.  
 The hierarchy follows your markdown structure, giving you a tree of blocks you can traverse.
 
-<a id="fig-accessing-block-children"></a> **FIG 22:** Accessing block children and sub-children
+<a id="fig-accessing-block-children"></a> **FIG 23:** Accessing block children and sub-children
 
 ```php
 <?php
@@ -766,7 +774,7 @@ They’re stored as collections, so you can grab *all* images, *all* links, and 
 
 Here’s a simple markdown example:
 
-<a id="fig-content-with-lists-images-paragraphs-links"></a> **FIG 23:** Content with lists, images, paragraphs, and links
+<a id="fig-content-with-lists-images-paragraphs-links"></a> **FIG 24:** Content with lists, images, paragraphs, and links
 
 ```markdown
 # Digital Studio
@@ -786,7 +794,7 @@ We are based in [Chicago](#), but we also have an office in [NY](#).
 
 Each block object contains a `HeadingElement` and the `ContentElementCollection` for lists, images, paragraphs, and links:
 
-<a id="fig-getting-elements-from-block"></a> **FIG 24:** Getting elements from a block
+<a id="fig-getting-elements-from-block"></a> **FIG 25:** Getting elements from a block
 
 ```php
 <?php
@@ -808,7 +816,7 @@ namespace ProcessWire;
 
 You can also drill down to specific elements:
 
-<a id="fig-accessing-specific-elements"></a> **FIG 25:** Accessing specific elements
+<a id="fig-accessing-specific-elements"></a> **FIG 26:** Accessing specific elements
 
 ```php
 <?php
@@ -840,7 +848,7 @@ This is the main heading that defines the block’s title and level.
 
 
 
-<a id="fig-heading-output"></a> **FIG 26:** Output of heading $heading from [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
+<a id="fig-heading-output"></a> **FIG 27:** Output of heading $heading from [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
 ```php
 LetMeDown\HeadingElement
   text: 'Digital Studio'
@@ -867,7 +875,7 @@ Each paragraph is returned as a `ContentElement` object with both plain text and
 
 
 
-<a id="fig-accessing-paragraphs-markdown-example"></a> **FIG 27:** Accessing paragraphs from the markdown example in [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
+<a id="fig-accessing-paragraphs-markdown-example"></a> **FIG 28:** Accessing paragraphs from the markdown example in [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
 
 ```php
 <?php
@@ -885,40 +893,13 @@ namespace ProcessWire;
 ?>
 ```
 
-<a id="fig-paragraph-contentelement-example"></a> **FIG 28:** Paragraph `ContentElement` example
+<a id="fig-paragraph-contentelement-example"></a> **FIG 29:** Paragraph `ContentElement` example
 
 ```php
-ProcessWire\MarkdownContentView
-  page: ProcessWire\Page
-  nodeArea: ''
-  text: 
-      'Digital Studio
-       
-       Welcome to our studio! We create digital experiences for brands like:
-       
-       Ramason
-       
-       Emtibi
-       
-       Feel free to call us, visit us, or drop us ...'
-  html: 
-      '<h1>Digital Studio</h1>
-       <p>Welcome to our studio! We create digital experiences for brands like:</p>
-       <ul>
-       <li>Ramason</li>
-       <li>Emtibi</li>
-       </ul>
-       <p...'
-  markdown: 
-      '# Digital Studio
-       
-       Welcome to our studio! We create digital experiences for brands like:
-       
-       - Ramason
-       - Emtibi
-       
-       Feel free to [call us](#), [visit us](...'
-  frontmatter: null
+LetMeDown\ContentElement
+  text: 'Welcome to our studio! We create digital experiences for brands like:'
+  html: '<p>Welcome to our studio! We create digital experiences for brands like:</p>'
+  data: array (0)
 ```
 
 ##### Lists
@@ -934,7 +915,7 @@ Each list is returned as a `ContentElement` object with its text, rendered HTML,
 | `items`  | array  | Individual list items as strings       |
 | `data`   | array  | Raw list metadata                      |
 
-<a id="fig-accessing-lists-markdown-example"></a> **FIG 29:** Accessing lists from the [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
+<a id="fig-accessing-lists-markdown-example"></a> **FIG 30:** Accessing lists from the [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
 
 ```php
 <?php
@@ -956,40 +937,21 @@ namespace ProcessWire;
 ?>
 ```
 
-<a id="fig-list-contentelement-example"></a> **FIG 30:** List `ContentElement` example
+<a id="fig-list-contentelement-example"></a> **FIG 31:** List `ContentElement` example
 
 ```php
-ProcessWire\MarkdownContentView
-  page: ProcessWire\Page
-  nodeArea: ''
+LetMeDown\ContentElement
   text: 
-      'Digital Studio
-       
-       Welcome to our studio! We create digital experiences for brands like:
-       
-       Ramason
-       
-       Emtibi
-       
-       Feel free to call us, visit us, or drop us ...'
+      'Ramason
+       Emtibi'
   html: 
-      '<h1>Digital Studio</h1>
-       <p>Welcome to our studio! We create digital experiences for brands like:</p>
-       <ul>
+      '<ul>
        <li>Ramason</li>
        <li>Emtibi</li>
-       </ul>
-       <p...'
-  markdown: 
-      '# Digital Studio
-       
-       Welcome to our studio! We create digital experiences for brands like:
-       
-       - Ramason
-       - Emtibi
-       
-       Feel free to [call us](#), [visit us](...'
-  frontmatter: null
+       </ul>'
+  data: array (2)
+    type => 'ul'
+    items => array (2) [ ... ]
 ```
 
 ##### Links
@@ -1004,7 +966,7 @@ Each link is returned as a `ContentElement` object with its text, rendered HTML,
 | `href`   | string | Link destination URL       |
 | `data`   | array  | Raw link metadata          |
 
-<a id="fig-accessing-links-markdown-example"></a> **FIG 31:** Accessing links from the [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
+<a id="fig-accessing-links-markdown-example"></a> **FIG 32:** Accessing links from the [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
 
 ```php
 <?php
@@ -1025,40 +987,14 @@ namespace ProcessWire;
 ?>
 ```
 
-<a id="fig-link-contentelement-example"></a> **FIG 32:** Link `ContentElement` example
+<a id="fig-link-contentelement-example"></a> **FIG 33:** Link `ContentElement` example
 
 ```php
-ProcessWire\MarkdownContentView
-  page: ProcessWire\Page
-  nodeArea: ''
-  text: 
-      'Digital Studio
-       
-       Welcome to our studio! We create digital experiences for brands like:
-       
-       Ramason
-       
-       Emtibi
-       
-       Feel free to call us, visit us, or drop us ...'
-  html: 
-      '<h1>Digital Studio</h1>
-       <p>Welcome to our studio! We create digital experiences for brands like:</p>
-       <ul>
-       <li>Ramason</li>
-       <li>Emtibi</li>
-       </ul>
-       <p...'
-  markdown: 
-      '# Digital Studio
-       
-       Welcome to our studio! We create digital experiences for brands like:
-       
-       - Ramason
-       - Emtibi
-       
-       Feel free to [call us](#), [visit us](...'
-  frontmatter: null
+LetMeDown\ContentElement
+  text: 'call us'
+  html: '<a href="#">call us</a>'
+  data: array (1)
+    href => '#'
 ```
 
 ##### Images
@@ -1077,7 +1013,7 @@ Each entry represents one image tag, giving you access to its label, rendered HT
 | `alt`    | string    | Alternative text             |
 | `img`    | PageImage | ProcessWire Pageimage object |
 
-<a id="fig-accessing-images-markdown-example"></a> **FIG 33:** Accessing images from the [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
+<a id="fig-accessing-images-markdown-example"></a> **FIG 34:** Accessing images from the [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
 
 ```php
 <?php
@@ -1100,40 +1036,15 @@ namespace ProcessWire;
 ?>
 ```
 
-<a id="fig-image-contentelement-example"></a> **FIG 34:** Image `ContentElement` example
+<a id="fig-image-contentelement-example"></a> **FIG 35:** Image `ContentElement` example
 
 ```php
-ProcessWire\MarkdownContentView
-  page: ProcessWire\Page
-  nodeArea: ''
-  text: 
-      'Digital Studio
-       
-       Welcome to our studio! We create digital experiences for brands like:
-       
-       Ramason
-       
-       Emtibi
-       
-       Feel free to call us, visit us, or drop us ...'
-  html: 
-      '<h1>Digital Studio</h1>
-       <p>Welcome to our studio! We create digital experiences for brands like:</p>
-       <ul>
-       <li>Ramason</li>
-       <li>Emtibi</li>
-       </ul>
-       <p...'
-  markdown: 
-      '# Digital Studio
-       
-       Welcome to our studio! We create digital experiences for brands like:
-       
-       - Ramason
-       - Emtibi
-       
-       Feel free to [call us](#), [visit us](...'
-  frontmatter: null
+LetMeDown\ContentElement
+  text: '[Chicago office]'
+  html: '<img src="chicago.jpg" alt="Chicago office">'
+  data: array (2)
+    src => 'chicago.jpg'
+    alt => 'Chicago office'
 ```
 
 
@@ -1146,7 +1057,7 @@ That’s where **field tags** shine. You drop a tag before any element, and… y
 
 In the [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links) let’s add a section tag `<!-- section:intro -->` and tag the lists with `<!-- brands -->` and `<!-- offices -->`:
 
-<a id="fig-content-with-field-tags"></a> **FIG 35:** Content with field tags
+<a id="fig-content-with-field-tags"></a> **FIG 36:** Content with field tags
 
 ```markdown
 <!-- section:intro -->
@@ -1169,7 +1080,7 @@ We are based in [Chicago](#), but we also have an office in [NY](#).
 
 Now the lists are easy to grab:
 
-<a id="fig-accessing-field-tagged-elements"></a> **FIG 36:** Accessing field-tagged elements
+<a id="fig-accessing-field-tagged-elements"></a> **FIG 37:** Accessing field-tagged elements
 
 ```php
 <?php namespace ProcessWire;
@@ -1188,7 +1099,7 @@ But if you place a field tag before a list, you’ll get the **entire list**, no
 
 So what the tag captures depends on what comes right after it.
 
-<a id="fig-field-tags-before-paragraphs-list"></a> **FIG 37:** Field tags before paragraphs and a list
+<a id="fig-field-tags-before-paragraphs-list"></a> **FIG 38:** Field tags before paragraphs and a list
 
 ```markdown
 # Hello
@@ -1241,7 +1152,7 @@ The wrapper is the same, but `type` and `data` depend on what you tagged.
 
 Example:
 
-<a id="fig-fielddata-offices"></a> **FIG 38:** FieldData object for the [`offices`](fig-content-with-field-tags) field tag
+<a id="fig-fielddata-offices"></a> **FIG 39:** FieldData object for the [`offices`](fig-content-with-field-tags) field tag
 
 ```php
 <?php namespace ProcessWire;
@@ -1280,7 +1191,7 @@ They collect everything between `<!-- name... -->` and `<!-- / -->`.
 
 Containers also **auto-close** if a new section, subsection, or another field container starts.
 
-<a id="fig-using-field-containers"></a> **FIG 39:** Using field containers
+<a id="fig-using-field-containers"></a> **FIG 40:** Using field containers
 
 ```markdown
 <!-- section:hello -->
@@ -1303,7 +1214,7 @@ Paragraph four.
 Paragraph five.
 ```
 
-<a id="fig-accessing-container-content"></a> **FIG 40:** Accessing container content
+<a id="fig-accessing-container-content"></a> **FIG 41:** Accessing container content
 
 ```php
 <?php namespace ProcessWire;
@@ -1320,7 +1231,7 @@ Sometimes you want a value from frontmatter to appear in your content body, and 
 
 Use `<!-- field:name -->` followed by emphasized text (`*value*` or `__value__`) to create a binding. When you update the frontmatter value (or the corresponding ProcessWire field), the emphasized text updates automatically in both directions.
 
-<a id="fig-frontmatter-field-binder"></a> **FIG 41:** A value of frontmatter represented in the content using the  field binder
+<a id="fig-frontmatter-field-binder"></a> **FIG 42:** A value of frontmatter represented in the content using the  field binder
 
 ```markdown
 ---
@@ -1383,7 +1294,7 @@ It just outputs the original image URL. No variants. No compression. No magic.
 If you want resizing, crops, formats, etc., that’s your job. You can access the actual `ProcessWire\Pageimage` object via the `img` property:
 
 
-<a id="fig-image-with-field-tag"></a> **FIG 42:** Image with field tag
+<a id="fig-image-with-field-tag"></a> **FIG 43:** Image with field tag
 
 ```markdown
 ---
@@ -1399,7 +1310,7 @@ We grow food and ideas in the city.
 ![Our farm](01.jpg)
 ```
 
-<a id="fig-getting-pageimage-object"></a> **FIG 43:** Getting the `ProcessWire\Pageimage` object
+<a id="fig-getting-pageimage-object"></a> **FIG 44:** Getting the `ProcessWire\Pageimage` object
 
 ```php
 <?php namespace ProcessWire;
@@ -1474,7 +1385,7 @@ content/
 
 When you add a new language (let’s say `es`), and you set your home page name to `es`:
 
-<a id="fig-language-name"></a> **FIG 44:** Example of language page name
+<a id="fig-language-name"></a> **FIG 45:** Example of language page name
 
 <img src="./language-name.png" width="700">
 
@@ -1516,14 +1427,14 @@ To achieve it, all you have to do is:
 
 1. Add a simple `code` text field to the template of languages.
 
-<a id="fig-language-code"></a> **FIG 45:** Code field on language template
+<a id="fig-language-code"></a> **FIG 46:** Code field on language template
 
 <img src="./language-code.png" width="700">
 
 
 2. Set the code in your language, for example `en` for default, `es` for Spanish.
 
-<a id="fig-language-default-code"></a> **FIG 46:** Default language code name
+<a id="fig-language-default-code"></a> **FIG 47:** Default language code name
 
 <img src="./language-default-code.png" width="700">
 
@@ -1588,12 +1499,11 @@ The references are stored in the `md_markdown_links` field as an array of page I
 
 This config goes in your `config.php` file. It controls how markdown is found, parsed, and synced.
 
-<a id="fig-example-config-file"></a> **FIG 47:** Example config file with all properties
+<a id="fig-example-config-file"></a> **FIG 48:** Example config file with all properties
 
 ```php
 <?php
 $config->MarkdownToFields = [
-
   // templates
   'enabledTemplates' => ['home', 'about'],
 

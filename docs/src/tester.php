@@ -79,7 +79,12 @@ if (isset($_POST['markdown'])) {
         $renderedHtml = '';
         if ($php) {
             ob_start();
-            $page = $mockPage;
+            $page = new class($mockPage, $content) {
+                public function __construct(public $page, private $content) {}
+                public function content() { return $this->content; }
+                public function __get($name) { return $this->page->$name; }
+                public function __call($name, $args) { return $this->page->$name(...$args); }
+            };
             // Execute the string as PHP
             try {
                 // Remove optional tags if present
@@ -111,16 +116,45 @@ if (isset($_POST['markdown'])) {
  * Discovery
  */
 $examples = [];
-foreach (glob("$markdownDir/*.md") as $file) {
-    $name = basename($file, '.md');
+$phpFiles = glob("$phpDir/*.php");
+$mdFiles = glob("$markdownDir/*.md");
+$seenMd = [];
+
+foreach ($phpFiles as $phpFile) {
+    $name = basename($phpFile, '.php');
+    $phpContent = file_get_contents($phpFile);
+    
+    // Check for @source
+    $sourceMd = $name . '.md';
+    if (preg_match('/@source:\s*([^\s\*]+)/', $phpContent, $m)) {
+        $sourceMd = trim($m[1]);
+    }
+    
+    $mdFile = "$markdownDir/$sourceMd";
+    $mdContent = file_exists($mdFile) ? file_get_contents($mdFile) : "<!-- Missing $sourceMd -->";
+    if (file_exists($mdFile)) {
+        $seenMd[] = realpath($mdFile);
+    }
+    
     $examples[$name] = [
         'name' => $name,
-        'md' => file_get_contents($file),
-        'php' => file_exists("$phpDir/$name.php") ? file_get_contents("$phpDir/$name.php") : ''
+        'md' => $mdContent,
+        'php' => $phpContent
     ];
 }
-ksort($examples);
 
+foreach ($mdFiles as $mdFile) {
+    if (in_array(realpath($mdFile), $seenMd)) continue;
+    $name = basename($mdFile, '.md');
+    if (!isset($examples[$name])) {
+        $examples[$name] = [
+            'name' => $name,
+            'md' => file_get_contents($mdFile),
+            'php' => ''
+        ];
+    }
+}
+ksort($examples);
 function explorer($obj, $name = 'root', $depth = 0) {
     $type = gettype($obj);
     $label = is_object($obj) ? get_class($obj) : $type;
