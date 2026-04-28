@@ -1,8 +1,8 @@
 <?php return array(
     'root' => array(
         'name' => 'lemachinarbo/markdowntofields',
-        'pretty_version' => '1.3.7',
-        'version' => '1.3.7.0',
+        'pretty_version' => '1.4.0',
+        'version' => '1.4.0.0',
         'reference' => null,
         'type' => 'processwire-module',
         'install_path' => __DIR__ . '/../../',
@@ -11,9 +11,9 @@
     ),
     'versions' => array(
         'erusev/parsedown' => array(
-            'pretty_version' => '1.7.4',
-            'version' => '1.7.4.0',
-            'reference' => 'cb17b6477dfff935958ba01325f2e8a2bfa6dab3',
+            'pretty_version' => '1.8.0',
+            'version' => '1.8.0.0',
+            'reference' => '96baaad00f71ba04d76e45b4620f54d3beabd6f7',
             'type' => 'library',
             'install_path' => __DIR__ . '/../erusev/parsedown',
             'aliases' => array(),
@@ -38,8 +38,8 @@
             'dev_requirement' => false,
         ),
         'lemachinarbo/markdowntofields' => array(
-            'pretty_version' => '1.3.7',
-            'version' => '1.3.7.0',
+            'pretty_version' => '1.4.0',
+            'version' => '1.4.0.0',
             'reference' => null,
             'type' => 'processwire-module',
             'install_path' => __DIR__ . '/../../',
