@@ -242,6 +242,10 @@ class DocBuilder {
                 if (in_array($name, ['itemsCache', 'sectionsByName', 'section', 'sections', 'frontmatterRaw'])) continue;
                 
                 $val = $prop->getValue($obj);
+                
+                // Skip 'key' if it is null (keeps snapshots clean)
+                if ($name === 'key' && $val === null) continue;
+
                 $out .= "{$indent}  {$name}: " . $this->prettyPrint($val, $level + 1);
             }
         } elseif (is_array($obj)) {
@@ -309,6 +313,7 @@ class DocBuilder {
             'ContentData' => [
                 'sections' => 'Array of all sections in the document',
                 'frontmatter' => 'Parsed frontmatter data',
+                'key' => 'Unique identifier for the content source (usually filename)',
                 'data' => 'Returns a plain array of the content dataset',
                 'dataSet' => "Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values."
             ],
@@ -320,6 +325,7 @@ class DocBuilder {
                 'fields' => 'Named field blocks inside the section',
                 'subsections' => 'Nested subsections (not supported inside subsections themselves)',
                 'frontmatter' => 'Frontmatter data for this section (if available)',
+                'key' => 'Unique name or identifier of this section',
                 'data' => 'Returns a plain array of the section dataset',
                 'dataSet' => "Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values.",
                 'subsection' => 'Access a nested subsection by name'
@@ -346,10 +352,12 @@ class DocBuilder {
             ],
             'FieldData' => [
                'data' => 'Returns a plain array of the field dataset',
+               'key' => 'Unique identifier for this field',
                'dataSet' => "Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values."
             ],
             'FieldContainer' => [
                'data' => 'Returns a plain array of the container dataset',
+               'key' => 'Unique identifier for this container',
                'dataSet' => "Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values."
             ]
         ];

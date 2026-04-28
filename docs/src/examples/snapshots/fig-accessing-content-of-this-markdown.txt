@@ -10,9 +10,8 @@ ProcessWire\MarkdownContentView
        We work where so...'
   html: 
       '<h1>The Urban Farm</h1>
-       <p>We grow food and ideas in the city.
-       From rooftop gardens to indoor farms, we craft systems that actually produce.</p>
-       <p...'
+       <p>We grow food and ideas in the city.<br>
+       From rooftop gardens to indoor farms, we craft systems that actually produce.</p...'
   markdown: 
       '<!-- section:hero -->
        

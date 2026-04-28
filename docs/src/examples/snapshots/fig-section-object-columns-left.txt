@@ -4,13 +4,11 @@ ProcessWire\MarkdownSectionView
   html: '<h1>Our Team</h1>'
   text: 'Our Team'
   markdown: 
-      '# Our Team
-       
-       <!-- sub:left --><!-- sub:right -->'
+      '# Our Team'
   blocks: array (1)
     0 => ProcessWire\MarkdownBlockView [...]
   fields: array (0)
   subsections: array (2)
     left => ProcessWire\MarkdownSectionView [...]
     right => ProcessWire\MarkdownSectionView [...]
-  frontmatter: 'columns'
+  key: 'columns'

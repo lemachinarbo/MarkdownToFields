@@ -269,7 +269,9 @@ class AboutPage extends DefaultPage {
 
 Logic, names, and folder structure are always totally up to you.
 
-One important detail: `contentSource()` is treated as the source of truth for the markdown file path. If you derive it from a mutable value like `$page->name`, the markdown filename will change when the page name changes. That means renaming a page can point the module to a new markdown file, and if that file does not exist yet, the module may create it for you. If you want the markdown filename to stay stable even when the page slug changes, return a stable filename instead of deriving it from `$page->name`.
+One important detail: `contentSource()` is treated as the source of truth for the markdown file path. If you derive it from a mutable value like `$page->name`, the markdown filename will change when the page name changes. 
+
+That means that, renaming a page, can point the module to a new markdown file, and if that file does not exist yet, the module may create it for you. If you want the markdown filename to stay stable even when the page slug changes, return a stable filename instead of deriving it from `$page->name`.
 
 
 ### Getting the content
@@ -370,12 +372,13 @@ Each section is represented by a `Section` object with these members:
 | `$markdown` | `string` | Raw markdown of the section |
 | `$fields` | `array` | Named field blocks inside the section |
 | `$subsections` | `array` | Nested subsections (not supported inside subsections themselves) |
-| `$frontmatter` | `array|string|null` | Frontmatter data for this section (if available) |
+| `$key` | `string` | Unique name or identifier of this section |
 | `area()` | `method` | Returns the canonical area path string for this node. / |
 | `data()` | `method` | Returns a plain array of the section dataset |
 | `dataSet($mode?)` | `method` | Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values. |
 | `subsection($name)` | `method` | Access a nested subsection by name |
 | `field($name)` | `method` | Get a field by name / |
+| `blocksWithSubsections()` | `method` | Return a read-only projection of section blocks with named subsections merged into the hierarchy. Subsection blocks are appended as children of the first top-level block. This does not mutate the canonical structure or any existing content values. / |
 
 
 <a id="fig-markdown-with-two-sections"></a> **FIG 11:** Markdown with two sections
@@ -567,12 +570,13 @@ Subsections are returned as `Section` objects with the same core properties:
 | `$markdown` | `string` | Raw markdown of the section |
 | `$fields` | `array` | Named field blocks inside the section |
 | `$subsections` | `array` | Nested subsections (not supported inside subsections themselves) |
-| `$frontmatter` | `array|string|null` | Frontmatter data for this section (if available) |
+| `$key` | `string` | Unique name or identifier of this section |
 | `area()` | `method` | Returns the canonical area path string for this node. / |
 | `data()` | `method` | Returns a plain array of the section dataset |
 | `dataSet($mode?)` | `method` | Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values. |
 | `subsection($name)` | `method` | Access a nested subsection by name |
 | `field($name)` | `method` | Get a field by name / |
+| `blocksWithSubsections()` | `method` | Return a read-only projection of section blocks with named subsections merged into the hierarchy. Subsection blocks are appended as children of the first top-level block. This does not mutate the canonical structure or any existing content values. / |
 
 
 <a id="fig-section-object-columns-left"></a> **FIG 18:** Example of section object for `$jane` aka: `$page->content()->columns->left`
@@ -584,16 +588,14 @@ ProcessWire\MarkdownSectionView
   html: '<h1>Our Team</h1>'
   text: 'Our Team'
   markdown: 
-      '# Our Team
-       
-       <!-- sub:left --><!-- sub:right -->'
+      '# Our Team'
   blocks: array (1)
     0 => ProcessWire\MarkdownBlockView [...]
   fields: array (0)
   subsections: array (2)
     left => ProcessWire\MarkdownSectionView [...]
     right => ProcessWire\MarkdownSectionView [...]
-  frontmatter: 'columns'
+  key: 'columns'
 ```
 
 Note: using a sub removes that content from the section’s blocks. It does not become a child block; it becomes a named subsection.
@@ -711,6 +713,7 @@ ProcessWire\MarkdownBlockView
   nodeArea: 'about/block_0'
   heading: LetMeDown\HeadingElement
     text: 'About Us'
+    innerHtml: 'About Us'
     html: '<h1>About Us</h1>'
   level: 1  content: '<p>Welcome to our studio! We create digital experiences for modern brands.</p>'
   html: 
@@ -845,6 +848,7 @@ This is the main heading that defines the block’s title and level.
 | Member | Type | Description |
 | :--- | :--- | :--- |
 | `$text` | `string` | Heading label (plain text) |
+| `$innerHtml` | `string` | Content inside the heading tag |
 | `$html` | `string` | Full rendered <h1>...</h1> tag |
 
 
@@ -854,6 +858,7 @@ This is the main heading that defines the block’s title and level.
 ```php
 LetMeDown\HeadingElement
   text: 'Digital Studio'
+  innerHtml: 'Digital Studio'
   html: '<h1>Digital Studio</h1>'
 ```
 

@@ -1,3 +1,4 @@
 LetMeDown\HeadingElement
   text: 'Digital Studio'
+  innerHtml: 'Digital Studio'
   html: '<h1>Digital Studio</h1>'
