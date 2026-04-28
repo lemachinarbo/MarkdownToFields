@@ -1,7 +1,7 @@
 {
   "name": "lemachinarbo/markdowntofields",
   "description": "Markdown files as source of truth in ProcessWire",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "type": "processwire-module",
   "authors": [
     {

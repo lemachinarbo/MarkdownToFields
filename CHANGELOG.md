@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.1](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.4.0...v1.4.1) (2026-04-28)
+
+
+### Bug Fixes
+
+* opt into raw html parser mode ([06bec18](https://github.com/lemachinarbo/MarkdownToFields/commit/06bec18771bfd0d694e33715483b0bac0ac1bca8))
+* update letmedown dependency ([cc1266b](https://github.com/lemachinarbo/MarkdownToFields/commit/cc1266b98622d783777f010a43a28723367553fa))
+
 ## [1.4.0](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.3.7...v1.4.0) (2026-04-28)
 
 
