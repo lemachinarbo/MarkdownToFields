@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.2](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.4.1...v1.4.2) (2026-04-28)
+
+
+### Miscellaneous Chores
+
+* add core module patching workflow to agents.md ([7e0e80f](https://github.com/lemachinarbo/MarkdownToFields/commit/7e0e80f992ed316846f0c49ee2699c761addf8f0))
+* bump version to 1.3.2 and update documentation comments ([9590bb8](https://github.com/lemachinarbo/MarkdownToFields/commit/9590bb82082aebead312fd34c59597f76652faa6))
+* upgrade Parsedown to 1.8.0 and include block-level parsing enhancements ([ef5d404](https://github.com/lemachinarbo/MarkdownToFields/commit/ef5d40415ac7177a0e85d3030631854869a29928))
+
 ## [1.4.1](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.4.0...v1.4.1) (2026-04-28)
 
 
