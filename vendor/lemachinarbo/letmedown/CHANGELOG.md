@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/lemachinarbo/LetMeDown/compare/v1.3.1...v1.3.2) (2026-04-28)
+
+
+### Bug Fixes
+
+* force release for docs update ([b1a9a79](https://github.com/lemachinarbo/LetMeDown/commit/b1a9a797d5b01f6ffdb6bc3ff5de4c8ee6f84ba0))
+
 ## [1.3.1](https://github.com/lemachinarbo/LetMeDown/compare/v1.3.0...v1.3.1) (2026-04-28)
 
 

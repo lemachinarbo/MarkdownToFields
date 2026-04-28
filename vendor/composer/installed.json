@@ -153,17 +153,17 @@
         },
         {
             "name": "lemachinarbo/letmedown",
-            "version": "1.3.1",
-            "version_normalized": "1.3.1.0",
+            "version": "1.3.2",
+            "version_normalized": "1.3.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/lemachinarbo/LetMeDown.git",
-                "reference": "7a0f48568ac37a6c0d3483dc3738bf27810255a4"
+                "reference": "a0a03959794d13160f40e49f5c5c2f9dab1f0590"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/lemachinarbo/LetMeDown/zipball/7a0f48568ac37a6c0d3483dc3738bf27810255a4",
-                "reference": "7a0f48568ac37a6c0d3483dc3738bf27810255a4",
+                "url": "https://api.github.com/repos/lemachinarbo/LetMeDown/zipball/a0a03959794d13160f40e49f5c5c2f9dab1f0590",
+                "reference": "a0a03959794d13160f40e49f5c5c2f9dab1f0590",
                 "shasum": ""
             },
             "require": {
@@ -172,7 +172,7 @@
             "require-dev": {
                 "phpunit/phpunit": "^9"
             },
-            "time": "2026-04-28T05:49:50+00:00",
+            "time": "2026-04-28T14:08:53+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -192,7 +192,7 @@
             ],
             "description": "A Markdown parser that probably will.",
             "support": {
-                "source": "https://github.com/lemachinarbo/LetMeDown/tree/v1.3.1",
+                "source": "https://github.com/lemachinarbo/LetMeDown/tree/v1.3.2",
                 "issues": "https://github.com/lemachinarbo/LetMeDown/issues"
             },
             "install-path": "../lemachinarbo/letmedown"

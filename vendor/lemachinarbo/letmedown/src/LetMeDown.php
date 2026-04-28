@@ -2418,16 +2418,12 @@ class Section
   }
 
   /**
-   * Return a read-only projection of this section's blocks with named
-   * subsections merged into the main block hierarchy.
+   * Return a read-only projection of section blocks with named subsections merged into the hierarchy.
    *
-   * This helper is strictly a projection and does not change parsing or the
-   * canonical section structure. It does not recompute or mutate any HTML,
-   * text, or markdown values. Subsection blocks are appended (in order) as
-   * children of the first top-level block. If there are no blocks or no
-   * subsections, the original blocks are returned unchanged.
+   * Subsection blocks are appended as children of the first top-level block. This does not 
+   * mutate the canonical structure or any existing content values.
    *
-   * @return Block[] Projection of blocks with subsection blocks merged as children
+   * @return Block[]
    */
   public function blocksWithSubsections(): array
   {
