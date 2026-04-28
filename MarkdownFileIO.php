@@ -211,7 +211,12 @@ class MarkdownFileIO extends MarkdownConfig
       return null;
     }
 
-    $parser = new LetMeDown();
+    // Preserve the module's raw HTML behavior when LetMeDown supports the
+    // explicit toggle, while remaining compatible with older releases.
+    $constructor = (new \ReflectionClass(LetMeDown::class))->getConstructor();
+    $parser = $constructor && $constructor->getNumberOfParameters() >= 2
+      ? new LetMeDown(null, true)
+      : new LetMeDown();
 
     // Parse processed markdown directly in-memory so readonly elements are
     // created with final HTML. Prefer in-memory over temp files for cleanliness.

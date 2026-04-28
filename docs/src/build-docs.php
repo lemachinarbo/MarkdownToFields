@@ -146,7 +146,10 @@ class DocBuilder {
         $expectHtml = "{$this->snapshotsDir}/{$name}.html";
 
         // Generate Object Dump
-        $parser = new LetMeDown();
+        $constructor = (new \ReflectionClass(LetMeDown::class))->getConstructor();
+        $parser = $constructor && $constructor->getNumberOfParameters() >= 2
+            ? new LetMeDown(null, true)
+            : new LetMeDown();
         $rawContent = $parser->loadFromString(file_get_contents($mdFile));
         
         // Wrap in View Layer (ProcessWire specific API)

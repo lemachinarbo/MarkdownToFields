@@ -70,7 +70,10 @@ if (isset($_POST['markdown'])) {
         $md = $_POST['markdown'];
         $php = $_POST['php'] ?? '';
         
-        $parser = new LetMeDown();
+        $constructor = (new \ReflectionClass(LetMeDown::class))->getConstructor();
+        $parser = $constructor && $constructor->getNumberOfParameters() >= 2
+            ? new LetMeDown(null, true)
+            : new LetMeDown();
         $rawContent = $parser->loadFromString($md);
         $mockPage = new Page();
         $content = new MarkdownContentView($mockPage, $rawContent);
