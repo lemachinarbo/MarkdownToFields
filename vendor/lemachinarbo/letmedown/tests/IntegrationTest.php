@@ -13,7 +13,7 @@ class IntegrationTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->parser = new LetMeDown();
+        $this->parser = new LetMeDown(__DIR__ . '/fixtures');
         $this->content = $this->parser->load(__DIR__ . '/fixtures/complex.md');
     }
 
@@ -271,7 +271,7 @@ class IntegrationTest extends TestCase
     /** @testdox Examples file — leading orphan text present */
     public function test_examples_leading_orphan_text()
     {
-        $parser = new LetMeDown();
+        $parser = new LetMeDown(__DIR__ . '/fixtures');
         $content = $parser->load(__DIR__ . '/fixtures/test-markdown.md');
         $this->assertStringContainsString('This section is an orphan section', $content->sections[0]->text);
     }

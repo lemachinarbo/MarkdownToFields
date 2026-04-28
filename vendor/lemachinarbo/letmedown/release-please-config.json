@@ -1,0 +1,8 @@
+{
+  "target-branch": "master",
+  "packages": {
+    ".": {
+      "release-type": "php"
+    }
+  }
+}

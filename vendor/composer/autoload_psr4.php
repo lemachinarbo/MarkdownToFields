@@ -7,6 +7,5 @@ $baseDir = dirname($vendorDir);
 
 return array(
     'MarkdownToFields\\' => array($baseDir . '/src'),
-    'LetMeDown\\' => array($vendorDir . '/lemachinarbo/letmedown/src'),
     'League\\HTMLToMarkdown\\' => array($vendorDir . '/league/html-to-markdown/src'),
 );

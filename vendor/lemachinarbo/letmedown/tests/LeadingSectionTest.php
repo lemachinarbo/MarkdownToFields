@@ -59,8 +59,8 @@ MD;
         $tmp = sys_get_temp_dir() . '/letmedown_test_' . uniqid() . '.md';
         file_put_contents($tmp, $md);
 
-        $parser = new LetMeDown();
-        $content = $parser->load($tmp);
+        $parser = new LetMeDown(sys_get_temp_dir());
+        $content = $parser->load(basename($tmp));
 
         $value = trim($content->section(0)->text);
         $this->note("\$content->section(0)->text", $value);
@@ -77,8 +77,8 @@ MD;
         $tmp = sys_get_temp_dir() . '/letmedown_test_' . uniqid() . '.md';
         file_put_contents($tmp, $md);
 
-        $parser = new LetMeDown();
-        $content = $parser->load($tmp);
+        $parser = new LetMeDown(sys_get_temp_dir());
+        $content = $parser->load(basename($tmp));
 
         // First section should be the tagged section
         $this->assertSame("Heading\n\nSome text.", trim($content->section(0)->text));

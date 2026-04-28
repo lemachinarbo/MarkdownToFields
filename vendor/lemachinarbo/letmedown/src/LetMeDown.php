@@ -12,11 +12,18 @@ use Parsedown;
  */
 class LetMeDown
 {
+  private const MARKER_NAME_PATTERN = '[A-Za-z0-9_-]+';
   private Parsedown $parsedown;
+  private ?string $basePath;
 
-  public function __construct()
+  public function __construct(?string $basePath = null, bool $allowRawHtml = false)
   {
+    $this->basePath = $basePath ? realpath($basePath) : null;
     $this->parsedown = new Parsedown();
+    // Treat single newlines as hard line breaks to match editor expectations.
+    $this->parsedown->setBreaksEnabled(true);
+    // Raw HTML is opt-in and should only be enabled for trusted content sources.
+    $this->parsedown->setSafeMode(!$allowRawHtml);
   }
 
   /**
@@ -27,11 +34,29 @@ class LetMeDown
    */
   public function load(string $filePath): ContentData
   {
-    if (!file_exists($filePath)) {
-      throw new \RuntimeException("Markdown file not found: {$filePath}");
+    if ($this->basePath !== null) {
+      // Allow passing absolute paths if they are inside the base path.
+      // Also allow relative paths relative to basePath.
+      $potentialPath = $this->basePath . DIRECTORY_SEPARATOR . $filePath;
+      $resolvedPath = realpath($potentialPath) ?: realpath($filePath);
+
+      if ($resolvedPath === false || !file_exists($resolvedPath)) {
+        throw new \RuntimeException("Markdown file not found: {$filePath}");
+      }
+      $basePathWithSep = rtrim($this->basePath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+      $resolvedPathWithSep = rtrim($resolvedPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+      if (!str_starts_with($resolvedPathWithSep, $basePathWithSep)) {
+        throw new \RuntimeException("Path traversal detected: {$filePath}");
+      }
+    } else {
+      $filePath = basename($filePath);
+      $resolvedPath = realpath($filePath);
+      if ($resolvedPath === false || !file_exists($resolvedPath)) {
+        throw new \RuntimeException("Markdown file not found: {$filePath}");
+      }
     }
 
-    $rawMarkdown = file_get_contents($filePath);
+    $rawMarkdown = file_get_contents($resolvedPath);
     return $this->parseMarkdown($rawMarkdown);
   }
 
@@ -51,6 +76,7 @@ class LetMeDown
    */
   private function parseMarkdown(string $rawMarkdown): ContentData
   {
+    $markerName = self::MARKER_NAME_PATTERN;
     $frontmatterInfo = $this->separateFrontmatter($rawMarkdown);
     $markdownBody = $frontmatterInfo['content'];
     $frontmatterRaw = $frontmatterInfo['raw'];
@@ -62,7 +88,7 @@ class LetMeDown
 
     // Match both <!-- section --> (unnamed) and <!-- section:name --> (named)
     preg_match_all(
-      '/<!-- section(?::(\w+))? -->/m',
+      '/<!--\s*section(?::(' . $markerName . '))?\s*-->/m',
       $markdownBody,
       $matches,
       PREG_OFFSET_CAPTURE,
@@ -75,7 +101,7 @@ class LetMeDown
       // If there is content before the first section marker, treat it as an unnamed leading section
       $firstMatchPos = $matches[0][0][1] ?? 0;
       if ($firstMatchPos > 0) {
-        $leadingContent = trim(substr($markdownBody, 0, $firstMatchPos));
+        $leadingContent = substr($markdownBody, 0, $firstMatchPos);
         if ($leadingContent !== '') {
           $sections[] = ['name' => null, 'content' => $leadingContent];
         }
@@ -92,7 +118,7 @@ class LetMeDown
           : strlen($markdownBody);
 
         $content = substr($markdownBody, $startPos, $endPos - $startPos);
-        $sections[] = ['name' => $sectionName, 'content' => trim($content)];
+        $sections[] = ['name' => $sectionName, 'content' => $content];
       }
     }
 
@@ -491,8 +517,9 @@ class LetMeDown
    */
   private function classifyMarker(string $content): ?array
   {
+    $markerName = self::MARKER_NAME_PATTERN;
     // Field binding: "field:name" - extracts atomic value from emphasized text
-    if (preg_match('/^field:([a-zA-Z0-9_-]+)$/', $content, $m)) {
+    if (preg_match('/^field:(' . $markerName . ')$/', $content, $m)) {
       return [
         'type' => 'field_opener',
         'name' => $m[1],
@@ -501,7 +528,7 @@ class LetMeDown
     }
 
     // Field opener: "fieldname" or "fieldname..." (container)
-    if (preg_match('/^([a-zA-Z0-9_-]+)(\.{3})?$/', $content, $m)) {
+    if (preg_match('/^(' . $markerName . ')(\.{3})?$/', $content, $m)) {
       return [
         'type' => 'field_opener',
         'name' => $m[1],
@@ -510,7 +537,7 @@ class LetMeDown
     }
 
     // Named field closer: "/fieldname"
-    if (preg_match('/^\/([a-zA-Z0-9_-]+)$/', $content, $m)) {
+    if (preg_match('/^\/(' . $markerName . ')$/', $content, $m)) {
       return [
         'type' => 'field_closer',
         'name' => $m[1],
@@ -525,7 +552,7 @@ class LetMeDown
     }
 
     // Subsection opener: "sub:name"
-    if (preg_match('/^sub:([a-zA-Z0-9_-]+)$/', $content, $m)) {
+    if (preg_match('/^sub:(' . $markerName . ')$/', $content, $m)) {
       return [
         'type' => 'subsection_opener',
         'name' => $m[1],
@@ -533,7 +560,7 @@ class LetMeDown
     }
 
     // Subsection closer: "/sub" or "/sub:name"
-    if (preg_match('/^\/sub(?::([a-zA-Z0-9_-]+))?$/', $content, $m)) {
+    if (preg_match('/^\/sub(?::(' . $markerName . '))?$/', $content, $m)) {
       return [
         'type' => 'subsection_closer',
         'name' => $m[1] ?? null,
@@ -541,7 +568,7 @@ class LetMeDown
     }
 
     // Section marker: "section" or "section:name"
-    if (preg_match('/^section(?::([a-zA-Z0-9_-]+))?$/', $content, $m)) {
+    if (preg_match('/^section(?::(' . $markerName . '))?$/', $content, $m)) {
       return [
         'type' => 'section',
         'name' => $m[1] ?? null,
@@ -782,13 +809,14 @@ class LetMeDown
 
   private function parseSectionContent(string $sectionMarkdown): array
   {
+    $markerName = self::MARKER_NAME_PATTERN;
     // This will contain the core logic from the original extractDefaults loop
     $fields = $this->parseFieldMarkers($sectionMarkdown);
 
     // Remove ALL markers: fields, closers, subsections
     // Order matters: match extended fields (with ...) before regular fields
     $sectionMarkdownClean = preg_replace(
-      '/<!--\s*(?:[a-zA-Z0-9_-]+\.{3}|\/sub:[a-zA-Z0-9_-]+|\/[a-zA-Z0-9_-]+|sub:[a-zA-Z0-9_-]+|\/sub|[a-zA-Z0-9_-]+|\/)\s*-->/m',
+      '/<!--\s*(' . $markerName . '(?:\.{3})?|\/sub:' . $markerName . '|\/' . $markerName . '|sub:' . $markerName . '|\/sub|' . $markerName . '|\/)\s*-->/m',
       '',
       $sectionMarkdown,
     );
@@ -828,13 +856,11 @@ class LetMeDown
    */
   private function extractDefaults(array $sections): ContentData
   {
+    $markerName = self::MARKER_NAME_PATTERN;
     // Ordered, deduplicated list of sections (canonical)
     $sectionsList = [];
     // Named lookup for sections (first occurrence wins)
     $sectionsByName = [];
-    $globalIndex = 0; // (no longer used for storage, kept for debugging if needed)
-    $unnamedIndex = 0;
-
     foreach ($sections as $section) {
       $sectionMarkdown = $section['content'];
       $sectionName = $section['name'];
@@ -849,7 +875,7 @@ class LetMeDown
       // Match subsection openers and closers
       // Note: <!-- / --> is NOT matched here - it's only for fields
       preg_match_all(
-        '/<!-- (?:sub:(\w+)|\/sub(?::(\w+))?) -->/m',
+        '/<!--\s*(?:sub:(' . $markerName . ')|\/sub(?::(' . $markerName . '))?)\s*-->/m',
         $sectionMarkdown,
         $allMatches,
         PREG_OFFSET_CAPTURE,
@@ -868,13 +894,16 @@ class LetMeDown
             $subName = $allMatches[1][$i][0];
             $openStack[] = [
               'name' => $subName,
+              // position of the opener comment itself
+              'opener' => $position,
+              // start of subsection content (after the opener)
               'start' => $position + strlen($fullMatch),
               'index' => $i,
             ];
           }
           // Check if it's a closer (/sub or /sub:name)
           // Note: <!-- / --> is NOT handled here, only explicit subsection closers
-          elseif (preg_match('/<!-- \/sub(?::(\w+))? -->/', $fullMatch)) {
+          elseif (preg_match('/<!--\s*\/sub(?::(' . $markerName . '))?\s*-->/', $fullMatch)) {
             if (!empty($openStack)) {
               // Check if it's <!-- /sub:name --> (named subsection closer)
               if (!empty($allMatches[2][$i][0])) {
@@ -889,6 +918,7 @@ class LetMeDown
                     $opener = array_splice($openStack, $stackIdx, 1)[0];
                     $subsectionRanges[] = [
                       'name' => $opener['name'],
+                      'opener' => $opener['opener'],
                       'start' => $opener['start'],
                       'end' => $position,
                     ];
@@ -900,6 +930,7 @@ class LetMeDown
                 $opener = array_pop($openStack);
                 $subsectionRanges[] = [
                   'name' => $opener['name'],
+                  'opener' => $opener['opener'],
                   'start' => $opener['start'],
                   'end' => $position,
                 ];
@@ -928,6 +959,7 @@ class LetMeDown
 
           $subsectionRanges[] = [
             'name' => $opener['name'],
+            'opener' => $opener['opener'] ?? $opener['start'],
             'start' => $opener['start'],
             'end' => $nextOpenerPos ?? strlen($sectionMarkdown),
           ];
@@ -939,8 +971,12 @@ class LetMeDown
           $pos = 0;
           $kept = '';
           foreach ($subsectionRanges as $range) {
-            if ($range['start'] > $pos) {
-              $kept .= substr($sectionMarkdown, $pos, $range['start'] - $pos);
+            // Use the opener position to cut main markdown so the opener comment itself
+            // is excluded from the main section (but subsection content still starts
+            // at 'start', which is after the opener).
+            $cutAt = $range['opener'] ?? $range['start'];
+            if ($cutAt > $pos) {
+              $kept .= substr($sectionMarkdown, $pos, $cutAt - $pos);
             }
             $pos = $range['end'];
           }
@@ -952,17 +988,11 @@ class LetMeDown
 
         // Now extract content for each subsection range
         foreach ($subsectionRanges as $range) {
-          $subSectionContent = trim(
-            substr(
+          $subSectionContent = substr(
               $sectionMarkdown,
               $range['start'],
               $range['end'] - $range['start'],
-            ),
-          );
-
-          if (empty($subSectionContent)) {
-            continue;
-          }
+            );
 
           $parsedSubContent = $this->parseSectionContent($subSectionContent);
 
@@ -1403,7 +1433,11 @@ class LetMeDown
           $alt = $imgNode->getAttribute('alt') ?? '';
           $images[] = new ContentElement(
             text: "[$alt]",
-            html: "<img src=\"$src\" alt=\"$alt\">",
+            html: '<img src="' .
+              htmlspecialchars($src) .
+              '" alt="' .
+              htmlspecialchars($alt) .
+              '">',
             data: ['src' => $src, 'alt' => $alt],
           );
         }
@@ -1447,7 +1481,10 @@ class LetMeDown
         $items = [];
         $listItems = $xpath->query('.//li', $listNode);
         foreach ($listItems as $liNode) {
-          $items[] = trim(strip_tags($this->serializeNode($liNode)));
+          $liHtml = $this->serializeNode($liNode);
+          $liText = trim(strip_tags($liHtml));
+          // Fallback to raw HTML when stripped text is empty (e.g., image-only list items)
+          $items[] = $liText !== '' ? $liText : $liHtml;
         }
 
         // Deduplicate by HTML content (lists are unique by their full content)
@@ -1678,6 +1715,7 @@ class ContentData
    */
   public array $section;
   public string $markdown;
+  public ?string $key = null;
   protected array|string|null $frontmatter;
   protected ?string $frontmatterRaw;
 
@@ -1704,7 +1742,7 @@ class ContentData
   {
     // Magic property access: named sections first
     if (isset($this->sectionsByName[$name])) {
-      return $this->sectionsByName[$name];
+      return $this->withNodeIdentity($this->sectionsByName[$name], (string) $name);
     }
 
     return match ($name) {
@@ -1729,6 +1767,11 @@ class ContentData
   public function getMarkdown(): string
   {
     return $this->markdown;
+  }
+
+  public function data(): array
+  {
+    return PlainDataProjector::content($this);
   }
 
   public function setFrontmatter(
@@ -1778,7 +1821,16 @@ class ContentData
       return $this->sections[$idx] ?? null;
     }
 
-    return $this->sectionsByName[$name] ?? null;
+    $section = $this->sectionsByName[$name] ?? null;
+    return $section ? $this->withNodeIdentity($section, (string) $name) : null;
+  }
+
+  private function withNodeIdentity(object $node, string $key): object
+  {
+    if (property_exists($node, 'key')) {
+      $node->key = $key;
+    }
+    return $node;
   }
 
   /**
@@ -1810,7 +1862,9 @@ class ContentData
   {
     $blocks = [];
     foreach ($this->getUniqueSections() as $section) {
-      $blocks = array_merge($blocks, $section->blocks);
+      foreach ($section->blocks as $block) {
+        $blocks[] = $block;
+      }
     }
     return $blocks;
   }
@@ -1819,7 +1873,10 @@ class ContentData
   {
     $images = [];
     foreach ($this->getUniqueSections() as $section) {
-      $images = array_merge($images, $section->images->getArrayCopy());
+      $items = $section->images->getArrayCopy();
+      foreach ($items as $item) {
+        $images[] = $item;
+      }
     }
     return new ContentElementCollection($images);
   }
@@ -1828,7 +1885,10 @@ class ContentData
   {
     $links = [];
     foreach ($this->getUniqueSections() as $section) {
-      $links = array_merge($links, $section->links->getArrayCopy());
+      $items = $section->links->getArrayCopy();
+      foreach ($items as $item) {
+        $links[] = $item;
+      }
     }
     return new ContentElementCollection($links);
   }
@@ -1837,7 +1897,10 @@ class ContentData
   {
     $lists = [];
     foreach ($this->getUniqueSections() as $section) {
-      $lists = array_merge($lists, $section->lists->getArrayCopy());
+      $items = $section->lists->getArrayCopy();
+      foreach ($items as $item) {
+        $lists[] = $item;
+      }
     }
     return new ContentElementCollection($lists);
   }
@@ -1846,10 +1909,10 @@ class ContentData
   {
     $paragraphs = [];
     foreach ($this->getUniqueSections() as $section) {
-      $paragraphs = array_merge(
-        $paragraphs,
-        $section->paragraphs->getArrayCopy(),
-      );
+      $items = $section->paragraphs->getArrayCopy();
+      foreach ($items as $item) {
+        $paragraphs[] = $item;
+      }
     }
     return new ContentElementCollection($paragraphs);
   }
@@ -1919,10 +1982,12 @@ class ContentElement
  * Allows access to heading in multiple forms:
  * - (string) cast or ->html: Returns full HTML like "<h3>foo</h3>"
  * - ->text: Returns extracted text like "foo"
+ * - ->innerHtml: Returns inner HTML like "foo"
  */
 class HeadingElement
 {
   public readonly string $text;
+  public readonly string $innerHtml;
   public string $html;
 
   public function __construct(string $heading)
@@ -1930,6 +1995,9 @@ class HeadingElement
     $this->html = $heading;
     // Extract text by stripping HTML tags and decoding entities
     $this->text = html_entity_decode(strip_tags($heading));
+    // Extract inner HTML by removing outer tags
+    preg_match('/^<[^>]+>(.*)<\/[^>]+>$/s', $heading, $matches);
+    $this->innerHtml = $matches[1] ?? '';
   }
 
   public function __toString(): string
@@ -2162,10 +2230,99 @@ class Block
 }
 
 /**
+ * HasBlockCollections: Shared collection extraction for classes with a $blocks array
+ */
+trait HasBlockCollections
+{
+  private function getHeadings(): array
+  {
+    $headings = [];
+    $seen = [];
+
+    foreach ($this->blocks as $block) {
+      $this->collectHeadingsFromBlock($block, $headings, $seen);
+    }
+
+    return $headings;
+  }
+
+  private function collectHeadingsFromBlock(
+    Block $block,
+    array &$headings,
+    array &$seen,
+  ): void {
+    if ($block->heading && $block->heading->text !== '') {
+      $key = $block->heading->text . '|' . $block->level;
+      if (!isset($seen[$key])) {
+        $seen[$key] = true;
+        $headings[] = new ContentElement(
+          text: $block->heading->text,
+          html: $block->heading->html,
+          data: ['level' => $block->level],
+        );
+      }
+    }
+
+    foreach ($block->children as $child) {
+      $this->collectHeadingsFromBlock($child, $headings, $seen);
+    }
+  }
+
+  private function getImages(): ContentElementCollection
+  {
+    $images = [];
+    foreach ($this->blocks as $block) {
+      $items = $block->getAllImages()->getArrayCopy();
+      foreach ($items as $item) {
+        $images[] = $item;
+      }
+    }
+    return new ContentElementCollection($images);
+  }
+
+  private function getLinks(): ContentElementCollection
+  {
+    $links = [];
+    foreach ($this->blocks as $block) {
+      $items = $block->getAllLinks()->getArrayCopy();
+      foreach ($items as $item) {
+        $links[] = $item;
+      }
+    }
+    return new ContentElementCollection($links);
+  }
+
+  private function getLists(): ContentElementCollection
+  {
+    $lists = [];
+    foreach ($this->blocks as $block) {
+      $items = $block->getAllLists()->getArrayCopy();
+      foreach ($items as $item) {
+        $lists[] = $item;
+      }
+    }
+    return new ContentElementCollection($lists);
+  }
+
+  private function getParagraphs(): ContentElementCollection
+  {
+    $paragraphs = [];
+    foreach ($this->blocks as $block) {
+      $items = $block->getAllParagraphs()->getArrayCopy();
+      foreach ($items as $item) {
+        $paragraphs[] = $item;
+      }
+    }
+    return new ContentElementCollection($paragraphs);
+  }
+}
+
+/**
  * Section: Container for markdown sections
  */
 class Section
 {
+  use HasBlockCollections;
   public function __construct(
     public string $html,
     public string $text,
@@ -2173,19 +2330,19 @@ class Section
     protected array $blocks,
     public array $fields = [],
     public array $subsections = [],
-    public array|string|null $frontmatter = null,
+    public ?string $key = null,
   ) {}
 
   public function __get($name)
   {
     // 1. Check for a subsection with the given name
     if (isset($this->subsections[$name])) {
-      return $this->subsections[$name];
+      return $this->withChildIdentity($this->subsections[$name], (string) $name);
     }
 
     // 2. Check for a field with the given name
     if (isset($this->fields[$name])) {
-      return $this->fields[$name];
+      return $this->withChildIdentity($this->fields[$name], (string) $name);
     }
 
     // 3. Fall back to generic content properties
@@ -2197,14 +2354,14 @@ class Section
       'paragraphs' => $this->getParagraphs(),
       'blocks'
         => $this->getRealBlocks(), // Use the new method to get real blocks
-      'frontmatter' => $this->getFrontmatter(),
       default => null,
     };
   }
 
   public function subsection(string $name): ?self
   {
-    return $this->subsections[$name] ?? null;
+    $subsection = $this->subsections[$name] ?? null;
+    return $subsection ? $this->withChildIdentity($subsection, $name) : null;
   }
 
   public function getMarkdown(): string
@@ -2212,9 +2369,9 @@ class Section
     return $this->markdown;
   }
 
-  public function getFrontmatter(): array|string|null
+  public function data(): array
   {
-    return $this->frontmatter;
+    return PlainDataProjector::section($this);
   }
 
   /**
@@ -2231,97 +2388,18 @@ class Section
 
   public function field(string $name): FieldData|FieldContainer|null
   {
-    return $this->fields[$name] ?? null;
+    $field = $this->fields[$name] ?? null;
+    return $field ? $this->withChildIdentity($field, $name) : null;
   }
 
-
-  private function getHeadings(): array
+  private function withChildIdentity(object $node, string $name): object
   {
-    $headings = [];
-
-    $seen = [];
-
-    foreach ($this->blocks as $block) {
-      $this->collectHeadingsFromBlock($block, $headings, $seen);
+    if (property_exists($node, 'key')) {
+      $node->key = $name;
     }
-
-    return $headings;
+    return $node;
   }
 
-  private function collectHeadingsFromBlock(
-    Block $block,
-    array &$headings,
-    array &$seen,
-  ): void {
-    // Add the block's own heading (avoid duplicates)
-
-    if ($block->heading && $block->heading->text !== '') {
-      $key = $block->heading->text . '|' . $block->level;
-
-      if (!isset($seen[$key])) {
-        $seen[$key] = true;
-
-        $headings[] = new ContentElement(
-          text: $block->heading->text,
-          html: $block->heading->html,
-          data: ['level' => $block->level],
-        );
-      }
-    }
-
-    // Recursively collect from children
-
-    foreach ($block->children as $child) {
-      $this->collectHeadingsFromBlock($child, $headings, $seen);
-    }
-  }
-
-  private function getImages(): ContentElementCollection
-  {
-    $images = [];
-
-    foreach ($this->blocks as $block) {
-      $images = array_merge($images, $block->getAllImages()->getArrayCopy());
-    }
-
-    return new ContentElementCollection($images);
-  }
-
-  private function getLinks(): ContentElementCollection
-  {
-    $links = [];
-
-    foreach ($this->blocks as $block) {
-      $links = array_merge($links, $block->getAllLinks()->getArrayCopy());
-    }
-
-    return new ContentElementCollection($links);
-  }
-
-  private function getLists(): ContentElementCollection
-  {
-    $lists = [];
-
-    foreach ($this->blocks as $block) {
-      $lists = array_merge($lists, $block->getAllLists()->getArrayCopy());
-    }
-
-    return new ContentElementCollection($lists);
-  }
-
-  private function getParagraphs(): ContentElementCollection
-  {
-    $paragraphs = [];
-
-    foreach ($this->blocks as $block) {
-      $paragraphs = array_merge(
-        $paragraphs,
-        $block->getAllParagraphs()->getArrayCopy(),
-      );
-    }
-
-    return new ContentElementCollection($paragraphs);
-  }
 
   public function getRealBlocks(): array
   {
@@ -2338,6 +2416,71 @@ class Section
 
     return $this->blocks;
   }
+
+  /**
+   * Return a read-only projection of this section's blocks with named
+   * subsections merged into the main block hierarchy.
+   *
+   * This helper is strictly a projection and does not change parsing or the
+   * canonical section structure. It does not recompute or mutate any HTML,
+   * text, or markdown values. Subsection blocks are appended (in order) as
+   * children of the first top-level block. If there are no blocks or no
+   * subsections, the original blocks are returned unchanged.
+   *
+   * @return Block[] Projection of blocks with subsection blocks merged as children
+   */
+  public function blocksWithSubsections(): array
+  {
+    $originalBlocks = $this->getRealBlocks();
+
+    // If nothing to project, return canonical blocks unchanged
+    if (empty($originalBlocks) || empty($this->subsections)) {
+      return $originalBlocks;
+    }
+
+    // Clone top-level blocks to avoid mutating originals
+    $clonedBlocks = [];
+    foreach ($originalBlocks as $b) {
+      $clonedBlocks[] = $this->cloneBlockForProjection($b);
+    }
+
+    // Append cloned subsection blocks (preserve order) as children of the first top-level cloned block
+    foreach ($this->subsections as $sub) {
+      foreach ($sub->getRealBlocks() as $sb) {
+        $clonedBlocks[0]->children[] = $this->cloneBlockForProjection($sb);
+      }
+    }
+
+    return $clonedBlocks;
+  }
+
+  /**
+   * Clone a Block for projection use (recursively clones children). This
+   * helper clones Block objects only to avoid mutating originals; it does not
+   * touch or recompute HTML/text/markdown values.
+   */
+  private function cloneBlockForProjection(Block $block): Block
+  {
+    $clonedChildren = [];
+    foreach ($block->children as $child) {
+      $clonedChildren[] = $this->cloneBlockForProjection($child);
+    }
+
+    return new Block(
+      heading: $block->heading,
+      level: $block->level,
+      content: $block->content,
+      html: $block->html,
+      text: $block->text,
+      markdown: $block->markdown,
+      paragraphs: $block->paragraphs,
+      images: $block->images,
+      links: $block->links,
+      lists: $block->lists,
+      children: $clonedChildren,
+      fields: $block->fields,
+    );
+  }
 }
 
 /**
@@ -2349,6 +2492,7 @@ class Section
 class FieldData implements \IteratorAggregate
 {
   private ?ContentElementCollection $itemsCache = null;
+  public string $innerHtml;
 
   public function __construct(
     public string $name,
@@ -2357,7 +2501,12 @@ class FieldData implements \IteratorAggregate
     public string $text,
     public string $type,
     public array $data = [],
-  ) {}
+    public ?string $key = null,
+  ) {
+    // Extract inner HTML by removing outer tags when possible
+    preg_match('/^<[^>]+>(.*)<\/[^>]+>$/s', $this->html, $matches);
+    $this->innerHtml = $matches[1] ?? $this->html;
+  }
 
   public function __toString(): string
   {
@@ -2367,6 +2516,11 @@ class FieldData implements \IteratorAggregate
   public function getMarkdown(): string
   {
     return $this->markdown;
+  }
+
+  public function data()
+  {
+    return PlainDataProjector::fieldData($this);
   }
 
   public function getFrontmatter(): array|string|null
@@ -2450,9 +2604,26 @@ class FieldData implements \IteratorAggregate
       }
     } elseif ($this->type === 'links') {
       foreach ($this->data as $link) {
+        $href = $link['href'] ?? '';
+
+        // Normalize and decode encoded schemes before checking allowed protocols.
+        $normalizedHref = html_entity_decode((string) $href, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $normalizedHref = rawurldecode($normalizedHref);
+
+        // Strip control characters and whitespace that browsers may ignore before the scheme.
+        $cleanHref = trim(preg_replace('/[\x00-\x20]/', '', $normalizedHref));
+        $scheme = parse_url($cleanHref, PHP_URL_SCHEME);
+
+        if ($scheme !== null) {
+            $scheme = strtolower($scheme);
+            if (!in_array($scheme, ['http', 'https', 'mailto', 'tel'])) {
+                $href = '#';
+            }
+        }
+
         $collection[] = new ContentElement(
           text: $link['text'] ?? '',
-          html: '<a href="' . htmlspecialchars($link['href']) . '">' . htmlspecialchars($link['text'] ?? '') . '</a>',
+          html: '<a href="' . htmlspecialchars($href) . '">' . htmlspecialchars($link['text'] ?? '') . '</a>',
           data: $link,
         );
       }
@@ -2471,16 +2642,27 @@ class FieldData implements \IteratorAggregate
  */
 class FieldContainer
 {
+  use HasBlockCollections;
   public function __construct(
     public string $name,
     public string $markdown,
     public string $html,
     public string $text,
     protected array $blocks,
+    public ?string $key = null,
   ) {}
 
   public function __get($name)
   {
+    if ($name === 'fields') {
+      return $this->fields();
+    }
+
+    $field = $this->field($name);
+    if ($field !== null) {
+      return $field;
+    }
+
     return match ($name) {
       'blocks' => $this->blocks,
       'images' => $this->getImages(),
@@ -2497,74 +2679,46 @@ class FieldContainer
     return $this->markdown;
   }
 
-  private function getHeadings(): array
+  public function field(string $name): FieldData|FieldContainer|null
   {
-    $headings = [];
-    $seen = [];
-
-    foreach ($this->blocks as $block) {
-      $this->collectHeadingsFromBlock($block, $headings, $seen);
-    }
-
-    return $headings;
+    $fields = $this->fields();
+    $field = $fields[$name] ?? null;
+    return $field ? $this->withChildIdentity($field, $name) : null;
   }
 
-  private function collectHeadingsFromBlock(
-    Block $block,
-    array &$headings,
-    array &$seen,
-  ): void {
-    if ($block->heading && $block->heading->text !== '') {
-      $key = $block->heading->text . '|' . $block->level;
-      if (!isset($seen[$key])) {
-        $seen[$key] = true;
-        $headings[] = new ContentElement(
-          text: $block->heading->text,
-          html: $block->heading->html,
-          data: ['level' => $block->level],
-        );
+  public function fields(): array
+  {
+    $fields = [];
+    foreach ($this->blocks as $block) {
+      $this->collectFieldsFromBlock($block, $fields);
+    }
+    return $fields;
+  }
+
+  public function data(): array
+  {
+    return PlainDataProjector::fieldContainer($this);
+  }
+
+  private function withChildIdentity(object $node, string $name): object
+  {
+    if (property_exists($node, 'key')) {
+      $node->key = $name;
+    }
+    return $node;
+  }
+
+  private function collectFieldsFromBlock(Block $block, array &$fields): void
+  {
+    foreach ($block->fields as $name => $field) {
+      if (!isset($fields[$name])) {
+        $fields[$name] = $this->withChildIdentity($field, (string) $name);
       }
     }
 
     foreach ($block->children as $child) {
-      $this->collectHeadingsFromBlock($child, $headings, $seen);
+      $this->collectFieldsFromBlock($child, $fields);
     }
-  }
-
-  private function getImages(): ContentElementCollection
-  {
-    $images = [];
-    foreach ($this->blocks as $block) {
-      $images = array_merge($images, $block->getAllImages()->getArrayCopy());
-    }
-    return new ContentElementCollection($images);
-  }
-
-  private function getLinks(): ContentElementCollection
-  {
-    $links = [];
-    foreach ($this->blocks as $block) {
-      $links = array_merge($links, $block->getAllLinks()->getArrayCopy());
-    }
-    return new ContentElementCollection($links);
-  }
-
-  private function getLists(): ContentElementCollection
-  {
-    $lists = [];
-    foreach ($this->blocks as $block) {
-      $lists = array_merge($lists, $block->getAllLists()->getArrayCopy());
-    }
-    return new ContentElementCollection($lists);
-  }
-
-  private function getParagraphs(): ContentElementCollection
-  {
-    $paragraphs = [];
-    foreach ($this->blocks as $block) {
-      $paragraphs = array_merge($paragraphs, $block->getAllParagraphs()->getArrayCopy());
-    }
-    return new ContentElementCollection($paragraphs);
   }
 }
 
@@ -2597,5 +2751,310 @@ class ContentElementCollection extends \ArrayObject
   public function __toString(): string
   {
     return $this->text;
+  }
+}
+
+class PlainDataProjector
+{
+  public static function content(ContentData $content): array
+  {
+    $data = [];
+
+    foreach ($content->sectionsByName as $name => $section) {
+      $section->key = (string) $name;
+      $data[(string) $name] = self::section($section, (string) $name);
+    }
+
+    return $data;
+  }
+
+  public static function section(Section $section, ?string $key = null): array
+  {
+    $resolvedKey = $key ?? $section->key ?? '';
+    $data = [
+      'key' => (string) $resolvedKey,
+      'subsections' => [],
+    ];
+
+    foreach (['html', 'text', 'markdown'] as $property) {
+      if (self::hasMeaningfulString($section->{$property})) {
+        $data[$property] = $section->{$property};
+      }
+    }
+
+    foreach ($section->fields as $name => $field) {
+      if (property_exists($field, 'key')) {
+        $field->key = (string) $name;
+      }
+      $data[$name] = self::projectField($field);
+    }
+
+    foreach ($section->subsections as $name => $subsection) {
+      $subsection->key = (string) $name;
+      $child = self::section($subsection, (string) $name);
+      $data[$name] = $child;
+      $data['subsections'][(string) $name] = $child;
+    }
+
+    return $data;
+  }
+
+  public static function fieldData(FieldData $field): array
+  {
+    $data = [
+      'type' => self::fieldDataType($field),
+      'key' => (string) ($field->key ?? ''),
+    ];
+
+    foreach (['html', 'text', 'markdown'] as $property) {
+      if (self::hasMeaningfulString($field->{$property})) {
+        $data[$property] = $field->{$property};
+      }
+    }
+
+    if (self::isLinkField($field)) {
+      return self::linkData($field, $data);
+    }
+
+    if (self::isImageField($field)) {
+      return self::imageData($field, $data);
+    }
+
+    if (self::isStructuredField($field)) {
+      return self::structuredFieldData($field, $data);
+    }
+
+    foreach ($field->data as $name => $value) {
+      if (is_scalar($value) && $value !== '' && !array_key_exists((string) $name, $data)) {
+        $data[(string) $name] = $value;
+      }
+    }
+
+    return $data;
+  }
+
+  private static function fieldDataType(FieldData $field): string
+  {
+    if (in_array($field->type, ['image', 'images', 'link', 'links', 'list', 'binding'], true)) {
+      return $field->type;
+    }
+
+    return (string) ($field->key ?? $field->name);
+  }
+
+  public static function fieldContainer(FieldContainer $field): array
+  {
+    $data = [
+      'key' => (string) ($field->key ?? ''),
+      'items' => [],
+    ];
+
+    foreach (['html', 'text', 'markdown'] as $property) {
+      if (self::hasMeaningfulString($field->{$property})) {
+        $data[$property] = $field->{$property};
+      }
+    }
+
+    foreach ($field->fields() as $name => $childField) {
+      if (property_exists($childField, 'key')) {
+        $childField->key = (string) $name;
+      }
+      $data[(string) $name] = self::projectField($childField);
+    }
+
+    foreach ($field->blocks as $block) {
+      $data['items'][] = self::blockData($block);
+    }
+
+    return $data;
+  }
+
+  private static function projectField($field)
+  {
+    if ($field instanceof FieldData) {
+      return self::fieldData($field);
+    }
+
+    if ($field instanceof FieldContainer) {
+      return self::fieldContainer($field);
+    }
+
+    return $field;
+  }
+
+  private static function isStructuredField(FieldData $field): bool
+  {
+    if ($field->data === []) {
+      return false;
+    }
+
+    if (in_array($field->type, ['list', 'images', 'links'], true)) {
+      return true;
+    }
+
+    $first = array_values($field->data)[0] ?? null;
+    return is_array($first);
+  }
+
+  private static function isLinkField(FieldData $field): bool
+  {
+    return $field->type === 'link' || isset($field->data['href']);
+  }
+
+  private static function isImageField(FieldData $field): bool
+  {
+    return $field->type === 'image' || isset($field->data['src']);
+  }
+
+  private static function structuredFieldData(FieldData $field, array $data): array
+  {
+    $data['items'] = [];
+
+    foreach (array_values($field->data) as $item) {
+      if ($field->type === 'images') {
+        $data['items'][] = self::imageDataArray($item);
+        continue;
+      }
+
+      if ($field->type === 'links') {
+        $data['items'][] = self::linkDataArray($item);
+        continue;
+      }
+
+      $data['items'][] = self::fieldItemData($item);
+    }
+
+    return $data;
+  }
+
+  private static function fieldItemData(array $item): array
+  {
+    $data = [];
+
+    foreach (['html', 'text', 'markdown'] as $property) {
+      if (
+        isset($item[$property]) &&
+        is_string($item[$property]) &&
+        self::hasMeaningfulString($item[$property])
+      ) {
+        $data[$property] = $item[$property];
+      }
+    }
+
+    if (!empty($item['images']) && is_array($item['images'])) {
+      $data['images'] = array_map(
+        fn(array $image): array => self::imageDataArray($image),
+        array_values($item['images'])
+      );
+    }
+
+    if (!empty($item['links']) && is_array($item['links'])) {
+      $data['links'] = array_map(
+        fn(array $link): array => self::linkDataArray($link),
+        array_values($item['links'])
+      );
+    }
+
+    return $data;
+  }
+
+  private static function linkData(FieldData $field, array $base): array
+  {
+    $data = array_merge($base, self::linkDataArray($field->data + [
+      'text' => $field->text,
+      'html' => $field->html,
+    ]));
+    return $data;
+  }
+
+  private static function imageData(FieldData $field, array $base): array
+  {
+    $data = array_merge($base, self::imageDataArray($field->data + [
+      'html' => $field->html,
+    ]));
+    return $data;
+  }
+
+  private static function blockData(Block $block): array
+  {
+    $data = [];
+
+    foreach (['html', 'text', 'markdown'] as $property) {
+      if (self::hasMeaningfulString($block->{$property})) {
+        $data[$property] = $block->{$property};
+      }
+    }
+
+    if ($block->heading instanceof HeadingElement && $block->heading->text !== '') {
+      $data['heading'] = array_filter([
+        'html' => $block->heading->html,
+        'text' => $block->heading->text,
+        'level' => $block->level,
+      ], static fn($value) => $value !== '' && $value !== null);
+    }
+
+    return $data;
+  }
+
+  private static function linkDataArray(array $data): array
+  {
+    $out = [];
+    foreach (['href', 'text', 'html', 'markdown'] as $property) {
+      if (
+        isset($data[$property]) &&
+        is_string($data[$property]) &&
+        self::hasMeaningfulString($data[$property])
+      ) {
+        $out[$property] = $data[$property];
+      }
+    }
+    return $out;
+  }
+
+  private static function imageDataArray(array $data): array
+  {
+    $out = [];
+    foreach (['src', 'alt', 'html', 'text', 'markdown'] as $property) {
+      if (
+        isset($data[$property]) &&
+        is_string($data[$property]) &&
+        self::hasMeaningfulString($data[$property])
+      ) {
+        $out[$property] = $data[$property];
+      }
+    }
+    return $out;
+  }
+
+  private static function collectionToArray($collection): array
+  {
+    if (!$collection instanceof \Traversable && !is_array($collection)) {
+      return [];
+    }
+
+    $items = [];
+    foreach ($collection as $item) {
+      if ($item instanceof ContentElement) {
+        $items[] = array_filter(array_merge($item->data, [
+          'html' => $item->html,
+          'text' => $item->text,
+        ]), static function ($value): bool {
+          if (is_string($value)) {
+            return trim($value) !== '';
+          }
+
+          return $value !== '';
+        });
+        continue;
+      }
+      $items[] = $item;
+    }
+
+    return $items;
+  }
+
+  private static function hasMeaningfulString(string $value): bool
+  {
+    return trim($value) !== '';
   }
 }

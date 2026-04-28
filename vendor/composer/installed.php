@@ -29,9 +29,9 @@
             'dev_requirement' => false,
         ),
         'lemachinarbo/letmedown' => array(
-            'pretty_version' => 'v1.1.5',
-            'version' => '1.1.5.0',
-            'reference' => '84874a123838eb8939998b5b0504b69a35d25029',
+            'pretty_version' => '1.3.1',
+            'version' => '1.3.1.0',
+            'reference' => '7a0f48568ac37a6c0d3483dc3738bf27810255a4',
             'type' => 'library',
             'install_path' => __DIR__ . '/../lemachinarbo/letmedown',
             'aliases' => array(),

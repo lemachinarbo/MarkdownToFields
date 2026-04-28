@@ -6,6 +6,10 @@ namespace Composer\Autoload;
 
 class ComposerStaticInit1c3d65c33cb223aafa8615ac651ba654
 {
+    public static $files = array (
+        'a729d6dab8e46e902a8659f09369df13' => __DIR__ . '/..' . '/lemachinarbo/letmedown/src/LetMeDown.php',
+    );
+
     public static $prefixLengthsPsr4 = array (
         'M' =>
         array (
@@ -13,7 +17,6 @@ class ComposerStaticInit1c3d65c33cb223aafa8615ac651ba654
         ),
         'L' =>
         array (
-            'LetMeDown\\' => 10,
             'League\\HTMLToMarkdown\\' => 22,
         ),
     );
@@ -22,10 +25,6 @@ class ComposerStaticInit1c3d65c33cb223aafa8615ac651ba654
         'MarkdownToFields\\' =>
         array (
             0 => __DIR__ . '/../..' . '/src',
-        ),
-        'LetMeDown\\' =>
-        array (
-            0 => __DIR__ . '/..' . '/lemachinarbo/letmedown/src',
         ),
         'League\\HTMLToMarkdown\\' =>
         array (

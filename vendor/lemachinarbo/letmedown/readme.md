@@ -23,9 +23,21 @@ $frontmatter = $content->getFrontmatter();
 
 // Original document including frontmatter and body
 $rawDocument = $content->getRawDocument();
+```
 
 > Note: `sections` is now an ordered numeric list (no duplicate named keys). Use `section('name')` or the magic property `->name` to access named sections. For indexed access you can use `section[0]` or `section(0)`.
+
+## Raw HTML
+
+By default, LetMeDown keeps Parsedown safe mode enabled, so raw HTML inside markdown is escaped.
+
+If you need trusted content to preserve inline HTML such as `<br>` or `<strong>`, opt in explicitly:
+
+```php
+$processor = new LetMeDown(allowRawHtml: true);
 ```
+
+Enable `allowRawHtml` only for markdown sources you trust.
 
 ## Markdown Format
 
@@ -70,9 +82,11 @@ Use extended fields when you need to group multiple paragraphs, lists, or other 
 
 ### Sub-sections
 
-You can create nested content structures using `<!-- sub:name -->` markers within a section. This allows for more granular content grouping and clearer access.
+You can create nested content structures using `<!-- sub:name -->` markers within a section. This allows for more granular content grouping and clearer access. 
 
-**Important:** By design, sections and subsections "bleed" — they extend until the next section/subsection marker or the end of the document. This gives you flexibility but requires explicit boundaries when needed.
+Note: subsections cut the section's blocks — content inside a `sub` is removed from the main section and becomes a named subsection.
+
+By design, sections and subsections "bleed" — they extend until the next section/subsection marker or the end of the document. This gives you flexibility but requires explicit boundaries when needed.
 
 #### Closing Subsections
 
@@ -342,6 +356,7 @@ When you access a field with `$section->field('name')`, you get a `FieldData` ob
 
 -   `->text`: The plain text content.
 -   `->html`: The rendered HTML content.
+-   `->innerHtml`: The inner HTML content (outer tag removed when possible).
 -   `->markdown`: The original markdown source.
 -   `->type`: The auto-detected type (`image`, `images`, `link`, `links`, `list`, `heading`, `text`, `binding`).
 -   `->src`, `->alt`: For `image` type fields.

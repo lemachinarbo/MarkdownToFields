@@ -15,7 +15,7 @@ class ComplexParsingTest extends TestCase
 
     public function test_sections_and_frontmatter()
     {
-        $parser = new LetMeDown();
+        $parser = new LetMeDown(__DIR__ . '/fixtures');
         $content = $parser->load($this->fixture);
 
         // 4 sections: leading unnamed + hero + columns + body
@@ -26,7 +26,7 @@ class ComplexParsingTest extends TestCase
 
     public function test_leading_section()
     {
-        $parser = new LetMeDown();
+        $parser = new LetMeDown(__DIR__ . '/fixtures');
         $content = $parser->load($this->fixture);
 
         $this->assertSame('We work with soil..', trim($content->section(0)->text));
@@ -34,7 +34,7 @@ class ComplexParsingTest extends TestCase
 
     public function test_hero_fields_and_containers()
     {
-        $parser = new LetMeDown();
+        $parser = new LetMeDown(__DIR__ . '/fixtures');
         $content = $parser->load($this->fixture);
 
         $hero = $content->section('hero');
@@ -57,7 +57,7 @@ class ComplexParsingTest extends TestCase
 
     public function test_columns_subsections_and_elements()
     {
-        $parser = new LetMeDown();
+        $parser = new LetMeDown(__DIR__ . '/fixtures');
         $content = $parser->load($this->fixture);
 
         $columns = $content->section('columns');
@@ -83,7 +83,7 @@ class ComplexParsingTest extends TestCase
 
     public function test_body_summary_and_plan_container()
     {
-        $parser = new LetMeDown();
+        $parser = new LetMeDown(__DIR__ . '/fixtures');
         $content = $parser->load($this->fixture);
 
         $body = $content->section('body');
@@ -101,7 +101,7 @@ class ComplexParsingTest extends TestCase
 
     public function test_synthetic_start_preserves_h2_level()
     {
-        $parser = new LetMeDown();
+        $parser = new LetMeDown(__DIR__ . '/fixtures');
         $content = $parser->load($this->fixture);
 
         $body = $content->section('body');
