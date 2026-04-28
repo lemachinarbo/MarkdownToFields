@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.4.0](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.3.7...v1.4.0) (2026-04-28)
+
+
+### Features
+
+* implement automated documentation builder and api reflection ([8dda5a6](https://github.com/lemachinarbo/MarkdownToFields/commit/8dda5a6036553903a210483dc7641c687eebb1b3))
+* implement markdownblockview and unify view layer api ([5efc64c](https://github.com/lemachinarbo/MarkdownToFields/commit/5efc64ce8a9c3fbc0ba96f55f335cb27c9450ddc))
+* test release workflow ([c97f826](https://github.com/lemachinarbo/MarkdownToFields/commit/c97f826cc1c1051f13a013e0fe15e753202e9799))
+
+
+### Bug Fixes
+
+* documentation builder logic, update snapshots, and enhance test discovery for content elements ([c09c111](https://github.com/lemachinarbo/MarkdownToFields/commit/c09c111d332a3aa778deca99ada2e93a9829642a))
+* resolve projection crashes and secure data flow ([6f82430](https://github.com/lemachinarbo/MarkdownToFields/commit/6f82430f405aa1cc2e8c64a2c273e0203e94b9fe))
+
+
+### Miscellaneous Chores
+
+* add module context and developer guidelines to AGENTS.md ([3de20cf](https://github.com/lemachinarbo/MarkdownToFields/commit/3de20cfd13b482aa56db7d7d2316c8cca35016fe))
+* configure release-please and update release workflow for automated versioning ([6ae7759](https://github.com/lemachinarbo/MarkdownToFields/commit/6ae7759c62bb0583529fef7ede3bd2e43f23703a))
+* update release branch ([79bb145](https://github.com/lemachinarbo/MarkdownToFields/commit/79bb145c4900b3b7e3f04d0c78509ff5c4a69b72))
+
 ## v1.3.7
 
 - Refactor `renderConfigurationReference()` into smaller focused methods for easier maintenance.
