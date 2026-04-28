@@ -186,3 +186,15 @@ Never log:
 - No cheerleading.
 - No summaries unless explicitly requested.
 - If something is over-engineered, say so plainly.
+ 
+ ---
+ 
+ ## Core Module Patching Workflow
+
+When patching the core engine (`LetMeDown`), it is located in `/home/lemachi/projects/LetMeDown`.
+
+**Rules for Submodules:**
+- It must be edited in its respective directory under `/home/lemachi/projects/LetMeDown` ONLY.
+- **Never** edit it directly in the vendor copy (`/home/lemachi/projects/MarkdownToFields/vendor/lemachinarbo/letmedown/...`) except for quick verification.
+- After editing, copy the changed files back to the `vendor/` directory in the current project to test it with the documentation builder and module logic.
+- This maintains the canonical source of truth while allowing local integration testing.
