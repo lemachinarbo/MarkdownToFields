@@ -267,7 +267,9 @@ class AboutPage extends DefaultPage {
 }
 ```
 
-Logic, names, and folder structure are totally up to you.
+Logic, names, and folder structure are always totally up to you.
+
+One important detail: `contentSource()` is treated as the source of truth for the markdown file path. If you derive it from a mutable value like `$page->name`, the markdown filename will change when the page name changes. That means renaming a page can point the module to a new markdown file, and if that file does not exist yet, the module may create it for you. If you want the markdown filename to stay stable even when the page slug changes, return a stable filename instead of deriving it from `$page->name`.
 
 
 ### Getting the content
