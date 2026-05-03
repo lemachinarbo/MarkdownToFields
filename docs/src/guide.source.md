@@ -89,7 +89,7 @@ Choose [your favorite way](https://modules.processwire.com/install-uninstall/) t
 Using the module boils down to three simple steps:
 
 1. [Create a markdown](#setting-up-the-content) file for your page
-2. [Tag your content](#getting-the-content) with [content tags](#content-tags)
+2. [Tag your content](#content-tags) with [content tags](#content-tags)
 3. Extract and render it in your templates
 
 ### Setting up the content
@@ -221,7 +221,22 @@ One important detail: `contentSource()` is treated as the source of truth for th
 That means that, renaming a page, can point the module to a new markdown file, and if that file does not exist yet, the module may create it for you. If you want the markdown filename to stay stable even when the page slug changes, return a stable filename instead of deriving it from `$page->name`.
 
 
-### Getting the content
+## Working with content
+
+Once your markdown file is in place, this is the chapter that matters most in day-to-day usage.
+
+First, you need to understand `content()`, because that is the real content tree.
+Then you need to understand content tags, because they are what make that tree useful for your layout.
+And once that model is clear, `dataSet()` becomes the lazy rendering layer you reach for when you do not want to walk the whole tree by hand.
+
+So there are really two levels here:
+
+- `content()` plus content tags when you want to understand and shape the document
+- `dataSet()` when you want a lazier frontend-friendly projection of that same structure
+
+Start with `content()`. It is the real content API.
+
+### `content()`
 
 Finally, the fun part!  
 
@@ -256,9 +271,11 @@ class HomePage extends DefaultPage {
 /site/templates/home.php
 [[EXAMPLE:fig-accessing-content-of-this-markdown:php]]
 
-And that’s it! Now, the next step is to understand how to use the [content tags](#content-tags). (This link will move you just 2 lines below. It’s also known as the laziest link in markdown history ever.)
+And that’s it. Once you have `content()`, the next step is to understand how the markdown structure becomes accessible in PHP.
 
-## Content tags
+### Content tags
+
+`content()` becomes much more useful once the markdown is tagged with the structure your frontend actually needs.
 
 “Content tags” are markers you can add to make it easy to structure your document’s content. Imagine that, in your frontend, you’re planning to have a *hero* banner with a *title* and a *description*, and then a *body* section with some *content* and an *aside*:
 
@@ -745,7 +762,7 @@ Useful for prices, dates, version numbers, or any value that appears multiple ti
 `price: USD 6000`, you’ll need to trigger a [Manual Sync](#manual-syncing-markdown-files-to-processwire) for that change to be reflected in the rendered content (e.g. “Our premium package costs *USD 6000*”).
 
 
-## When walking the tree gets old
+### `dataSet()` the lazy way
 
 `content()` is the rich API, and it is the right tool when you want to navigate the document node by node.
 
@@ -768,7 +785,7 @@ Let’s use this tiny markdown example:
 
 [[EXAMPLE:fig-data-dataset-hero:md]]
 
-### `dataSet()` is the practical frontend shortcut
+#### `dataSet()` is the practical frontend shortcut
 
 `dataSet()` gives you a frontend-friendly version of the content structure, so you can stop walking the whole object tree by hand.
 
@@ -845,7 +862,7 @@ That is useful when your consumer wants plain text defaults instead of rendered 
 
 So the convenience is real, but it still respects the shape of the document.
 
-### `data()` is the plain contract underneath
+#### `data()` is the plain contract underneath
 
 `dataSet()` is built on top of `data()`.
 
@@ -911,7 +928,7 @@ But it should still not invent things like:
 
 If your component needs names that do not exist in markdown, shape them yourself on top of `content()`, `data()`, or `dataSet()`.
 
-### Patch values without rebuilding everything
+#### Patch values without rebuilding everything
 
 Another reason `dataSet()` exists is that frontend shaping often needs one or two tweaks, not a full rewrite.
 
@@ -963,11 +980,11 @@ $topics = $page->content()->topics
   ]);
 ```
 
-### Experimental helper API
+#### Experimental helper API
 
 If you want to treat `dataSet()` as a small shaping layer before rendering, these helpers are the main tools.
 
-#### `set()`
+##### `set()`
 
 Use `set()` when you want to replace one value directly, or transform the current value with a callback.
 
@@ -987,7 +1004,7 @@ $hero = $page->content()->hero
 
 Use dot notation for nested values such as `image.src`, `image.alt`, or `cta.href`.
 
-#### `merge()`
+##### `merge()`
 
 Use `merge()` when the target is already object-like and you want to keep what exists, but add or override a few keys.
 
@@ -1004,7 +1021,7 @@ $hero = $page->content()->hero
 
 That is usually cleaner than rebuilding the whole `image` structure yourself.
 
-#### `map()`
+##### `map()`
 
 Use `map()` when the value at a path is iterable and you want to transform each item.
 
@@ -1019,7 +1036,7 @@ $topics = $page->content()->topics
 
 That gives you a flatter component payload without nesting `array_map()` inside `set()`.
 
-#### `setArray()`, `value()`, and `toArray()`
+##### `setArray()`, `value()`, and `toArray()`
 
 Use `setArray()` when you want to apply several top-level values at once:
 
@@ -1048,7 +1065,7 @@ So the workflow becomes:
 - patch a few values with helpers
 - pass the object directly to the component, or export it back to an array
 
-### The real split
+#### The real split
 
 So the mental model becomes:
 
@@ -1065,7 +1082,9 @@ And the architecture rule stays the same:
 If you want the technical details of `data()` and `dataSet()`, see `data-contract.md` in the docs folder.
 
 
-## Images Management
+## Sync and integration
+
+### Images Management
 
 In ProcessWire, you usually create an image field, attach it to a template, and upload images there.
 With this module, you have an alternative.
@@ -1106,7 +1125,6 @@ It just outputs the original image URL. No variants. No compression. No magic.
 
 If you want resizing, crops, formats, etc., that’s your job. You can access the actual `ProcessWire\Pageimage` object via the `img` property:
 
-
 <a id="fig-image-with-field-tag"></a> **FIG:** Image with field tag
 
 ```markdown
@@ -1136,7 +1154,6 @@ We grow food and ideas in the city.
 
 Sweet. Isn't it?
 
-
 ### Configuration (in `site/config.php`):
 
 If you want to customize the folder where your source images are, use:
@@ -1157,8 +1174,7 @@ Imagine you are using an image `mypicture.jpg` and you want to replace it, BUT, 
 
 2. **"Image Resync" button** in the module settings.
 
-
-## Frontmatter
+### Frontmatter
 
 You can use frontmatter to sync ProcessWire fields from markdown.
 
@@ -1167,6 +1183,7 @@ You can use frontmatter to sync ProcessWire fields from markdown.
 title: The Urban Farm Studio.
 name: our-studio
 ---
+```
 
 By default, only the `title` and `name` fields are synced.
 
@@ -1185,7 +1202,6 @@ You can disable it with:
 **Note:**
 ProcessWire field support is ~~lame~~ basic for now, and only text-based fields are supported.
 We all have to start somewhere, right?
-
 
 ### Multi-Language Support
 
@@ -1221,7 +1237,6 @@ The filename comes from the **page name**. For the home page, if the page name i
 
 That’s why the default language folder is named `default`, and the Spanish home page is `es.md`: because that’s the name you set in [home page > settings](#fig-language-name).
 
-
 #### Improving the structure
 
 I prefer a structure where all content files are mirrored using same names:
@@ -1243,7 +1258,6 @@ To achieve it, all you have to do is:
 <a id="fig-language-code"></a> **FIG:** Code field on language template
 
 <img src="./language-code.png" width="700">
-
 
 2. Set the code in your language, for example `en` for default, `es` for Spanish.
 
@@ -1267,8 +1281,7 @@ class HomePage extends DefaultPage {
 
 ```
 
-
-## Keeping internal links updated
+### Keeping internal links updated
 
 Sometimes a markdown link points to another ProcessWire page:
 
@@ -1307,8 +1320,7 @@ The references are stored in the `md_markdown_links` field as an array of page I
 }
 ```
 
-
-## Config reference
+### Config reference
 
 This config goes in your `config.php` file. It controls how markdown is found, parsed, and synced.
 
@@ -1340,7 +1352,6 @@ $config->MarkdownToFields = [
 ];
 ```
 
-
 - **enabledTemplates**
   Lets you define the active templates in code instead of clicking around in the 'Enable templates' section of modules UI.
 
@@ -1368,7 +1379,6 @@ $config->MarkdownToFields = [
   If `true`, frontmatter keys are synced to page fields.
   If `false`, frontmatter keys are... not synced to page fields.
 
-
 - **includeFrontmatterFields**
   Extra frontmatter keys to sync.
   Use this for fields like `name` if you *want* markdown to control them.
@@ -1379,9 +1389,7 @@ $config->MarkdownToFields = [
 - **debug**
   Enable debug mode if `true`
 
-
-
-## Manual syncing markdown files to ProcessWire
+### Manual syncing markdown files to ProcessWire
 
 If you change **content only** (text, lists, etc.), you don’t need to do anything special.
 Those updates are reflected in the frontend automatically.

@@ -193,7 +193,7 @@ class DocBuilder {
         $mockPage = new Page();
         $content = new MarkdownContentView($mockPage, $rawContent);
         
-           $dumpObj = $this->resolveDumpObject($name, $content, $phpFile);
+        $dumpObj = $this->resolveDumpObject($name, $content, $phpFile);
 
         $actualTxt = $this->prettyPrint($dumpObj);
 
@@ -217,8 +217,21 @@ class DocBuilder {
                     die("  [ERROR] Example '{$name}' HTML output mismatch! Run with --update to approve changes.\n");
                 }
             }
-            echo "  [OK] {$name} (" . get_class($dumpObj) . ")\n";
+            echo "  [OK] {$name} (" . $this->describeDumpType($dumpObj) . ")\n";
         }
+    }
+
+    private function describeDumpType($value): string
+    {
+        if (is_object($value)) {
+            return get_class($value);
+        }
+
+        if (is_array($value)) {
+            return 'array';
+        }
+
+        return gettype($value);
     }
 
     private function resolveDumpObject(string $name, $content, ?string $phpFile)
