@@ -1259,6 +1259,316 @@ Useful for prices, dates, version numbers, or any value that appears multiple ti
 `price: USD 6000`, you’ll need to trigger a [Manual Sync](#manual-syncing-markdown-files-to-processwire) for that change to be reflected in the rendered content (e.g. “Our premium package costs *USD 6000*”).
 
 
+## When walking the tree gets old
+
+`content()` is the rich API, and it is the right tool when you want to navigate the document node by node.
+
+But in real frontend code, doing:
+
+```php
+$heroTitle = $content->hero->title->html;
+$heroIntro = $content->hero->intro->html;
+$heroImage = $content->hero->image->src;
+$heroCta = $content->hero->cta->href;
+```
+
+over and over can get old fast.
+
+For frontend work, the first thing to reach for is usually `dataSet()`.
+
+### `dataSet()` is the practical frontend shortcut
+
+`dataSet()` gives you a frontend-friendly version of the content structure, so you can stop walking the whole object tree by hand.
+
+If you want flat component props instead of passing one `$hero` object around, you can still do that from `dataSet()` and spread the final array into the render call:
+
+```php
+<?php namespace ProcessWire;
+  $hero = $page->content()->hero->dataSet('html');
+  $hero->set('imageSrc', $hero->image->src ?? null);
+
+  // Just an example: I like components to receive the exact props they use
+  // instead of one magical $hero object, and spread saves me from writing
+  // title => ..., intro => ..., imageSrc => ... one by one.
+  echo $this->render('components/hero', [
+    ...$hero->toArray(),
+  ]);
+?>
+```
+
+Then inside the component, you can consume plain props directly:
+
+```php
+<?php namespace ProcessWire;
+  echo $title;
+  echo $intro;
+  echo $imageSrc;
+?>
+```
+
+That is one of the main reasons `dataSet()` exists: it lets you prepare a useful payload for the view layer without rebuilding a custom array from scratch for every small section.
+
+So if your real question is "what do I use instead of walking `$content->hero->title->html` everywhere?", the answer is usually `dataSet()`, not `data()`.
+
+Example:
+
+```php
+<?php namespace ProcessWire;
+  $content = $page->content();
+
+  $hero = $content->hero->dataSet('html');
+
+  $title = $hero->title;
+  $intro = $hero->intro;
+  $imageSrc = $hero->image->src;
+?>
+```
+
+With `dataSet('html')`:
+
+- simple content nodes collapse to their `html` value
+- simple text-like fields become easier to consume
+- structural nodes such as images, links, and sections stay structured
+
+And `dataSet('text')` does the same kind of projection, but using `text` instead of `html`.
+
+```php
+<?php namespace ProcessWire;
+  $hero = $content->hero->dataSet('text');
+
+  $title = $hero->title;
+  $intro = $hero->intro;
+?>
+```
+
+That is useful when your consumer wants plain text defaults instead of rendered markup.
+
+So the convenience is real, but it still respects the shape of the document.
+
+### `data()` is the plain contract underneath
+
+`dataSet()` is built on top of `data()`.
+
+`data()` gives you the same content as plain arrays.
+
+That means:
+
+- `content()` = rich objects
+- `data()` = plain arrays
+- `dataSet()` = ProcessWire-friendly wrapper over `data()`
+
+Example:
+
+```php
+<?php namespace ProcessWire;
+  $content = $page->content();
+
+  $hero = $content->hero->data();
+
+  $titleHtml = $hero['title']['html'];
+  $introHtml = $hero['intro']['html'];
+  $imageSrc = $hero['image']['src'];
+?>
+```
+
+It is not less typing than `content()`. The point is just to get plain array data.
+
+Use `data()` when you specifically want:
+
+- plain PHP arrays instead of objects
+- a stable serialized structure you can inspect, dump, or pass around
+- structural metadata such as `key`, `area`, `items`, and `subsections`
+- the raw uncollapsed shape before `html` / `text` projection
+
+Most names come from your markdown, for example:
+
+- `title`
+- `description`
+- `cta`
+- `image`
+
+If those names exist, it is because your markdown already exposed them.
+
+`data()` only adds a few fixed helper keys such as:
+
+- `type`
+- `key`
+- `area`
+- `items`
+- `subsections`
+
+and content keys when they make sense, such as:
+
+- `html`
+- `text`
+- `markdown`
+- `href`
+- `src`
+- `alt`
+
+But it should still not invent things like:
+
+- `card`
+- `header`
+- `settings`
+- `content`
+
+If your component needs names that do not exist in markdown, shape them yourself on top of `content()`, `data()`, or `dataSet()`.
+
+### Patch values without rebuilding everything
+
+Another reason `dataSet()` exists is that frontend shaping often needs one or two tweaks, not a full rewrite.
+
+**Note:** The helper API on top of `dataSet()` is still experimental.
+The idea is stable, but the exact helper surface may still evolve as real-world usage gets clearer.
+
+On top of the raw wrapping, `dataSet()` gives you a small helper API for that job:
+
+- `html()`
+- `text()`
+- `project()`
+- `set()`
+- `setArray()`
+- `merge()`
+- `map()`
+- `value()`
+- `toArray()`
+
+For example:
+
+```php
+$hero = $page->content()->hero
+  ->dataSet('html')
+  ->set('theme', 'dark')
+  ->set('image.alt', 'Urban farm hero image');
+```
+
+Or if you want to merge an enriched image payload:
+
+```php
+$heroImage = $this->image($content->hero->image->src ?? '', [
+  'sizes' => '(min-width: 1280px) 500px, 100vw',
+  'lazy' => false,
+]);
+
+$hero = $page->content()->hero
+  ->dataSet()
+  ->merge('image', $heroImage);
+```
+
+Or if you want to transform a list:
+
+```php
+$topics = $page->content()->topics
+  ->dataSet()
+  ->map('list.items', fn ($item) => [
+    'title' => $item->text ?? '',
+    'href' => $item->links[0]->href ?? null,
+  ]);
+```
+
+### Experimental helper API
+
+If you want to treat `dataSet()` as a small shaping layer before rendering, these helpers are the main tools.
+
+#### `set()`
+
+Use `set()` when you want to replace one value directly, or transform the current value with a callback.
+
+```php
+$hero = $page->content()->hero
+  ->dataSet('html')
+  ->set('theme', 'dark')
+  ->set('image.alt', 'Hero image');
+```
+
+```php
+$hero = $page->content()->hero
+  ->dataSet('html')
+  ->set('title', fn ($title) => strtoupper((string) $title))
+  ->set('image.src', fn ($src) => $this->image($src, ['image-set' => true]));
+```
+
+Use dot notation for nested values such as `image.src`, `image.alt`, or `cta.href`.
+
+#### `merge()`
+
+Use `merge()` when the target is already object-like and you want to keep what exists, but add or override a few keys.
+
+```php
+$heroImage = $this->image($content->hero->image->src ?? '', [
+  'sizes' => '(min-width: 1280px) 500px, 100vw',
+  'lazy' => false,
+]);
+
+$hero = $page->content()->hero
+  ->dataSet()
+  ->merge('image', $heroImage);
+```
+
+That is usually cleaner than rebuilding the whole `image` structure yourself.
+
+#### `map()`
+
+Use `map()` when the value at a path is iterable and you want to transform each item.
+
+```php
+$topics = $page->content()->topics
+  ->dataSet()
+  ->map('list.items', fn ($item) => [
+    'title' => $item->text ?? '',
+    'href' => $item->links[0]->href ?? null,
+  ]);
+```
+
+That gives you a flatter component payload without nesting `array_map()` inside `set()`.
+
+#### `setArray()`, `value()`, and `toArray()`
+
+Use `setArray()` when you want to apply several top-level values at once:
+
+```php
+$hero = $page->content()->hero
+  ->dataSet('html')
+  ->setArray([
+    'theme' => 'dark',
+    'eyebrow' => 'Featured',
+  ]);
+```
+
+And if you want the final plain PHP structure again, export it with `value()` or `toArray()`:
+
+```php
+$heroArray = $page->content()->hero
+  ->dataSet('html')
+  ->set('theme', 'dark')
+  ->toArray();
+```
+
+So the workflow becomes:
+
+- start from markdown structure
+- project with `html` or `text` if useful
+- patch a few values with helpers
+- pass the object directly to the component, or export it back to an array
+
+### The real split
+
+So the mental model becomes:
+
+- `content()` = explore and control
+- `data()` = same structure, as plain PHP
+- `dataSet()` = same structure, but friendlier to patch and consume
+
+And the architecture rule stays the same:
+
+- `dataSet()` is a convenience layer
+- `dataSet()` is not a hidden view-model framework
+- if your frontend needs component-specific semantics, shape them explicitly yourself
+
+If you want the technical details of `data()` and `dataSet()`, see `data-contract.md` in the docs folder.
+
+
 ## Images Management
 
 In ProcessWire, you usually create an image field, attach it to a template, and upload images there.
