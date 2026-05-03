@@ -122,19 +122,13 @@ By default when installed, the module doesn’t know in which templates you want
 
 What enabling a template actually does is:
 
-- add a markdown tab with a textfield you can use to edit the raw markdown (and 2 extra fields we use internally to map links and hashes, but you can ignore those)
+- add internal tracking fields (a hash and a link index) for sync integrity
 - let the admin edit form sync content for pages using that template
 - let the save hooks run for those pages
 
+> For a rich markdown editing experience, use [MarkdownToFieldsFrontEditor](https://github.com/lemachinarbo/MarkdownToFieldsFrontEditor).
 
-Also, if you uncheck a template, the fields to edit the content and the markdown will be removed. But don’t worry, you won’t lose any content. Remember, your source of truth is the markdown file. Nice.
-
-<a id="fig-markdown-editor-tab"></a> **FIG:** Markdown editor tab
-
-<img src="./editor-markdown.png" width="700">
-
-
->Note: Editing a raw markdown file isn't the best experience for all users. But I got you covered: For a rich markdown editing experience, use [MarkdownToFieldsFrontEditor](https://github.com/lemachinarbo/MarkdownToFieldsFrontEditor).
+Also, if you uncheck a template, the internal tracking fields will be removed from that template. But don’t worry, you won’t lose any content. Remember, your source of truth is the markdown file. Nice.
 
 
 #### Automatic generation of markdown files

@@ -17,7 +17,7 @@ MarkdownToFields is a ProcessWire module that allows using Markdown files as the
 - **Naming Convention**: Files are mapped by page name (e.g., `about` -> `about.md`).
 - **Lazy Mapping**: Can be customized per page class by overriding the `contentSource()` method.
 - **Auto-Provisioning**: Automatically generates a new `.md` file when a page using an enabled template is created.
-- **Editor Sync**: Adds a "Markdown" tab to the ProcessWire page editor for raw editing which stays in sync with the physical file.
+- **Editor Sync**: Stays in sync with the physical `.md` file on each page save and page open. Editing is handled by [MarkdownToFieldsFrontEditor](https://github.com/lemachinarbo/MarkdownToFieldsFrontEditor).
 
 ## Requirements
 

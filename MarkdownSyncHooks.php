@@ -8,23 +8,6 @@ class MarkdownSyncHooks
 {
   private static array $pendingLinkedPageRefresh = [];
 
-  /** Disable raw markdown field in edit form. */
-  public static function lockRawMarkdownField(HookEvent $event): void
-  {
-    $form = $event->return;
-    if (!$form) {
-      return;
-    }
-
-    $markdown = $form->get('md_markdown');
-    if (!$markdown) {
-      return;
-    }
-
-    $markdown->removeAttr('disabled');
-    $markdown->description = 'Edit markdown directly here';
-  }
-
   /** Sync template fields after module config save. */
   public static function handleSaveConfig(HookEvent $event): void
   {
@@ -67,43 +50,6 @@ class MarkdownSyncHooks
 
     $documentField = MarkdownConfig::getMarkdownField($page);
     if (!$documentField) {
-      return;
-    }
-
-    // Admin script registration moved to module init (assumes properly installed module).
-    if ($event->wire('input')->requestMethod('POST')) {
-      return;
-    }
-
-    $pendingBody = MarkdownSessionManager::consumePendingBody($page, $documentField);
-    $pendingFields = MarkdownSessionManager::consumePendingFields($page);
-
-    if ($pendingBody !== null || $pendingFields) {
-      $page->of(false);
-      $defaultCode = MarkdownLanguageResolver::getDefaultLanguageCode($page);
-
-      if ($pendingBody !== null) {
-        $values = $pendingBody;
-        if (!is_array($values)) {
-          $values = [$defaultCode => (string) $pendingBody];
-        }
-
-        MarkdownFieldSync::applyLanguageValues($page, $documentField, $values);
-      }
-
-      foreach ($pendingFields as $field => $value) {
-        if ($field !== 'title' && !$page->hasField($field)) {
-          continue;
-        }
-
-        $values = $value;
-        if (!is_array($values)) {
-          $values = [$defaultCode => (string) $value];
-        }
-
-        MarkdownFieldSync::applyLanguageValues($page, $field, $values);
-      }
-
       return;
     }
 

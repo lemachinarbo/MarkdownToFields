@@ -49,11 +49,8 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   private static bool $uninstalling = false;
   
   private array $fieldDefs = [
-    'md_markdown_tab' => ['FieldtypeFieldsetTabOpen', 'Markdown'],
-    'md_markdown' => ['FieldtypeTextarea', 'Markdown editor'],
     'md_markdown_hash' => ['FieldtypeText', 'Markdown hash'],
     'md_link_index' => ['FieldtypeTextarea', 'Markdown links'],
-    'md_markdown_tab_END' => ['FieldtypeFieldsetClose', 'Close Markdown tab'],
   ];
 
   /** Provide module metadata to ProcessWire. */
@@ -84,7 +81,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $this->addHookBefore('Pages::saveReady', MarkdownSyncHooks::class . '::trackLinkedPageSaveReady');
     $this->addHook('Pages::saveReady', MarkdownSyncHooks::class . '::handleSaveReady');
     $this->addHookAfter('Pages::saved', MarkdownSyncHooks::class . '::handleLinkedPageSaved');
-    $this->addHookAfter('ProcessPageEdit::buildForm', MarkdownSyncHooks::class . '::lockRawMarkdownField');
     $this->addHookAfter('Modules::refresh', MarkdownSyncHooks::class . '::handleModulesRefresh');
     $this->addHookAfter('Modules::saveConfig', MarkdownSyncHooks::class . '::handleSaveConfig');
   }
@@ -314,7 +310,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       'linkSync' => array_key_exists('linkSync', $mdConfig)
         ? (bool) $mdConfig['linkSync']
         : (bool) ($moduleConfig['linkSync'] ?? false),
-      'markdownField' => $mdConfig['markdownField'] ?? 'md_markdown',
       'hashField' => $mdConfig['hashField'] ?? 'md_markdown_hash',
       'sourcePath' => $mdConfig['sourcePath'] ?? 'content/',
       'imageBaseUrl' => $mdConfig['imageBaseUrl'] ?? null,
@@ -353,10 +348,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $html .= "\n";
     $html .= "  // templates\n";
     $html .= "  'enabledTemplates' => ['home', 'about'],\n";
-    $html .= "\n";
-    $html .= "  // fields\n";
-    $html .= "  'markdownField' => 'md_markdown',\n";
-    $html .= "  'hashField' => 'md_markdown_hash',\n";
+    $html .= "  // sync\n";
     $html .= "  'linkSync' => false,\n";
     $html .= "\n";
     $html .= "  // content\n";
@@ -389,8 +381,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   private function isDefaultSetting(string $key, string &$display): bool {
     $isDefault = false;
     if ($key === 'linkSync' && $display === 'false') {
-      $isDefault = true;
-    } elseif ($key === 'markdownField' && $display === 'md_markdown') {
       $isDefault = true;
     } elseif ($key === 'hashField' && $display === 'md_markdown_hash') {
       $isDefault = true;
@@ -643,13 +633,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $hasLanguages = $modules->isInstalled('LanguageSupport');
 
     $resolveType = function (string $name, string $defaultType) use ($hasLanguages, $modules) {
-      // md_markdown should be language-aware when languages are installed
-      if ($hasLanguages && $name === 'md_markdown') {
-        if ($defaultType === 'FieldtypeTextarea') {
-          return $modules->get('FieldtypeTextareaLanguage');
-        }
-      }
-
       // md_markdown_hash and md_link_index should remain single-language JSON/text
       if (in_array($name, ['md_markdown_hash', 'md_link_index'], true)) {
         return $modules->get($defaultType);
@@ -670,11 +653,6 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
         $f->label = $label;
         $f->tags = 'markdown';
         
-        // Configure markdown textarea with larger editor
-        if ($name === 'md_markdown') {
-          $f->rows = 40;
-        }
-
         if ($name === 'md_link_index') {
           $f->rows = 8;
         }

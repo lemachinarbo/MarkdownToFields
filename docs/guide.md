@@ -175,19 +175,13 @@ By default when installed, the module doesn’t know in which templates you want
 
 What enabling a template actually does is:
 
-- add a markdown tab with a textfield you can use to edit the raw markdown (and 2 extra fields we use internally to map links and hashes, but you can ignore those)
+- add internal tracking fields (a hash and a link index) for sync integrity
 - let the admin edit form sync content for pages using that template
 - let the save hooks run for those pages
 
+> For a rich markdown editing experience, use [MarkdownToFieldsFrontEditor](https://github.com/lemachinarbo/MarkdownToFieldsFrontEditor).
 
-Also, if you uncheck a template, the fields to edit the content and the markdown will be removed. But don’t worry, you won’t lose any content. Remember, your source of truth is the markdown file. Nice.
-
-<a id="fig-markdown-editor-tab"></a> **FIG 4:** Markdown editor tab
-
-<img src="./editor-markdown.png" width="700">
-
-
->Note: Editing a raw markdown file isn't the best experience for all users. But I got you covered: For a rich markdown editing experience, use [MarkdownToFieldsFrontEditor](https://github.com/lemachinarbo/MarkdownToFieldsFrontEditor).
+Also, if you uncheck a template, the internal tracking fields will be removed from that template. But don’t worry, you won’t lose any content. Remember, your source of truth is the markdown file. 
 
 
 #### Automatic generation of markdown files
@@ -203,7 +197,7 @@ You can change the `content folder` (where your markdown files are stored) using
 
 For example, to use `site/templates/markdown` you can do:
 
-<a id="fig-custom-content-folder-source-path"></a> **FIG 5:** Custom content folder source path
+<a id="fig-custom-content-folder-source-path"></a> **FIG 4:** Custom content folder source path
 
 ```php
 <?php
@@ -214,7 +208,7 @@ $config->MarkdownToFields = [
 
 `site/` is used as the root by default, but you’re not limited to it. You can point outside the site folder if you want. For example, `../src/content` will resolve to:
 
-<a id="fig-path-outside-site-folder"></a> **FIG 6:** Path outside site folder
+<a id="fig-path-outside-site-folder"></a> **FIG 5:** Path outside site folder
 
 ```markdown
 site
@@ -230,7 +224,7 @@ It’s obvious, but worth to mention it.
 
 The module uses `contentSource()` to get your markdown files, and by default uses `$page->name . '.md'` (e.g. `about.md` for page `about`). If you want something different, you can override the value in your Page Class:
 
-<a id="fig-customizing-content-file-path-page-class"></a> **FIG 7:** Customizing the content file path in a Page Class
+<a id="fig-customizing-content-file-path-page-class"></a> **FIG 6:** Customizing the content file path in a Page Class
 
 ```php
 <?php
@@ -243,7 +237,7 @@ class AboutPage extends DefaultPage {
 
 Or, if multiple pages use the same template:
 
-<a id="fig-dynamic-content-path-based-on-page-name"></a> **FIG 8:** Dynamic content file path based on page name
+<a id="fig-dynamic-content-path-based-on-page-name"></a> **FIG 7:** Dynamic content file path based on page name
 
 ```php
 <?php
@@ -256,7 +250,7 @@ class AboutPage extends DefaultPage {
 
 Alternatively, if you want to group pages into a custom directory without losing the automatic page-name resolution, call `$this->defaultContentSource()`:
 
-<a id="fig-dynamic-content-path-with-default"></a> **FIG 9:** Dynamic content file path combining directories with default rules
+<a id="fig-dynamic-content-path-with-default"></a> **FIG 8:** Dynamic content file path combining directories with default rules
 
 ```php
 <?php
@@ -276,12 +270,10 @@ That means that, renaming a page, can point the module to a new markdown file, a
 
 ## Working with content
 
-Finally, the fun part!  
+Once your markdown file is in place, this is the chapter that matters most in day-to-day usage.
 
-To represent the content in your FrontEnd:
 First, you need to understand `content()`, because that is the real content tree.
 Then you need to understand content tags, because they are what make that tree useful for your layout.
-
 And once that model is clear, `dataSet()` becomes the lazy rendering layer you reach for when you do not want to walk the whole tree by hand.
 
 So there are really two levels here:
@@ -289,14 +281,17 @@ So there are really two levels here:
 - `content()` plus content tags when you want to understand and shape the document
 - `dataSet()` when you want a lazier frontend-friendly projection of that same structure
 
+Start with `content()`. It is the real content API.
 
 ### `content()`
+
+Finally, the fun part!  
 
 Once you have a markdown file, a template, and a page, the next step is to access the Markdown content to display it on the frontend. To let your templates access that content, you need to add the `MarkdownContent` trait to your [default PageClass ➚](https://processwire.com/blog/posts/pw-3.0.152/#new-ability-to-specify-custom-page-classes).
 
 This trait adds the `content()` method to your Page class, so any template that extends `DefaultPage` can read markdown content using `$page->content()`.
 
-<a id="fig-accessing-content-of-this-markdown"></a> **FIG 10:** Accessing the content of [this markdown](#fig-markdown-example)
+<a id="fig-accessing-content-of-this-markdown"></a> **FIG 9:** Accessing the content of [this markdown](#fig-markdown-example)
 
 /site/classes/DefaultPage.php
 ```php
@@ -397,7 +392,7 @@ Each section is represented by a `Section` object with these members:
 | `blocksWithSubsections()` | `method` | Return a read-only projection of section blocks with named subsections merged into the hierarchy. Subsection blocks are appended as children of the first top-level block. This does not mutate the canonical structure or any existing content values. / |
 
 
-<a id="fig-markdown-with-two-sections"></a> **FIG 11:** Markdown with two sections
+<a id="fig-markdown-with-two-sections"></a> **FIG 10:** Markdown with two sections
 
 ```markdown
 <!-- section:hello -->
@@ -418,7 +413,7 @@ Intro text for hello section.
 Short bye text.
 ```
 
-<a id="fig-rendering-sections"></a> **FIG 12:** Rendering sections
+<a id="fig-rendering-sections"></a> **FIG 11:** Rendering sections
 
 ```php
 <?php
@@ -448,7 +443,7 @@ Starting a new `<!-- section:foo -->` implicitly closes the previous section. Al
 If content appears **before the first section tag**, it is collected into an **orphan section**.
 This orphan section has no name and is accessible by index.
 
-<a id="fig-content-without-section"></a> **FIG 13:** Content without a section
+<a id="fig-content-without-section"></a> **FIG 12:** Content without a section
 
 ```markdown
 # No content tag before this title
@@ -462,7 +457,7 @@ Intro text outside any section.
 Short text.
 ```
 
-<a id="fig-rendering-orphan-section"></a> **FIG 14:** Rendering an orphan section
+<a id="fig-rendering-orphan-section"></a> **FIG 13:** Rendering an orphan section
 
 ```php
 <?php
@@ -480,7 +475,7 @@ namespace ProcessWire;
 
 The section object also gives you access to any block field of subsection inside. For example if we add an `<!-- intro -->` [tag field](#field-tags) and a `<!-- sub:foo -->` [subsection](#subsections) to the `<!-- section:hello -->`:
 
-<a id="fig-section-with-tag-field-subsection"></a> **FIG 15:** Section with a tag field and a subsection
+<a id="fig-section-with-tag-field-subsection"></a> **FIG 14:** Section with a tag field and a subsection
 
 ```markdown
 <!-- section:hello -->
@@ -535,7 +530,7 @@ A `subsection` captures all content until the next `subsection` or `section` tag
 
 Example:
 
-<a id="fig-content-with-subsections"></a> **FIG 16:** Content with subsections
+<a id="fig-content-with-subsections"></a> **FIG 15:** Content with subsections
 
 ```markdown
 <!-- section:columns -->
@@ -563,7 +558,7 @@ John manages our technology and automation.
 Always ready to help troubleshoot or optimize a setup!
 ```
 
-<a id="fig-rendering-html-subsections"></a> **FIG 17:** Rendering HTML of subsections
+<a id="fig-rendering-html-subsections"></a> **FIG 16:** Rendering HTML of subsections
 
 ```php
 <?php
@@ -596,7 +591,7 @@ Subsections are returned as `Section` objects with the same core properties:
 | `blocksWithSubsections()` | `method` | Return a read-only projection of section blocks with named subsections merged into the hierarchy. Subsection blocks are appended as children of the first top-level block. This does not mutate the canonical structure or any existing content values. / |
 
 
-<a id="fig-section-object-columns-left"></a> **FIG 18:** Example of section object for `$jane` aka: `$page->content()->columns->left`
+<a id="fig-section-object-columns-left"></a> **FIG 17:** Example of section object for `$jane` aka: `$page->content()->columns->left`
 
 ```php
 ProcessWire\MarkdownSectionView
@@ -627,7 +622,7 @@ Each heading starts a **block**.
 - A higher-level heading becomes a **parent block**
 - Lower-level headings under it become **child blocks**
 
-<a id="fig-content-with-blocks-and-children"></a> **FIG 19:** Content example with blocks and childs
+<a id="fig-content-with-blocks-and-children"></a> **FIG 18:** Content example with blocks and childs
 
 ```markdown
 <!-- section:about -->
@@ -664,7 +659,7 @@ This produces **two top-level blocks** inside the `about` section:
 
 To access them you can use:
 
-<a id="fig-getting-blocks-of-section"></a> **FIG 20:** Getting the blocks of a section
+<a id="fig-getting-blocks-of-section"></a> **FIG 19:** Getting the blocks of a section
 
 ```php
 <?php
@@ -682,7 +677,7 @@ namespace ProcessWire;
 
 Or, you can also access blocks by index:
 
-<a id="fig-getting-section-blocks-by-index"></a> **FIG 21:** Getting section and blocks by index
+<a id="fig-getting-section-blocks-by-index"></a> **FIG 20:** Getting section and blocks by index
 
 ```php
 <?php
@@ -722,7 +717,7 @@ namespace ProcessWire;
 
 
 
-<a id="fig-block-object-about"></a> **FIG 22:** Output of Block object `$about` from the markdown in [Content example with blocks and childs](#fig-content-with-blocks-and-children) 
+<a id="fig-block-object-about"></a> **FIG 21:** Output of Block object `$about` from the markdown in [Content example with blocks and childs](#fig-content-with-blocks-and-children) 
 
 
 ```php
@@ -775,7 +770,7 @@ ProcessWire\MarkdownBlockView
 Any heading under another becomes a child block.  
 The hierarchy follows your markdown structure, giving you a tree of blocks you can traverse.
 
-<a id="fig-accessing-block-children"></a> **FIG 23:** Accessing block children and sub-children
+<a id="fig-accessing-block-children"></a> **FIG 22:** Accessing block children and sub-children
 
 ```php
 <?php
@@ -798,7 +793,7 @@ They’re stored as collections, so you can grab *all* images, *all* links, and 
 
 Here’s a simple markdown example:
 
-<a id="fig-content-with-lists-images-paragraphs-links"></a> **FIG 24:** Content with lists, images, paragraphs, and links
+<a id="fig-content-with-lists-images-paragraphs-links"></a> **FIG 23:** Content with lists, images, paragraphs, and links
 
 ```markdown
 # Digital Studio
@@ -818,7 +813,7 @@ We are based in [Chicago](#), but we also have an office in [NY](#).
 
 Each block object contains a `HeadingElement` and the `ContentElementCollection` for lists, images, paragraphs, and links:
 
-<a id="fig-getting-elements-from-block"></a> **FIG 25:** Getting elements from a block
+<a id="fig-getting-elements-from-block"></a> **FIG 24:** Getting elements from a block
 
 ```php
 <?php
@@ -840,7 +835,7 @@ namespace ProcessWire;
 
 You can also drill down to specific elements:
 
-<a id="fig-accessing-specific-elements"></a> **FIG 26:** Accessing specific elements
+<a id="fig-accessing-specific-elements"></a> **FIG 25:** Accessing specific elements
 
 ```php
 <?php
@@ -873,7 +868,7 @@ This is the main heading that defines the block’s title and level.
 
 
 
-<a id="fig-heading-output"></a> **FIG 27:** Output of heading $heading from [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
+<a id="fig-heading-output"></a> **FIG 26:** Output of heading $heading from [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
 ```php
 LetMeDown\HeadingElement
   text: 'Digital Studio'
@@ -901,7 +896,7 @@ Each paragraph is returned as a `ContentElement` object with both plain text and
 
 
 
-<a id="fig-accessing-paragraphs-markdown-example"></a> **FIG 28:** Accessing paragraphs from the markdown example in [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
+<a id="fig-accessing-paragraphs-markdown-example"></a> **FIG 27:** Accessing paragraphs from the markdown example in [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
 
 ```php
 <?php
@@ -919,7 +914,7 @@ namespace ProcessWire;
 ?>
 ```
 
-<a id="fig-paragraph-contentelement-example"></a> **FIG 29:** Paragraph `ContentElement` example
+<a id="fig-paragraph-contentelement-example"></a> **FIG 28:** Paragraph `ContentElement` example
 
 ```php
 LetMeDown\ContentElement
@@ -941,7 +936,7 @@ Each list is returned as a `ContentElement` object with its text, rendered HTML,
 | `items`  | array  | Individual list items as strings       |
 | `data`   | array  | Raw list metadata                      |
 
-<a id="fig-accessing-lists-markdown-example"></a> **FIG 30:** Accessing lists from the [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
+<a id="fig-accessing-lists-markdown-example"></a> **FIG 29:** Accessing lists from the [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
 
 ```php
 <?php
@@ -963,7 +958,7 @@ namespace ProcessWire;
 ?>
 ```
 
-<a id="fig-list-contentelement-example"></a> **FIG 31:** List `ContentElement` example
+<a id="fig-list-contentelement-example"></a> **FIG 30:** List `ContentElement` example
 
 ```php
 LetMeDown\ContentElement
@@ -992,7 +987,7 @@ Each link is returned as a `ContentElement` object with its text, rendered HTML,
 | `href`   | string | Link destination URL       |
 | `data`   | array  | Raw link metadata          |
 
-<a id="fig-accessing-links-markdown-example"></a> **FIG 32:** Accessing links from the [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
+<a id="fig-accessing-links-markdown-example"></a> **FIG 31:** Accessing links from the [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
 
 ```php
 <?php
@@ -1013,7 +1008,7 @@ namespace ProcessWire;
 ?>
 ```
 
-<a id="fig-link-contentelement-example"></a> **FIG 33:** Link `ContentElement` example
+<a id="fig-link-contentelement-example"></a> **FIG 32:** Link `ContentElement` example
 
 ```php
 LetMeDown\ContentElement
@@ -1039,7 +1034,7 @@ Each entry represents one image tag, giving you access to its label, rendered HT
 | `alt`    | string    | Alternative text             |
 | `img`    | PageImage | ProcessWire Pageimage object |
 
-<a id="fig-accessing-images-markdown-example"></a> **FIG 34:** Accessing images from the [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
+<a id="fig-accessing-images-markdown-example"></a> **FIG 33:** Accessing images from the [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links)
 
 ```php
 <?php
@@ -1062,7 +1057,7 @@ namespace ProcessWire;
 ?>
 ```
 
-<a id="fig-image-contentelement-example"></a> **FIG 35:** Image `ContentElement` example
+<a id="fig-image-contentelement-example"></a> **FIG 34:** Image `ContentElement` example
 
 ```php
 LetMeDown\ContentElement
@@ -1083,7 +1078,7 @@ That’s where **field tags** shine. You drop a tag before any element, and… y
 
 In the [Digital Studio markdown example](#fig-content-with-lists-images-paragraphs-links) let’s add a section tag `<!-- section:intro -->` and tag the lists with `<!-- brands -->` and `<!-- offices -->`:
 
-<a id="fig-content-with-field-tags"></a> **FIG 36:** Content with field tags
+<a id="fig-content-with-field-tags"></a> **FIG 35:** Content with field tags
 
 ```markdown
 <!-- section:intro -->
@@ -1106,7 +1101,7 @@ We are based in [Chicago](#), but we also have an office in [NY](#).
 
 Now the lists are easy to grab:
 
-<a id="fig-accessing-field-tagged-elements"></a> **FIG 37:** Accessing field-tagged elements
+<a id="fig-accessing-field-tagged-elements"></a> **FIG 36:** Accessing field-tagged elements
 
 ```php
 <?php namespace ProcessWire;
@@ -1125,7 +1120,7 @@ But if you place a field tag before a list, you’ll get the **entire list**, no
 
 So what the tag captures depends on what comes right after it.
 
-<a id="fig-field-tags-before-paragraphs-list"></a> **FIG 38:** Field tags before paragraphs and a list
+<a id="fig-field-tags-before-paragraphs-list"></a> **FIG 37:** Field tags before paragraphs and a list
 
 ```markdown
 # Hello
@@ -1178,7 +1173,7 @@ The wrapper is the same, but `type` and `data` depend on what you tagged.
 
 Example:
 
-<a id="fig-fielddata-offices"></a> **FIG 39:** FieldData object for the [`offices`](fig-content-with-field-tags) field tag
+<a id="fig-fielddata-offices"></a> **FIG 38:** FieldData object for the [`offices`](fig-content-with-field-tags) field tag
 
 ```php
 <?php namespace ProcessWire;
@@ -1217,7 +1212,7 @@ They collect everything between `<!-- name... -->` and `<!-- / -->`.
 
 Containers also **auto-close** if a new section, subsection, or another field container starts.
 
-<a id="fig-using-field-containers"></a> **FIG 40:** Using field containers
+<a id="fig-using-field-containers"></a> **FIG 39:** Using field containers
 
 ```markdown
 <!-- section:hello -->
@@ -1240,7 +1235,7 @@ Paragraph four.
 Paragraph five.
 ```
 
-<a id="fig-accessing-container-content"></a> **FIG 41:** Accessing container content
+<a id="fig-accessing-container-content"></a> **FIG 40:** Accessing container content
 
 ```php
 <?php namespace ProcessWire;
@@ -1257,7 +1252,7 @@ Sometimes you want a value from frontmatter to appear in your content body, and 
 
 Use `<!-- field:name -->` followed by emphasized text (`*value*` or `__value__`) to create a binding. When you update the frontmatter value (or the corresponding ProcessWire field), the emphasized text updates automatically in both directions.
 
-<a id="fig-frontmatter-field-binder"></a> **FIG 42:** A value of frontmatter represented in the content using the  field binder
+<a id="fig-frontmatter-field-binder"></a> **FIG 41:** A value of frontmatter represented in the content using the  field binder
 
 ```markdown
 ---
@@ -1297,7 +1292,7 @@ For frontend work, the first thing to reach for is usually `dataSet()`.
 
 Let’s use this tiny markdown example:
 
-<a id="fig-data-dataset-hero-markdown"></a> **FIG 43:** Small markdown example for `data()` and `dataSet()`
+<a id="fig-data-dataset-hero-markdown"></a> **FIG 42:** Small markdown example for `data()` and `dataSet()`
 
 ```markdown
 <!-- section:hero -->
@@ -1344,9 +1339,9 @@ Then inside the component, you can consume plain props directly:
 
 That is one of the main reasons `dataSet()` exists: it lets you prepare a useful payload for the view layer without rebuilding a custom array from scratch for every small section.
 
-So if your real question is "what do I use instead of walking `$content->hero->title->html` everywhere?", the answer is usually `dataSet()`.
+So if your real question is "what do I use instead of walking `$content->hero->title->html` everywhere?", the answer is usually `dataSet()`, not `data()`.
 
-<a id="fig-dataset-html-hero"></a> **FIG 44:** Using `dataSet('html')`
+<a id="fig-dataset-html-hero"></a> **FIG 43:** Using `dataSet('html')`
 
 ```php
 <?php
@@ -1360,7 +1355,7 @@ namespace ProcessWire;
 ?>
 ```
 
-<a id="fig-dataset-html-hero-dump"></a> **FIG 45:** Dump of `$content->hero->dataSet('html')`
+<a id="fig-dataset-html-hero-dump"></a> **FIG 44:** Dump of `$content->hero->dataSet('html')`
 
 ```php
 ProcessWire\MarkdownDataSet
@@ -1448,7 +1443,7 @@ That means:
 
 Example:
 
-<a id="fig-data-hero"></a> **FIG 46:** Using `data()`
+<a id="fig-data-hero"></a> **FIG 45:** Using `data()`
 
 ```php
 <?php
@@ -1462,7 +1457,7 @@ namespace ProcessWire;
 ?>
 ```
 
-<a id="fig-data-hero-dump"></a> **FIG 47:** Dump of `$content->hero->data()`
+<a id="fig-data-hero-dump"></a> **FIG 46:** Dump of `$content->hero->data()`
 
 ```php
 array (9)
@@ -1753,7 +1748,7 @@ It just outputs the original image URL. No variants. No compression. No magic.
 
 If you want resizing, crops, formats, etc., that’s your job. You can access the actual `ProcessWire\Pageimage` object via the `img` property:
 
-<a id="fig-image-with-field-tag"></a> **FIG 48:** Image with field tag
+<a id="fig-image-with-field-tag"></a> **FIG 47:** Image with field tag
 
 ```markdown
 ---
@@ -1769,7 +1764,7 @@ We grow food and ideas in the city.
 ![Our farm](01.jpg)
 ```
 
-<a id="fig-getting-pageimage-object"></a> **FIG 49:** Getting the `ProcessWire\Pageimage` object
+<a id="fig-getting-pageimage-object"></a> **FIG 48:** Getting the `ProcessWire\Pageimage` object
 
 ```php
 <?php namespace ProcessWire;
@@ -1809,7 +1804,7 @@ You can use frontmatter to sync ProcessWire fields from markdown.
 ```markdown
 ---
 title: The Urban Farm Studio.
-name: studio
+name: our-studio
 ---
 ```
 
@@ -1842,7 +1837,7 @@ content/
 
 When you add a new language (let’s say `es`), and you set your home page name to `es`:
 
-<a id="fig-language-name"></a> **FIG 50:** Example of language page name
+<a id="fig-language-name"></a> **FIG 49:** Example of language page name
 
 <img src="./language-name.png" width="700">
 
@@ -1883,13 +1878,13 @@ To achieve it, all you have to do is:
 
 1. Add a simple `code` text field to the template of languages.
 
-<a id="fig-language-code"></a> **FIG 51:** Code field on language template
+<a id="fig-language-code"></a> **FIG 50:** Code field on language template
 
 <img src="./language-code.png" width="700">
 
 2. Set the code in your language, for example `en` for default, `es` for Spanish.
 
-<a id="fig-language-default-code"></a> **FIG 52:** Default language code name
+<a id="fig-language-default-code"></a> **FIG 51:** Default language code name
 
 <img src="./language-default-code.png" width="700">
 
@@ -1952,7 +1947,7 @@ The references are stored in the `md_markdown_links` field as an array of page I
 
 This config goes in your `config.php` file. It controls how markdown is found, parsed, and synced.
 
-<a id="fig-example-config-file"></a> **FIG 53:** Example config file with all properties
+<a id="fig-example-config-file"></a> **FIG 52:** Example config file with all properties
 
 ```php
 <?php

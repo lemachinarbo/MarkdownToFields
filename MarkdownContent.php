@@ -91,10 +91,8 @@ trait MarkdownContent {
 
     if ($autoSync && $this->template) {
       $excludeNames = [
-        (string)($mdConfig['markdownField'] ?? 'md_markdown'),
+        'md_markdown',
         (string)($mdConfig['hashField'] ?? 'md_markdown_hash'),
-        'md_markdown_tab',
-        'md_markdown_tab_END',
       ];
       foreach ($this->template->fieldgroup as $field) {
         $name = (string) $field->name;
@@ -116,12 +114,22 @@ trait MarkdownContent {
       // Unsaved pages can hit page-class overrides before IDs exist.
     }
 
+    // 'markdownField' in config.php is deprecated — the field name is always 'md_markdown'.
+    // Honor a custom value if set, but log a deprecation notice.
+    $markdownField = 'md_markdown';
+    if (!empty($mdConfig['markdownField']) && $mdConfig['markdownField'] !== 'md_markdown') {
+      $markdownField = (string) $mdConfig['markdownField'];
+      $this->wire('log')->warning(
+        "MarkdownToFields: 'markdownField' in config.php is deprecated and will be removed. Remove this setting; the field name is always 'md_markdown'."
+      );
+    }
+
     $map = [
       'source' => [
         'path' => $path,
         'fallback' => $fallbackSource,
       ],
-      'markdownField' => $mdConfig['markdownField'] ?? 'md_markdown',
+      'markdownField' => $markdownField,
       'hashField' => $mdConfig['hashField'] ?? 'md_markdown_hash',
       'frontmatter' => $frontmatterMap,
     ];
