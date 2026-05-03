@@ -1,5 +1,6 @@
 ProcessWire\MarkdownContentView
   page: ProcessWire\Page
+    data: array (0)
   nodeArea: ''
   text: 
       'Digital Studio

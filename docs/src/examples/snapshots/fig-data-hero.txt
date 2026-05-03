@@ -1,0 +1,45 @@
+array (9)
+  html => 
+      '<h1>The Urban Farm</h1>
+       <p>We grow food in the city.</p>
+       <p><a href="/book">Book now</a></p>'
+  text => 
+      'The Urban Farm
+       
+       We grow food in the city.
+       
+       Book now'
+  markdown => 
+      '<!-- title -->
+       # The Urban Farm
+       
+       <!-- intro -->
+       We grow food in the city.
+       
+       <!-- cta -->
+       [Book now](/book)'
+  key => 'hero'
+  area => 'hero'
+  subsections => array (0)
+  cta => array (7)
+    html => '<p><a href="/book">Book now</a></p>'
+    text => 'Book now'
+    markdown => '[Book now](/book)'
+    href => '/book'
+    type => 'link'
+    key => 'cta'
+    area => 'hero/cta'
+  intro => array (6)
+    html => '<p>We grow food in the city.</p>'
+    text => 'We grow food in the city.'
+    markdown => 'We grow food in the city.'
+    type => 'text'
+    key => 'intro'
+    area => 'hero/intro'
+  title => array (6)
+    html => '<h1>The Urban Farm</h1>'
+    text => 'The Urban Farm'
+    markdown => '# The Urban Farm'
+    type => 'heading'
+    key => 'title'
+    area => 'hero/title'

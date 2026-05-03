@@ -762,6 +762,12 @@ over and over can get old fast.
 
 For frontend work, the first thing to reach for is usually `dataSet()`.
 
+Let’s use this tiny markdown example:
+
+<a id="fig-data-dataset-hero-markdown"></a> **FIG:** Small markdown example for `data()` and `dataSet()`
+
+[[EXAMPLE:fig-data-dataset-hero:md]]
+
 ### `dataSet()` is the practical frontend shortcut
 
 `dataSet()` gives you a frontend-friendly version of the content structure, so you can stop walking the whole object tree by hand.
@@ -771,11 +777,11 @@ If you want flat component props instead of passing one `$hero` object around, y
 ```php
 <?php namespace ProcessWire;
   $hero = $page->content()->hero->dataSet('html');
-  $hero->set('imageSrc', $hero->image->src ?? null);
+  $hero->set('ctaHref', $hero->cta->href ?? null);
 
   // Just an example: I like components to receive the exact props they use
   // instead of one magical $hero object, and spread saves me from writing
-  // title => ..., intro => ..., imageSrc => ... one by one.
+  // title => ..., intro => ..., ctaHref => ... one by one.
   echo $this->render('components/hero', [
     ...$hero->toArray(),
   ]);
@@ -788,13 +794,21 @@ Then inside the component, you can consume plain props directly:
 <?php namespace ProcessWire;
   echo $title;
   echo $intro;
-  echo $imageSrc;
+  echo $ctaHref;
 ?>
 ```
 
 That is one of the main reasons `dataSet()` exists: it lets you prepare a useful payload for the view layer without rebuilding a custom array from scratch for every small section.
 
 So if your real question is "what do I use instead of walking `$content->hero->title->html` everywhere?", the answer is usually `dataSet()`, not `data()`.
+
+<a id="fig-dataset-html-hero"></a> **FIG:** Using `dataSet('html')`
+
+[[EXAMPLE:fig-dataset-html-hero:php]]
+
+<a id="fig-dataset-html-hero-dump"></a> **FIG:** Dump of `$content->hero->dataSet('html')`
+
+[[DUMP:fig-dataset-html-hero]]
 
 Example:
 
@@ -806,7 +820,7 @@ Example:
 
   $title = $hero->title;
   $intro = $hero->intro;
-  $imageSrc = $hero->image->src;
+  $ctaHref = $hero->cta->href;
 ?>
 ```
 
@@ -845,17 +859,13 @@ That means:
 
 Example:
 
-```php
-<?php namespace ProcessWire;
-  $content = $page->content();
+<a id="fig-data-hero"></a> **FIG:** Using `data()`
 
-  $hero = $content->hero->data();
+[[EXAMPLE:fig-data-hero:php]]
 
-  $titleHtml = $hero['title']['html'];
-  $introHtml = $hero['intro']['html'];
-  $imageSrc = $hero['image']['src'];
-?>
-```
+<a id="fig-data-hero-dump"></a> **FIG:** Dump of `$content->hero->data()`
+
+[[DUMP:fig-data-hero]]
 
 It is not less typing than `content()`. The point is just to get plain array data.
 

@@ -15,20 +15,49 @@ use ProcessWire\Page;
 
 // Mock ProcessWire infrastructure for CLI documentation
 if (!class_exists('ProcessWire\Wire')) {
-    class Wire { 
-        public function __get($n) { return null; }
-        public function __call($n, $a) { return $this; }
+    class Wire {
+        protected array $data = [];
+
+        public function __get($n) { return $this->get($n); }
+        public function __set($n, $v) { $this->set($n, $v); }
+        public function __isset($n) { return $this->get($n) !== null; }
+        public function __call($n, $a) { return null; }
+
+        public function get($key) {
+            return $this->data[$key] ?? null;
+        }
+
+        public function set($key, $value) {
+            $this->data[$key] = $value;
+            return $this;
+        }
+
+        public function remove($key) {
+            unset($this->data[$key]);
+            return $this;
+        }
+
+        public function getArray(): array {
+            return $this->data;
+        }
     }
 }
 if (!class_exists('ProcessWire\WireData')) {
     class WireData extends Wire {
+        public function setArray(array $data) {
+            foreach ($data as $key => $value) {
+                $this->set($key, $value);
+            }
+            return $this;
+        }
+
         public function project(?string $m = null): mixed { return $this; }
     }
 }
 if (!class_exists('ProcessWire\WireArray')) {
     class WireArray extends WireData implements \IteratorAggregate, \Countable {
-        public function getIterator(): \Traversable { return new \ArrayIterator([]); }
-        public function count(): int { return 0; }
+        public function getIterator(): \Traversable { return new \ArrayIterator($this->getArray()); }
+        public function count(): int { return count($this->getArray()); }
     }
 }
 if (!class_exists('ProcessWire\Page')) {
@@ -141,6 +170,14 @@ class DocBuilder {
         return null;
     }
 
+    private function extractDumpExpr(string $file): ?string {
+        $content = file_get_contents($file);
+        if (preg_match('/@dump:\s*(.+)/', $content, $m)) {
+            return trim($m[1]);
+        }
+        return null;
+    }
+
     private function verifyNode(string $name, string $mdFile, ?string $phpFile): void {
         $expectTxt = "{$this->snapshotsDir}/{$name}.txt";
         $expectHtml = "{$this->snapshotsDir}/{$name}.html";
@@ -156,28 +193,7 @@ class DocBuilder {
         $mockPage = new Page();
         $content = new MarkdownContentView($mockPage, $rawContent);
         
-        // Curation: If the example name suggests we only want a specific part, dive into it
-        $dumpObj = $content;
-        if (str_contains($name, 'section-object')) {
-             $dumpObj = count($content->sections) ? $content->sections[0] : $content;
-        } elseif (str_contains($name, 'block-object')) {
-             // Look for the first block in the first section
-             $section = count($content->sections) ? $content->sections[0] : null;
-             $dumpObj = ($section && count($section->blocks)) ? $section->blocks[0] : ($section ?: $content);
-        } elseif (str_contains($name, 'heading-output')) {
-             $section = count($content->sections) ? $content->sections[0] : null;
-             $block = ($section && count($section->blocks)) ? $section->blocks[0] : null;
-             $dumpObj = $block ? $block->heading : $content;
-        } elseif (str_contains($name, 'contentelement-example')) {
-             $section = count($content->sections) ? $content->sections[0] : null;
-             $block = ($section && count($section->blocks)) ? $section->blocks[0] : null;
-             if ($block) {
-                 if (str_contains($name, 'image')) $dumpObj = count($block->images) ? $block->images[0] : $content;
-                 elseif (str_contains($name, 'link')) $dumpObj = count($block->links) ? $block->links[0] : $content;
-                 elseif (str_contains($name, 'list')) $dumpObj = count($block->lists) ? $block->lists[0] : $content;
-                 elseif (str_contains($name, 'paragraph')) $dumpObj = count($block->paragraphs) ? $block->paragraphs[0] : $content;
-             }
-        }
+           $dumpObj = $this->resolveDumpObject($name, $content, $phpFile);
 
         $actualTxt = $this->prettyPrint($dumpObj);
 
@@ -205,6 +221,51 @@ class DocBuilder {
         }
     }
 
+    private function resolveDumpObject(string $name, $content, ?string $phpFile)
+    {
+        if ($phpFile) {
+            $dumpExpr = $this->extractDumpExpr($phpFile);
+            if ($dumpExpr) {
+                return $this->evaluateDumpExpr($dumpExpr, $content);
+            }
+        }
+
+        // Curation: If the example name suggests we only want a specific part, dive into it
+        $dumpObj = $content;
+        if (str_contains($name, 'section-object')) {
+             $dumpObj = count($content->sections) ? $content->sections[0] : $content;
+        } elseif (str_contains($name, 'block-object')) {
+             // Look for the first block in the first section
+             $section = count($content->sections) ? $content->sections[0] : null;
+             $dumpObj = ($section && count($section->blocks)) ? $section->blocks[0] : ($section ?: $content);
+        } elseif (str_contains($name, 'heading-output')) {
+             $section = count($content->sections) ? $content->sections[0] : null;
+             $block = ($section && count($section->blocks)) ? $section->blocks[0] : null;
+             $dumpObj = $block ? $block->heading : $content;
+        } elseif (str_contains($name, 'contentelement-example')) {
+             $section = count($content->sections) ? $content->sections[0] : null;
+             $block = ($section && count($section->blocks)) ? $section->blocks[0] : null;
+             if ($block) {
+                 if (str_contains($name, 'image')) $dumpObj = count($block->images) ? $block->images[0] : $content;
+                 elseif (str_contains($name, 'link')) $dumpObj = count($block->links) ? $block->links[0] : $content;
+                 elseif (str_contains($name, 'list')) $dumpObj = count($block->lists) ? $block->lists[0] : $content;
+                 elseif (str_contains($name, 'paragraph')) $dumpObj = count($block->paragraphs) ? $block->paragraphs[0] : $content;
+             }
+        }
+
+        return $dumpObj;
+    }
+
+    private function evaluateDumpExpr(string $expr, $content)
+    {
+        $page = new class($content) {
+            public function __construct(private $content) {}
+            public function content() { return $this->content; }
+        };
+
+        return eval('return ' . $expr . ';');
+    }
+
     private function captureRender(string $file, $contentData): string {
         // Mock $page->content() behavior
         $page = new class($contentData) {
@@ -226,6 +287,13 @@ class DocBuilder {
     private function prettyPrint($obj, int $level = 0): string {
         $indent = str_repeat('  ', $level);
         $out = "";
+
+        if ($obj instanceof MarkdownDataSet || $obj instanceof MarkdownDataArray) {
+            $className = get_class($obj);
+            $out .= "{$className}\n";
+            $out .= $this->prettyPrint($obj->toArray(), $level);
+            return $out;
+        }
 
         if (is_object($obj)) {
             $className = get_class($obj);
@@ -296,13 +364,13 @@ class DocBuilder {
         
         $out = "";
         if (($type === null || $type === 'md') && file_exists($mdFile)) {
-            $md = file_get_contents($mdFile);
-            $out .= "```markdown\n{$md}```\n\n";
+            $md = rtrim(file_get_contents($mdFile), "\r\n");
+            $out .= "```markdown\n{$md}\n```\n\n";
         }
         
         if (($type === null || $type === 'php') && file_exists($phpFile)) {
-            $php = file_get_contents($phpFile);
-            $out .= "```php\n{$php}```\n";
+            $php = rtrim(file_get_contents($phpFile), "\r\n");
+            $out .= "```php\n{$php}\n```\n";
         }
         
         return trim($out);

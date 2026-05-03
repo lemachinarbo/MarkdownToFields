@@ -486,6 +486,7 @@ The section object exposes them like this
 ```php
 ProcessWire\MarkdownContentView
   page: ProcessWire\Page
+    data: array (0)
   nodeArea: ''
   text: 
       'Hello
@@ -584,6 +585,7 @@ Subsections are returned as `Section` objects with the same core properties:
 ```php
 ProcessWire\MarkdownSectionView
   page: ProcessWire\Page
+    data: array (0)
   nodeArea: 'columns'
   html: '<h1>Our Team</h1>'
   text: 'Our Team'
@@ -710,6 +712,7 @@ namespace ProcessWire;
 ```php
 ProcessWire\MarkdownBlockView
   page: ProcessWire\Page
+    data: array (0)
   nodeArea: 'about/block_0'
   heading: LetMeDown\HeadingElement
     text: 'About Us'
@@ -1276,6 +1279,23 @@ over and over can get old fast.
 
 For frontend work, the first thing to reach for is usually `dataSet()`.
 
+Let’s use this tiny markdown example:
+
+<a id="fig-data-dataset-hero-markdown"></a> **FIG 43:** Small markdown example for `data()` and `dataSet()`
+
+```markdown
+<!-- section:hero -->
+
+<!-- title -->
+# The Urban Farm
+
+<!-- intro -->
+We grow food in the city.
+
+<!-- cta -->
+[Book now](/book)
+```
+
 ### `dataSet()` is the practical frontend shortcut
 
 `dataSet()` gives you a frontend-friendly version of the content structure, so you can stop walking the whole object tree by hand.
@@ -1285,11 +1305,11 @@ If you want flat component props instead of passing one `$hero` object around, y
 ```php
 <?php namespace ProcessWire;
   $hero = $page->content()->hero->dataSet('html');
-  $hero->set('imageSrc', $hero->image->src ?? null);
+  $hero->set('ctaHref', $hero->cta->href ?? null);
 
   // Just an example: I like components to receive the exact props they use
   // instead of one magical $hero object, and spread saves me from writing
-  // title => ..., intro => ..., imageSrc => ... one by one.
+  // title => ..., intro => ..., ctaHref => ... one by one.
   echo $this->render('components/hero', [
     ...$hero->toArray(),
   ]);
@@ -1302,13 +1322,66 @@ Then inside the component, you can consume plain props directly:
 <?php namespace ProcessWire;
   echo $title;
   echo $intro;
-  echo $imageSrc;
+  echo $ctaHref;
 ?>
 ```
 
 That is one of the main reasons `dataSet()` exists: it lets you prepare a useful payload for the view layer without rebuilding a custom array from scratch for every small section.
 
 So if your real question is "what do I use instead of walking `$content->hero->title->html` everywhere?", the answer is usually `dataSet()`, not `data()`.
+
+<a id="fig-dataset-html-hero"></a> **FIG 44:** Using `dataSet('html')`
+
+```php
+<?php
+/**
+ * @source: fig-data-dataset-hero.md
+ * @dump: $content->hero->dataSet('html')
+ */
+namespace ProcessWire;
+  $content = $page->content();
+  $hero = $content->hero->dataSet('html');
+?>
+```
+
+<a id="fig-dataset-html-hero-dump"></a> **FIG 45:** Dump of `$content->hero->dataSet('html')`
+
+```php
+ProcessWire\MarkdownDataSet
+array (9)
+  html => 
+      '<h1>The Urban Farm</h1>
+       <p>We grow food in the city.</p>
+       <p><a href="/book">Book now</a></p>'
+  text => 
+      'The Urban Farm
+       
+       We grow food in the city.
+       
+       Book now'
+  markdown => 
+      '<!-- title -->
+       # The Urban Farm
+       
+       <!-- intro -->
+       We grow food in the city.
+       
+       <!-- cta -->
+       [Book now](/book)'
+  key => 'hero'
+  area => 'hero'
+  subsections => array (0)
+  cta => array (7)
+    html => '<p><a href="/book">Book now</a></p>'
+    text => 'Book now'
+    markdown => '[Book now](/book)'
+    href => '/book'
+    type => 'link'
+    key => 'cta'
+    area => 'hero/cta'
+  intro => '<p>We grow food in the city.</p>'
+  title => '<h1>The Urban Farm</h1>'
+```
 
 Example:
 
@@ -1320,7 +1393,7 @@ Example:
 
   $title = $hero->title;
   $intro = $hero->intro;
-  $imageSrc = $hero->image->src;
+  $ctaHref = $hero->cta->href;
 ?>
 ```
 
@@ -1359,16 +1432,68 @@ That means:
 
 Example:
 
+<a id="fig-data-hero"></a> **FIG 46:** Using `data()`
+
 ```php
-<?php namespace ProcessWire;
+<?php
+/**
+ * @source: fig-data-dataset-hero.md
+ * @dump: $content->hero->data()
+ */
+namespace ProcessWire;
   $content = $page->content();
-
   $hero = $content->hero->data();
-
-  $titleHtml = $hero['title']['html'];
-  $introHtml = $hero['intro']['html'];
-  $imageSrc = $hero['image']['src'];
 ?>
+```
+
+<a id="fig-data-hero-dump"></a> **FIG 47:** Dump of `$content->hero->data()`
+
+```php
+array (9)
+  html => 
+      '<h1>The Urban Farm</h1>
+       <p>We grow food in the city.</p>
+       <p><a href="/book">Book now</a></p>'
+  text => 
+      'The Urban Farm
+       
+       We grow food in the city.
+       
+       Book now'
+  markdown => 
+      '<!-- title -->
+       # The Urban Farm
+       
+       <!-- intro -->
+       We grow food in the city.
+       
+       <!-- cta -->
+       [Book now](/book)'
+  key => 'hero'
+  area => 'hero'
+  subsections => array (0)
+  cta => array (7)
+    html => '<p><a href="/book">Book now</a></p>'
+    text => 'Book now'
+    markdown => '[Book now](/book)'
+    href => '/book'
+    type => 'link'
+    key => 'cta'
+    area => 'hero/cta'
+  intro => array (6)
+    html => '<p>We grow food in the city.</p>'
+    text => 'We grow food in the city.'
+    markdown => 'We grow food in the city.'
+    type => 'text'
+    key => 'intro'
+    area => 'hero/intro'
+  title => array (6)
+    html => '<h1>The Urban Farm</h1>'
+    text => 'The Urban Farm'
+    markdown => '# The Urban Farm'
+    type => 'heading'
+    key => 'title'
+    area => 'hero/title'
 ```
 
 It is not less typing than `content()`. The point is just to get plain array data.
@@ -1611,7 +1736,7 @@ It just outputs the original image URL. No variants. No compression. No magic.
 If you want resizing, crops, formats, etc., that’s your job. You can access the actual `ProcessWire\Pageimage` object via the `img` property:
 
 
-<a id="fig-image-with-field-tag"></a> **FIG 43:** Image with field tag
+<a id="fig-image-with-field-tag"></a> **FIG 48:** Image with field tag
 
 ```markdown
 ---
@@ -1627,7 +1752,7 @@ We grow food and ideas in the city.
 ![Our farm](01.jpg)
 ```
 
-<a id="fig-getting-pageimage-object"></a> **FIG 44:** Getting the `ProcessWire\Pageimage` object
+<a id="fig-getting-pageimage-object"></a> **FIG 49:** Getting the `ProcessWire\Pageimage` object
 
 ```php
 <?php namespace ProcessWire;
@@ -1702,7 +1827,7 @@ content/
 
 When you add a new language (let’s say `es`), and you set your home page name to `es`:
 
-<a id="fig-language-name"></a> **FIG 45:** Example of language page name
+<a id="fig-language-name"></a> **FIG 50:** Example of language page name
 
 <img src="./language-name.png" width="700">
 
@@ -1744,14 +1869,14 @@ To achieve it, all you have to do is:
 
 1. Add a simple `code` text field to the template of languages.
 
-<a id="fig-language-code"></a> **FIG 46:** Code field on language template
+<a id="fig-language-code"></a> **FIG 51:** Code field on language template
 
 <img src="./language-code.png" width="700">
 
 
 2. Set the code in your language, for example `en` for default, `es` for Spanish.
 
-<a id="fig-language-default-code"></a> **FIG 47:** Default language code name
+<a id="fig-language-default-code"></a> **FIG 52:** Default language code name
 
 <img src="./language-default-code.png" width="700">
 
@@ -1816,7 +1941,7 @@ The references are stored in the `md_markdown_links` field as an array of page I
 
 This config goes in your `config.php` file. It controls how markdown is found, parsed, and synced.
 
-<a id="fig-example-config-file"></a> **FIG 48:** Example config file with all properties
+<a id="fig-example-config-file"></a> **FIG 53:** Example config file with all properties
 
 ```php
 <?php

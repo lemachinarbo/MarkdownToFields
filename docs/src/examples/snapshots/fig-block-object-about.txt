@@ -1,5 +1,6 @@
 ProcessWire\MarkdownBlockView
   page: ProcessWire\Page
+    data: array (0)
   nodeArea: 'about/block_0'
   heading: LetMeDown\HeadingElement
     text: 'About Us'

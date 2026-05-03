@@ -1,5 +1,6 @@
 ProcessWire\MarkdownSectionView
   page: ProcessWire\Page
+    data: array (0)
   nodeArea: 'columns'
   html: '<h1>Our Team</h1>'
   text: 'Our Team'
