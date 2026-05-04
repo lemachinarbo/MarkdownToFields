@@ -3,7 +3,7 @@ Use markdown as your content. Structure it with simple tags, and enjoy the markd
 
 Need help? See:
 
-- The [Why it's so long intro](#the-long-intro)
+- The [Why it's so long, intro](#the-long-intro)
 - The [I'm lazy resume all to me, guide](#lazy-guide)
 - The [MarkdownToFields survival guide](./docs/guide.md) (aka The Docs)
 
@@ -22,7 +22,7 @@ Note: For a rich markdown editing experience, use [MarkdownToFieldsFrontEditor](
 
 ### Quick FAQ
 
-**Q: Wait, what? So you’re telling me that the whole markdown is the content, not the Procewsswire Fields, and that you only support syncing of basic text fields?**
+**Q: Wait, what? So you’re telling me that the whole markdown is the content, not the Processwire Fields, and that you only support syncing of basic text fields?**
 
 **A:** Yes.
 
@@ -41,7 +41,7 @@ Show on GitHub (then press E to edit)
 
 The whole content of the page was text files. And I felt the darkest envy. 
 
-But from that evil envy, a question arose: Can I reduce all that PW multiple-field experience to a single field/text experience?
+But from that evil envy, a question arose: Can I reduce all that PW multiple-field experience to a single text file experience?
 
 So there I was, writing my page in markdown like the “first” human who ever had the idea:
 
@@ -73,7 +73,7 @@ Some text…
 
 **Q: Now I get your point. But are you aware that by writing content in markdown files and skipping the “real” fields, you basically lose all the benefits of a database, right?**
 
-**A:** Oh crap… I think, er, no, I mean, er, yes, but it's all wrong. That is, I think I disagree.
+**A:** Oh crap… *I think, er, no, I mean, er, yes, but it's all wrong. That is, I think I disagree.*
 
 ## Lazy guide
 
