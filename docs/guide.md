@@ -181,7 +181,7 @@ What enabling a template actually does is:
 
 > For a rich markdown editing experience, use [MarkdownToFieldsFrontEditor](https://github.com/lemachinarbo/MarkdownToFieldsFrontEditor).
 
-Also, if you uncheck a template, the internal tracking fields will be removed from that template. But don’t worry, you won’t lose any content. Remember, your source of truth is the markdown file. 
+Also, if you uncheck a template, the internal tracking fields will be removed from that template. But don’t worry, you won’t lose any content. Remember, your source of truth is the markdown file. Nice.
 
 
 #### Automatic generation of markdown files
@@ -263,9 +263,17 @@ class AboutPage extends DefaultPage {
 
 Logic, names, and folder structure are always totally up to you.
 
-One important detail: `contentSource()` is treated as the source of truth for the markdown file path. If you derive it from a mutable value like `$page->name`, the markdown filename will change when the page name changes. 
+#### What happens when a page is renamed?
 
-That means that, renaming a page, can point the module to a new markdown file, and if that file does not exist yet, the module may create it for you. If you want the markdown filename to stay stable even when the page slug changes, return a stable filename instead of deriving it from `$page->name`.
+Because the module uses `$page->name . '.md'` by default, changing the page name in the CMS means the markdown filename will change too. 
+
+For example, renaming a page from `about` to `story` will cause the module to physically rename `about.md` to `story.md` on your disk to keep everything synchronized. 
+
+However, if you override `contentSource()` to return a fixed string (like `return 'company-info.md';`), the filename becomes completely independent from the page name. Renaming the page in the CMS will *not* rename the file. Instead, the module will simply update the `name` field inside the frontmatter of `company-info.md`.
+
+This gives you a choice: you can tie the filename to the URL slug (the default), or you can use a fixed file structure that never breaks regardless of how the page URL changes.
+
+If you are using a multi-language setup, the module always determines the filename using the **default language** (e.g., `en/about.md` instead of `es/sobre-nosotros.md`) to keep your translated files perfectly grouped. For an in-depth explanation of how this works, check the [Multi-Language content source logic](#multi-language-content-source-logic) section.
 
 
 ## Working with content
@@ -1901,8 +1909,33 @@ class HomePage extends DefaultPage {
     return 'home.md';
   }
 }
-
 ```
+
+#### Multi-Language content source logic
+
+ProcessWire allows you to have a different page name (slug) for each language. For example, your default language might have the name `about`, while Spanish has `sobre-nosotros`.
+
+So, how does the module know which markdown file to load for Spanish? Does it look for `sobre-nosotros.md`?
+
+**No.** The module *always* relies on `contentSource()` to determine the file name, and it evaluates `contentSource()` using the **default language**.
+
+By default, `contentSource()` returns `$page->name . '.md'`. Since it evaluates in the context of the default language, it returns `about.md`. The module then prepends the language code directory to find the translated file.
+
+So the structure looks like this:
+- `content/en/about.md` (Default English)
+- `content/es/about.md` (Spanish translation, even though its slug is `sobre-nosotros`)
+
+This architecture is opinionated and intentional. It keeps all translations of a single page perfectly grouped under the exact same filename across your directories. You will always know that `es/about.md` is the Spanish equivalent of `en/about.md`.
+
+**What if you change the Spanish page name in the CMS to `nuestra-historia`?**
+The physical filename *will not change*. It remains `es/about.md`. However, the module will automatically update the `name` field inside the frontmatter of `es/about.md` to `name: nuestra-historia`. This ensures the markdown file retains its correct localized slug while maintaining file structure sanity.
+
+**What if you change the default page name from `about` to `story`?**
+Because `contentSource()` uses `$page->name`, the source path evaluates to a new string: `story.md`. The module will automatically physically relocate the files for *all* languages to match:
+- `en/about.md` moves to `en/story.md`
+- `es/about.md` moves to `es/story.md`
+
+If you override `contentSource()` to return a hardcoded string (like `return 'company-info.md';`), then renaming the page in *any* language will not affect the filenames at all. The module will simply update the frontmatter `name` property inside those files.
 
 ### Keeping internal links updated
 
