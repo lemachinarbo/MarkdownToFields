@@ -18,6 +18,27 @@ class MarkdownUtilities
     return (bool) ($moduleConfig[self::DEBUG_CONFIG_FLAG] ?? false);
   }
 
+  /** Display a message or warning in the ProcessWire UI. */
+  public static function sessionMessage(
+    string $message,
+    bool $isWarning = false,
+  ): void {
+    // Prevent duplicate identical messages in the same request
+    static $notified = [];
+    $hash = md5($message . ($isWarning ? '1' : '0'));
+    if (isset($notified[$hash])) return;
+    $notified[$hash] = true;
+
+    $session = wire('session');
+    if (!$session) return;
+
+    if ($isWarning) {
+      $session->warning($message);
+    } else {
+      $session->message($message);
+    }
+  }
+
   public static function logChannel(
     ?Page $page,
     string $message,

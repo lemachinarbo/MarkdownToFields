@@ -19,6 +19,13 @@ class MarkdownSyncEngine extends MarkdownSessionManager
   protected static array $syncingFromMarkdown = [];
 
   /** Syncs page fields from markdown files. */
+  protected static function fieldMap(Page $page): array
+  {
+    $map = MarkdownConfig::getFrontmatterMap($page);
+    $map['name'] = 'name';
+    return $map;
+  }
+
   public static function syncFromMarkdown(Page $page): array
   {
     $config = self::config($page);
@@ -82,9 +89,27 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         continue;
       }
 
-      $content = $isDefaultLanguage
-        ? self::loadMarkdown($page)
-        : self::loadLanguageMarkdown($page, $language);
+      $content = self::loadLanguageMarkdown($page, $language);
+
+      // Orphan discovery: If the primary file is missing, look for a file that identifies as this page
+      if (!$content instanceof ContentData) {
+        $orphanFile = self::findOrphanByFrontmatterName($page, $languageCode);
+        if ($orphanFile) {
+           $pathAttempted = MarkdownFileIO::getMarkdownFilePath($page, $languageCode);
+           // Move the orphan to its canonical home before loading
+           if (!is_file($pathAttempted)) {
+             if (@rename(dirname($pathAttempted) . '/' . $orphanFile, $pathAttempted)) {
+                $msg = sprintf("Moved markdown file '%s' to '%s' to match page rename.", $orphanFile, basename($pathAttempted));
+                MarkdownUtilities::sessionMessage($msg);
+                self::logInfo($page, "Relocated orphan file to canonical path", [
+                  'from' => $orphanFile,
+                  'to' => basename($pathAttempted)
+                ]);
+             }
+           }
+           $content = self::loadLanguageMarkdown($page, $language); // Load from new canonical path
+        }
+      }
 
       if (!$content instanceof ContentData) {
         if (!$isDefaultLanguage) {
@@ -323,6 +348,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         }
 
         if ($hasMarkdownPost) {
+          // Proceed with save
         } else {
           $language = self::resolveLanguage($page, $mismatch);
           $label =
@@ -330,14 +356,25 @@ class MarkdownSyncEngine extends MarkdownSessionManager
               ? trim((string) ($language->title ?: $language->name))
               : (string) $mismatch;
 
-          throw new WireException(
-            sprintf(
-              __(
-                'The markdown file for language "%s" changed outside this editor. Please reload before saving again.',
+          $current = $currentHashes[(string)$mismatch] ?? null;
+          $expected = $expectedHashes[(string)$mismatch] ?? null;
+
+          // Special case: If the file is missing and we didn't have an expected hash anyway,
+          // it's likely a rename or a new page. Let it pass.
+          // ALSO: If we just renamed the page, the new path might already exist (moved by handleRenameFiles),
+          // so we should be lenient.
+          if ($page->isChanged('name') || ($current === 'missing' && ($expected === null || $expected === ''))) {
+            // No conflict, allow save to proceed
+          } else {
+            throw new WireException(
+              sprintf(
+                __(
+                  'The markdown file for language "%s" changed outside this editor. Please reload before saving again.',
+                ),
+                $label !== '' ? $label : (string) $mismatch,
               ),
-              $label !== '' ? $label : (string) $mismatch,
-            ),
-          );
+            );
+          }
         }
       }
     }
@@ -366,9 +403,28 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
       $page->of(false);
 
-      $languageContent = $isDefaultLanguage
-        ? self::loadMarkdown($page)
-        : self::loadLanguageMarkdown($page, $language);
+      $languageContent = self::loadLanguageMarkdown($page, $language);
+
+      // Orphan discovery: If the primary file is missing during write, look for an orphan to relocate.
+      // This prevents duplicates like roo.md and foo.md existing simultaneously.
+      if (!$languageContent instanceof ContentData) {
+        $orphanFile = self::findOrphanByFrontmatterName($page, $languageCode);
+        if ($orphanFile) {
+          $pathAttempted = MarkdownFileIO::getMarkdownFilePath($page, $languageCode);
+          if (!is_file($pathAttempted)) {
+            if (@rename(dirname($pathAttempted) . '/' . $orphanFile, $pathAttempted)) {
+               $msg = sprintf("Moved markdown file '%s' to '%s' to match page rename.", $orphanFile, basename($pathAttempted));
+               MarkdownUtilities::sessionMessage($msg);
+               self::logInfo($page, "Relocated orphan file during write sync", [
+                 'from' => $orphanFile,
+                 'to' => basename($pathAttempted)
+               ]);
+               // Load the newly relocated file
+               $languageContent = self::loadLanguageMarkdown($page, $language);
+            }
+          }
+        }
+      }
 
       $existingDocument =
         $languageContent instanceof ContentData
@@ -523,15 +579,21 @@ class MarkdownSyncEngine extends MarkdownSessionManager
             self::frontmatterValuesDiffer($normalizedPosted, $documentValue);
 
           if ($valuesDiffer) {
-            $label = $field === 'title' ? __('title') : $field;
-            throw new WireException(
-              sprintf(
-                __(
-                  'Field "%s" was modified in both the markdown and the form. Please adjust only one version before saving.',
+            // Special case: If we are renaming the page, the 'name' field mismatch is expected.
+            // Don't treat it as a conflict.
+            if ($field === 'name' && $page->isChanged('name')) {
+              // Allow CMS to win
+            } else {
+              $label = $field === 'title' ? __('title') : $field;
+              throw new WireException(
+                sprintf(
+                  __(
+                    'Field "%s" was modified in both the markdown and the form. Please adjust only one version before saving.',
+                  ),
+                  $label,
                 ),
-                $label,
-              ),
-            );
+              );
+            }
           }
         }
 
@@ -687,5 +749,41 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     }
 
     return $frontmatter;
+  }
+
+  private static function findOrphanByFrontmatterName(Page $page, ?string $languageCode = null): ?string
+  {
+    $langCode = $languageCode ?: MarkdownLanguageResolver::getDefaultLanguageCode($page);
+    $expectedPath = MarkdownFileIO::getMarkdownFilePath($page, $langCode);
+    $dir = dirname($expectedPath);
+    
+    if (!is_dir($dir)) return null;
+
+    $files = glob($dir . '/*.md');
+    if (!$files) return null;
+
+    $pageName = (string) $page->name;
+
+    foreach ($files as $file) {
+      $filename = basename($file);
+      // Skip the expected filename (we already tried it)
+      if ($filename === $pageName . '.md') continue;
+
+      try {
+        // We use a low-level load to avoid recursion or heavy logic
+        $content = self::loadLanguageMarkdown($page, null, $filename);
+        if ($content) {
+          $fm = $content->getFrontmatter();
+          $fmName = trim((string)($fm['name'] ?? ''));
+          if ($fmName === $pageName) {
+            return $filename;
+          }
+        }
+      } catch (\Throwable $_e) {
+        continue;
+      }
+    }
+
+    return null;
   }
 }

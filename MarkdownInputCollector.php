@@ -229,7 +229,12 @@ class MarkdownInputCollector extends MarkdownFieldSync
         );
         $normalizedCurrent = self::stringifyPendingFieldValue($currentValue);
 
-        if ($submitted !== $normalizedCurrent) {
+        $isFieldChanged = $page->isChanged($field);
+        if (!$isFieldChanged && $language instanceof Language && !$language->isDefault()) {
+          $isFieldChanged = $page->isChanged($field . $language->id);
+        }
+
+        if ($submitted !== $normalizedCurrent || $isFieldChanged) {
           if ($isTranslatable) {
             $codes[$code] = true;
           } else {

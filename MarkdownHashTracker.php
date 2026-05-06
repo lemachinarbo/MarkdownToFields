@@ -19,11 +19,11 @@ class MarkdownHashTracker extends MarkdownHtmlConverter
     $path = self::getMarkdownFilePath($page, $languageCode, $source);
 
     if (!is_file($path)) {
-      return null;
+      return 'missing';
     }
 
     $hash = md5_file($path);
-    return $hash !== false ? $hash : null;
+    return $hash !== false ? $hash : 'error';
   }
 
   /** Returns a map of language codes to file hashes for a page. */

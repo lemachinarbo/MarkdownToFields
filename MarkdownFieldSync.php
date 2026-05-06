@@ -167,6 +167,13 @@ class MarkdownFieldSync extends MarkdownHashTracker
     Page $page,
     Language $language,
   ): ?string {
+    // System properties like 'name' are stored as name1030
+    $explicitProperty = 'name' . $language->id;
+    $explicitValue = $page->get($explicitProperty);
+    if (is_string($explicitValue) && $explicitValue !== '') {
+      return $explicitValue;
+    }
+
     if (method_exists($page, 'getLanguageValue')) {
       try {
         $value = $page->getLanguageValue($language, 'name');
@@ -297,16 +304,25 @@ class MarkdownFieldSync extends MarkdownHashTracker
 
   protected static function mappedFieldsChanged(Page $page, array $fields): bool
   {
+    $languages = $page->wire('languages');
+    
     foreach ($fields as $field) {
       if ($field === '') {
         continue;
       }
 
-      if (
-        self::pageSupportsMappedField($page, $field) &&
-        $page->isChanged($field)
-      ) {
-        return true;
+      if (self::pageSupportsMappedField($page, $field)) {
+        if ($page->isChanged($field)) {
+          return true;
+        }
+        
+        if ($languages) {
+          foreach ($languages as $language) {
+            if (!$language->isDefault() && $page->isChanged($field . $language->id)) {
+              return true;
+            }
+          }
+        }
       }
     }
 

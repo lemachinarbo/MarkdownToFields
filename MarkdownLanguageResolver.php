@@ -6,7 +6,7 @@ class MarkdownLanguageResolver extends MarkdownDocumentParser
 {
   protected const FALLBACK_LANGUAGE = 'en';
 
-  protected static function resolveLanguage(Page $page, $language): ?Language
+  public static function resolveLanguage(Page $page, $language): ?Language
   {
     if ($language instanceof Language) {
       return $language;

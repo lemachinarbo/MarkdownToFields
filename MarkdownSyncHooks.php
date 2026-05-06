@@ -42,14 +42,14 @@ class MarkdownSyncHooks
       return;
     }
 
-    // Double-check: template must be explicitly enabled in module config
-    $templates = wire('modules')->getConfig('MarkdownToFields')['templates'] ?? [];
-    if (!is_array($templates) || !in_array($page->template->name, $templates, true)) {
+    $documentField = MarkdownConfig::getMarkdownField($page);
+    if (!$documentField) {
       return;
     }
 
-    $documentField = MarkdownConfig::getMarkdownField($page);
-    if (!$documentField) {
+    // Skip sync-from-markdown if we are currently receiving a form submission.
+    // We want the UI values to win during a page save.
+    if (count(wire('input')->post)) {
       return;
     }
 
@@ -149,8 +149,7 @@ class MarkdownSyncHooks
 
     self::assertUniqueMarkdownSource($page);
 
-    // Auto-create markdown file on first save if it doesn't exist
-    self::ensureMarkdownFileExists($page, $event);
+    self::handleRenameFiles($page);
 
     $input = $event->wire('input');
     $hashFieldName = MarkdownEditor::hashField($page);
@@ -177,6 +176,16 @@ class MarkdownSyncHooks
 
     if ($titleValues) {
       $postedLanguageValues['title'] = $titleValues;
+    }
+
+    $nameValues = MarkdownInputCollector::collectSubmittedLanguageValues(
+      $page,
+      'name',
+      $input,
+    );
+
+    if ($nameValues) {
+      $postedLanguageValues['name'] = $nameValues;
     }
 
     foreach (
@@ -296,75 +305,7 @@ class MarkdownSyncHooks
     }
   }
 
-  /**
-   * Auto-create markdown file on first page save if it doesn't exist.
-   * Creates minimal frontmatter with title and name fields.
-   * Only applies to selected templates.
-   */
-  private static function ensureMarkdownFileExists(Page $page, HookEvent $event): void
-  {
-    try {
-      // Check if file already exists in all languages
-      $languages = $page->wire('languages');
-      $isMultilingual = $languages && count($languages) > 1;
 
-      $fileExists = false;
-      if ($isMultilingual) {
-        foreach (MarkdownLanguageResolver::availableLanguageCodes($page) as $languageCode) {
-          $path = MarkdownFileIO::getMarkdownFilePath($page, $languageCode);
-          if (is_file($path)) {
-            $fileExists = true;
-            break;
-          }
-        }
-      } else {
-        $path = MarkdownFileIO::getMarkdownFilePath($page);
-        if (is_file($path)) {
-          $fileExists = true;
-        }
-      }
-
-      // File exists, nothing to do
-      if ($fileExists) {
-        return;
-      }
-
-      // Create minimal frontmatter with title and name
-      $frontmatter = [
-        'title' => (string) $page->get('title'),
-        'name' => (string) $page->get('name'),
-      ];
-
-      // Build minimal document (frontmatter only)
-      $frontRaw = "---\n";
-      foreach ($frontmatter as $key => $value) {
-        $frontRaw .= $key . ': ' . $value . "\n";
-      }
-      $frontRaw .= "---\n\n";
-      $document = $frontRaw;
-
-      // Write to file
-      $defaultPath = MarkdownFileIO::getMarkdownFilePath($page);
-      MarkdownFileIO::saveLanguageMarkdown($page, $document);
-
-      // Notify user
-      $event->wire('session')->message(
-        sprintf('Created markdown file: %s', $defaultPath)
-      );
-      MarkdownUtilities::logChannel(
-        $page,
-        'Auto-created markdown file',
-        ['title' => (string) $page->title, 'path' => $defaultPath],
-      );
-    } catch (\Throwable $e) {
-      // Non-fatal: log the error but don't block page save
-      MarkdownUtilities::logChannel(
-        $page,
-        'ensureMarkdownFileExists error',
-        ['message' => $e->getMessage()],
-      );
-    }
-  }
 
   private static function pageUrlMayHaveChanged(Page $page): bool
   {
@@ -445,15 +386,153 @@ class MarkdownSyncHooks
     // there does not belong to this page.
     if ($page->id && $page->isChanged('name')) {
       $defaultCode = MarkdownLanguageResolver::getDefaultLanguageCode($page);
-      $defaultPath = $currentPaths[$defaultCode] ?? null;
-      if ($defaultPath !== null && is_file($defaultPath)) {
-        throw new WireException(
+      $newPath = $currentPaths[$defaultCode] ?? null;
+
+      // Detect if the rename actually changed the markdown source path.
+      // If contentSource() is overridden to a static string, it won't change.
+      $changes = $page->getChanges(true);
+      $oldName = $changes['name'] ?? null;
+      $pathChanged = true;
+
+      if ($oldName !== null) {
+        $oldPage = clone $page;
+        $oldPage->name = $oldName;
+        $oldPath = MarkdownFileIO::getMarkdownFilePath($oldPage, $defaultCode);
+        if ($oldPath === $newPath) {
+          $pathChanged = false;
+        }
+      }
+
+      if ($pathChanged && $newPath !== null && is_file($newPath)) {
+        // Orphan Adoption: If we can verify this is our file (via frontmatter), we allow it silently.
+        try {
+          $content = MarkdownFileIO::loadLanguageMarkdown($page, $defaultCode, basename($newPath));
+          if ($content) {
+            $frontmatter = $content->getFrontmatter();
+            $fileStoredName = trim((string) ($frontmatter['name'] ?? ''));
+            if ($fileStoredName !== '') {
+              $currentNames = [];
+              $languages = $page->wire('languages');
+              if ($languages) {
+                foreach ($languages as $lang) {
+                  $n = (string) $page->get('name' . ($lang->isDefault() ? '' : $lang->id));
+                  if ($n !== '') $currentNames[] = $n;
+                }
+              } else {
+                $currentNames[] = (string) $page->name;
+              }
+              
+              if (in_array($fileStoredName, array_unique($currentNames), true)) {
+                return; // Direct reunion, allow silently
+              }
+            }
+          }
+        } catch (\Throwable $_e) {
+          // Ignore read errors during adoption check
+        }
+
+        // If not a clear reunion, allow it but warn the user.
+        // This fulfills the "you pick the name, you pick the file" philosophy
+        // while remaining respectful by providing transparency.
+        $page->wire('session')?->warning(
           sprintf(
-            'Markdown source collision: renaming to "%s" would overwrite the existing file at %s. Use a different name or remove the conflicting file first.',
-            (string) $page->name,
-            $defaultPath,
-          ),
+            'Markdown: This page is now using "%s", an existing file found on the disk.',
+            basename($newPath)
+          )
         );
+      }
+    }
+  }
+
+  /**
+   * Physically move markdown files when a page name changes.
+   * This preserves unmapped content that would otherwise be lost if a new
+   * blank file was created at the new path.
+   */
+  private static function handleRenameFiles(Page $page): void
+  {
+    $pageId = (int) $page->id;
+    if (!$pageId) {
+      return;
+    }
+
+    // Fetch the version currently in the DB using getFresh to bypass memory cache
+    $dbPage = $page->wire('pages')->getFresh($pageId);
+    if (!$dbPage || !$dbPage->id) {
+      return;
+    }
+
+    $languages = $page->wire('languages');
+    if (!$languages) {
+      return;
+    }
+
+    $renamedCount = 0;
+    foreach (MarkdownLanguageResolver::availableLanguageCodes($page) as $langCode) {
+      try {
+        $language = MarkdownSyncEngine::resolveLanguage($page, $langCode);
+        if (!$language instanceof Language) {
+          continue;
+        }
+
+        $newName = (string) $page->getLanguageValue($language, 'name');
+        $oldName = (string) $dbPage->getLanguageValue($language, 'name');
+
+        if ($oldName === '' || $newName === '' || $oldName === $newName) {
+          continue;
+        }
+
+        // Construct paths
+        $oldPage = clone $dbPage;
+        // Ensure the oldPage clone has the specific old name for the current langCode context
+        if (!$language->isDefault()) {
+           $oldPage->setLanguageValue($language, 'name', $oldName);
+        } else {
+           $oldPage->name = $oldName;
+        }
+
+        $oldPath = MarkdownFileIO::getMarkdownFilePath($oldPage, $langCode);
+        $newPath = MarkdownFileIO::getMarkdownFilePath($page, $langCode);
+
+        if ($oldPath === $newPath) continue;
+
+        if (is_file($oldPath)) {
+          $canOverwrite = false;
+          if (!is_file($newPath)) {
+            $canOverwrite = true;
+          } else {
+            // Overwrite if orphan or same page
+            $collidingPage = $page->wire('pages')->get("md_markdown=" . basename($newPath));
+            if (!$collidingPage->id || (int)$collidingPage->id === (int)$page->id) {
+              $canOverwrite = true;
+            }
+          }
+
+          if ($canOverwrite) {
+            MarkdownFileIO::ensureDirectory($newPath);
+            if (rename($oldPath, $newPath)) {
+              $msg = sprintf("Moved markdown file '%s' to '%s' to match page rename.", basename($oldPath), basename($newPath));
+              MarkdownUtilities::sessionMessage($msg);
+              $renamedCount++;
+              MarkdownUtilities::logChannel($page, 'Moved markdown file on rename', [
+                'from' => $oldPath,
+                'to' => $newPath,
+                'language' => $langCode,
+              ]);
+            } else {
+              MarkdownUtilities::logChannel($page, 'FAILED to move markdown file on rename', [
+                'from' => $oldPath,
+                'to' => $newPath,
+                'language' => $langCode,
+                'error' => error_get_last()['message'] ?? 'Unknown error',
+              ]);
+            }
+          }
+        }
+      } catch (\Throwable $e) {
+        MarkdownUtilities::logChannel($page, "Error processing language rename: $langCode", [
+          'message' => $e->getMessage()
+        ]);
       }
     }
   }

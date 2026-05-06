@@ -191,20 +191,9 @@ class MarkdownFileIO extends MarkdownConfig
 
     $path = self::getMarkdownFilePath($page, $languageCode, $source);
     if (!is_file($path)) {
-      self::logDebug(
-        $page,
-        sprintf('markdown file not found for language %s', $languageCode),
-        [
-          'path' => $path,
-          'source' => $source,
-          'language' => $languageCode,
-          'pageName' => (string) $page->name,
-          'exists' => file_exists($path) ? 'yes' : 'no',
-        ],
-      );
       return null;
     }
-
+    
     // Read and process markdown before parsing
     $markdown = @file_get_contents($path);
     if ($markdown === false) {
@@ -351,7 +340,7 @@ class MarkdownFileIO extends MarkdownConfig
     return is_file($path);
   }
 
-  protected static function ensureDirectory(string $path): void
+  public static function ensureDirectory(string $path): void
   {
     $directory = dirname($path);
     if (!is_dir($directory)) {
