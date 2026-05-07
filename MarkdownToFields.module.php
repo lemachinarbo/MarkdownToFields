@@ -464,6 +464,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     // Remove and delete fields (reverse order for fieldset pairs)
     $fieldsToDelete = array_reverse($fieldNames);
     $deletedCount = 0;
+    $fieldgroupsCache = [];
     
     foreach ($fieldsToDelete as $fieldName) {
       $field = $fields->get($fieldName);
@@ -473,8 +474,12 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
       
       // Remove from all templates/fieldgroups
       foreach ($templates as $template) {
-        // SAFETY: Reload fieldgroup fresh from database
-        $fieldgroup = $this->wire('fieldgroups')->get($template->fieldgroup->id);
+        $fgId = $template->fieldgroup->id;
+        if (!isset($fieldgroupsCache[$fgId])) {
+          // SAFETY: Reload fieldgroup fresh from database
+          $fieldgroupsCache[$fgId] = $this->wire('fieldgroups')->get($fgId);
+        }
+        $fieldgroup = $fieldgroupsCache[$fgId];
         if (!$fieldgroup) continue;
         
         if ($fieldgroup->has($field)) {
