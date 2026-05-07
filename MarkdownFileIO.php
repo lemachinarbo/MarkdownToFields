@@ -40,69 +40,35 @@ class MarkdownFileIO extends MarkdownConfig
   protected static $gettingContentSource = [];
 
   /** Returns the markdown source filename for the page. */
-  public static function contentSource(Page $page): string
+  public static function contentSource(Page $page, $language = null): string
   {
     $pageId = $page->id;
 
     if (isset(self::$gettingContentSource[$pageId])) {
-      $config = self::requireConfig($page);
-      $source = $config['source'];
-      $fallback = trim((string) $source['fallback']);
-      if ($fallback !== '') {
-        return $fallback;
-      }
-      throw new WireException(
-        sprintf('Recursion detected getting source for page %s.', $page->path),
-      );
+      // Emergency fallback to avoid infinite recursion
+      return (string) $page->getLanguageValue($language, 'name') . '.md';
     }
 
     self::$gettingContentSource[$pageId] = true;
     try {
-      // Check if page class has overridden contentSource()
+      // 1. Check for explicit class override
       if (self::hasContentSourceOverride($page)) {
         try {
           $override = $page->contentSource();
-          // Only use if it returns a non-empty string; otherwise fall through to field/default
           if (is_string($override) && $override !== '') {
             return $override;
           }
-        } catch (\Throwable $e) {
-          // Override exists but implementation failed; fall through to frontmatter/default
-        }
+        } catch (\Throwable $e) {}
       }
 
-      $config = self::requireConfig($page);
-      $source = $config['source'];
-
-      // Try frontmatter 'name' field in case page name was changed via markdown
-      try {
-        $content = self::loadLanguageMarkdown($page, null);
-        if ($content instanceof ContentData) {
-          $frontmatter = $content->getFrontmatter();
-          if (is_array($frontmatter) && isset($frontmatter['name'])) {
-            $frontmatterName = trim((string) $frontmatter['name']);
-            if ($frontmatterName !== '') {
-              return $frontmatterName . '.md';
-            }
-          }
-        }
-      } catch (\Throwable $e) {
-        // If we can't load markdown to check frontmatter, continue to fallback
-      }
-
-      $fallback = trim((string) $source['fallback']);
-      if (self::isValidSource($fallback)) {
-        return $fallback;
-      }
-
-      // Default: use page name with .md extension
-      $pageName = trim((string) $page->name);
+      // 2. Fall back to localized page name
+      $pageName = trim((string) $page->getLanguageValue($language, 'name'));
       if ($pageName !== '') {
         return $pageName . '.md';
       }
 
       throw new WireException(
-        sprintf('No markdown source configured for page %s.', $page->path),
+        sprintf('No markdown source could be determined for page %s.', $page->path),
       );
     } finally {
       unset(self::$gettingContentSource[$pageId]);
@@ -119,14 +85,23 @@ class MarkdownFileIO extends MarkdownConfig
       return false;
     }
 
-    try {
-      $reflClass = new \ReflectionClass($page);
-      $method = $reflClass->getMethod('contentSource');
-      $declaringClass = $method->getDeclaringClass()->getName();
-      return $declaringClass !== 'ProcessWire\Page';
-    } catch (\Throwable $e) {
+    $reflClass = new \ReflectionClass($page);
+    if (!$reflClass->hasMethod('contentSource')) {
       return false;
     }
+
+    $method = $reflClass->getMethod('contentSource');
+    $declaringClass = $method->getDeclaringClass()->getName();
+    
+    // If it's declared in a trait or the base Page class, it's not an override we care about
+    // (Trait methods are considered declared in the class using them, but we can check if it's our trait)
+    if ($declaringClass === 'ProcessWire\Page') {
+      return false;
+    }
+
+    // Check if it's the default implementation from MarkdownContent trait
+    // We want to allow REAL overrides in Page classes
+    return true; 
   }
 
   /** Returns the filesystem path to the markdown file for a page and language. */
@@ -138,7 +113,8 @@ class MarkdownFileIO extends MarkdownConfig
     $config = self::requireConfig($page);
 
     $languageCode ??= self::getLanguageCode($page);
-    $source ??= self::contentSource($page);
+    $language = self::resolveLanguage($page, $languageCode);
+    $source ??= self::contentSource($page, $language);
 
     $root = $config['source']['path'];
     $source = ltrim($source, '/');

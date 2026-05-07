@@ -26,7 +26,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     return $map;
   }
 
-  public static function syncFromMarkdown(Page $page): array
+  public static function syncFromMarkdown(Page $page, bool $save = true): array
   {
     $config = self::config($page);
     if ($config === null) {
@@ -36,13 +36,13 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     self::$syncingFromMarkdown[$page->id] = true;
 
     try {
-      return self::doSyncFromMarkdown($page);
+      return self::doSyncFromMarkdown($page, $save);
     } finally {
       unset(self::$syncingFromMarkdown[$page->id]);
     }
   }
 
-  private static function doSyncFromMarkdown(Page $page): array
+  private static function doSyncFromMarkdown(Page $page, bool $save = true): array
   {
     $config = self::config($page);
     if ($config === null) {
@@ -59,7 +59,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     }
 
     $failedFields = [];
-    $savedFields = self::saveDirtyFields($page, $dirtyFields, $failedFields);
+    $savedFields = self::saveDirtyFields($page, $dirtyFields, $failedFields, $save);
 
     if ($failedFields) {
       self::handleFailedFields($page, $failedFields);
@@ -79,13 +79,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
       $isDefaultLanguage = $languageCode === $defaultCode;
 
       if (!$isDefaultLanguage && !$language instanceof Language) {
-        self::logInfo(
-          $page,
-          sprintf(
-            'skip language %s: not configured in ProcessWire',
-            $languageCode,
-          ),
-        );
         continue;
       }
 
@@ -101,24 +94,13 @@ class MarkdownSyncEngine extends MarkdownSessionManager
              if (@rename(dirname($pathAttempted) . '/' . $orphanFile, $pathAttempted)) {
                 $msg = sprintf("Moved markdown file '%s' to '%s' to match page rename.", $orphanFile, basename($pathAttempted));
                 MarkdownUtilities::sessionMessage($msg);
-                self::logInfo($page, "Relocated orphan file to canonical path", [
-                  'from' => $orphanFile,
-                  'to' => basename($pathAttempted)
-                ]);
+                $content = self::loadLanguageMarkdown($page, $language); // Load from new canonical path
              }
            }
-           $content = self::loadLanguageMarkdown($page, $language); // Load from new canonical path
         }
       }
 
       if (!$content instanceof ContentData) {
-        if (!$isDefaultLanguage) {
-          self::logInfo(
-            $page,
-            sprintf('missing markdown file for language %s', $languageCode),
-            ['field' => $markdownField],
-          );
-        }
         continue;
       }
 
@@ -169,7 +151,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     return $dirtyFields;
   }
 
-  private static function saveDirtyFields(Page $page, array $dirtyFields, array &$failedFields): array
+  private static function saveDirtyFields(Page $page, array $dirtyFields, array &$failedFields, bool $save = true): array
   {
     $savedFields = [];
 
@@ -189,18 +171,16 @@ class MarkdownSyncEngine extends MarkdownSessionManager
           MarkdownBoundLinks::persistLinkIndexFromStoredPage($page);
         }
 
-        $page->save($field);
+        if ($save) {
+          $page->save($field);
+        }
         $savedFields[] = $field;
 
-        if ($field === 'name' && MarkdownConfig::isLinkSyncEnabled($page)) {
+        if ($field === 'name' && MarkdownConfig::isLinkSyncEnabled($page) && $save) {
           MarkdownBoundLinks::refreshReferencesForPageTree($page, $oldUrlsByPageId);
         }
       } catch (\Throwable $e) {
         $failedFields[$field] = $e->getMessage();
-        self::logInfo(
-          $page,
-          sprintf('failed to save field %s: %s', $field, $e->getMessage()),
-        );
       }
     }
 
@@ -228,7 +208,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         $errorPreview,
       );
 
-      self::logInfo($page, $errorMsg);
       throw new WireException($errorMsg);
     }
   }
@@ -404,10 +383,11 @@ class MarkdownSyncEngine extends MarkdownSessionManager
       $page->of(false);
 
       $languageContent = self::loadLanguageMarkdown($page, $language);
-
+      $isRenamingPage = $page->isChanged('name') || $page->get('_md_renaming_' . ($language ? $language->id : ''));
+ 
       // Orphan discovery: If the primary file is missing during write, look for an orphan to relocate.
       // This prevents duplicates like roo.md and foo.md existing simultaneously.
-      if (!$languageContent instanceof ContentData) {
+      if (!$languageContent instanceof ContentData && !$isRenamingPage) {
         $orphanFile = self::findOrphanByFrontmatterName($page, $languageCode);
         if ($orphanFile) {
           $pathAttempted = MarkdownFileIO::getMarkdownFilePath($page, $languageCode);
@@ -470,15 +450,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         ) {
           $markdownValue = $storedLanguageMarkdown;
         } else {
-          self::logInfo(
-            $page,
-            sprintf(
-              'skip sync for %s: no markdown input available',
-              self::languageLogLabel($page, $language),
-            ),
-            ['field' => $markdownField],
-          );
-          continue;
+          $markdownValue = '';
         }
       }
 
@@ -572,6 +544,8 @@ class MarkdownSyncEngine extends MarkdownSessionManager
           }
         }
 
+        $isRenaming = $field === 'name' && ($page->isChanged('name') || $page->get('_md_renaming_' . ($language ? $language->id : '')));
+
         if ($fieldChanged && $markdownChanged) {
           $valuesDiffer =
             $normalizedPosted !== null &&
@@ -581,7 +555,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
           if ($valuesDiffer) {
             // Special case: If we are renaming the page, the 'name' field mismatch is expected.
             // Don't treat it as a conflict.
-            if ($field === 'name' && $page->isChanged('name')) {
+            if ($isRenaming) {
               // Allow CMS to win
             } else {
               $label = $field === 'title' ? __('title') : $field;
@@ -599,8 +573,8 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
         $finalValue = null;
 
-        if ($fieldChanged) {
-          $finalValue = $normalizedPosted;
+        if ($fieldChanged || $isRenaming) {
+          $finalValue = $normalizedPosted ?? self::frontmatterValue($page, $field, $language);
         } elseif ($markdownChanged) {
           $finalValue = $documentValue;
         } elseif ($hasDocumentFrontmatter) {

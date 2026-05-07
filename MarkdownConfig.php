@@ -16,6 +16,15 @@ class MarkdownConfig extends MarkdownLanguageResolver
     return self::config($page) !== null;
   }
 
+  /** Clears the cached configuration for a specific page. */
+  public static function forget(Page $page): void
+  {
+    $pageId = (int) $page->id;
+    if ($pageId > 0) {
+      unset(self::$configCache[$pageId]);
+    }
+  }
+
   protected static function config(Page $page): ?array
   {
     $pageId = (int) $page->id;

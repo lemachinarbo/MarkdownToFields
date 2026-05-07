@@ -227,16 +227,16 @@ class MarkdownSyncHooks
       $expectedHash,
       $languageScope ?: null,
       $postedLanguageValues,
+      false, // save=false
     );
     
     MarkdownEditor::rememberHash($page);
 
     $hashField = MarkdownConfig::getHashField($page);
-    // Skip hash persistence until the page has an ID (new pages can't save individual fields yet)
+    // Update hash field - ProcessWire will persist this as part of the ongoing save.
     if ($page->id && $hashField && $page->hasField($hashField)) {
       $page->of(false);
       $page->set($hashField, MarkdownHashTracker::buildHashPayload($page));
-      $page->save($hashField);
     }
 
     MarkdownBoundLinks::persistLinkIndex($page);
@@ -456,6 +456,8 @@ class MarkdownSyncHooks
       return;
     }
 
+    MarkdownConfig::forget($page);
+
     // Fetch the version currently in the DB using getFresh to bypass memory cache
     $dbPage = $page->wire('pages')->getFresh($pageId);
     if (!$dbPage || !$dbPage->id) {
@@ -513,12 +515,13 @@ class MarkdownSyncHooks
             if (rename($oldPath, $newPath)) {
               $msg = sprintf("Moved markdown file '%s' to '%s' to match page rename.", basename($oldPath), basename($newPath));
               MarkdownUtilities::sessionMessage($msg);
-              $renamedCount++;
+              $page->setQuietly('_md_renaming_' . $language->id, true);
               MarkdownUtilities::logChannel($page, 'Moved markdown file on rename', [
                 'from' => $oldPath,
                 'to' => $newPath,
                 'language' => $langCode,
               ]);
+              $renamedCount++;
             } else {
               MarkdownUtilities::logChannel($page, 'FAILED to move markdown file on rename', [
                 'from' => $oldPath,
