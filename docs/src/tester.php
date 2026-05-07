@@ -66,9 +66,28 @@ function dump($obj) {
  */
 if (isset($_POST['markdown'])) {
     header('Content-Type: application/json');
+
+    // Security Gate: PHP Execution is disabled by default.
+    $php = $_POST['php'] ?? '';
+    if ($php) {
+        $isLocal = in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1']);
+        $isDevEnv = getenv('DDEV_PROJECT') || getenv('IS_DDEV');
+        $isEnabled = file_exists(__DIR__ . '/.enable-playground');
+
+        if (!$isEnabled || (!$isLocal && !$isDevEnv)) {
+            http_response_code(403);
+            echo json_encode([
+                'error' => "Security Gate: PHP Execution is disabled. To enable it for local development:\n" .
+                           "1. Ensure you are on localhost or DDEV.\n" .
+                           "2. Create an empty file at docs/src/.enable-playground\n\n" .
+                           "This prevents accidental RCE on production servers."
+            ]);
+            exit;
+        }
+    }
+
     try {
         $md = $_POST['markdown'];
-        $php = $_POST['php'] ?? '';
         
         $constructor = (new \ReflectionClass(LetMeDown::class))->getConstructor();
         $parser = $constructor && $constructor->getNumberOfParameters() >= 2
@@ -334,7 +353,7 @@ function explorer($obj, $name = 'root', $depth = 0) {
             const data = await resp.json();
             
             if (data.error) {
-                document.getElementById('preview-area').innerHTML = `<div style="color:red; font-family:monospace;">${data.error}</div>`;
+                document.getElementById('preview-area').innerHTML = `<div style="color:red; font-family:monospace; white-space:pre-wrap; padding:10px;">${data.error}</div>`;
                 return;
             }
 
