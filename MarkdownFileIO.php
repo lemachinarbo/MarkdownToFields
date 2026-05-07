@@ -39,14 +39,18 @@ class MarkdownFileIO extends MarkdownConfig
 
   protected static $gettingContentSource = [];
 
-  /** Returns the markdown source filename for the page. */
-  public static function contentSource(Page $page, $language = null): string
+  /** Returns the markdown source filename for the page. Evaluates using the default language context. */
+  public static function contentSource(Page $page): string
   {
     $pageId = $page->id;
 
     if (isset(self::$gettingContentSource[$pageId])) {
       // Emergency fallback to avoid infinite recursion
-      return (string) $page->getLanguageValue($language, 'name') . '.md';
+      $defaultLang = MarkdownLanguageResolver::getDefaultLanguage($page);
+      $name = $defaultLang
+          ? (string) $page->getLanguageValue($defaultLang, 'name')
+          : (string) $page->name;
+      return trim($name) . '.md';
     }
 
     self::$gettingContentSource[$pageId] = true;
@@ -61,8 +65,12 @@ class MarkdownFileIO extends MarkdownConfig
         } catch (\Throwable $e) {}
       }
 
-      // 2. Fall back to localized page name
-      $pageName = trim((string) $page->getLanguageValue($language, 'name'));
+      // 2. Fall back to localized page name using the default language context
+      $defaultLang = MarkdownLanguageResolver::getDefaultLanguage($page);
+      $pageName = $defaultLang
+          ? trim((string) $page->getLanguageValue($defaultLang, 'name'))
+          : trim((string) $page->name);
+          
       if ($pageName !== '') {
         return $pageName . '.md';
       }
@@ -93,14 +101,18 @@ class MarkdownFileIO extends MarkdownConfig
     $method = $reflClass->getMethod('contentSource');
     $declaringClass = $method->getDeclaringClass()->getName();
     
-    // If it's declared in a trait or the base Page class, it's not an override we care about
-    // (Trait methods are considered declared in the class using them, but we can check if it's our trait)
+    // If it's declared in the base Page class, it's not an override we care about
     if ($declaringClass === 'ProcessWire\Page') {
       return false;
     }
 
-    // Check if it's the default implementation from MarkdownContent trait
-    // We want to allow REAL overrides in Page classes
+    // If it's the default implementation from MarkdownContent trait, it's not a "real" override.
+    // Traits are flattened into the class, so we check the filename of the method.
+    $fileName = $method->getFileName();
+    if ($fileName && strpos($fileName, 'MarkdownContent.php') !== false) {
+      return false;
+    }
+
     return true; 
   }
 
@@ -114,7 +126,7 @@ class MarkdownFileIO extends MarkdownConfig
 
     $languageCode ??= self::getLanguageCode($page);
     $language = self::resolveLanguage($page, $languageCode);
-    $source ??= self::contentSource($page, $language);
+    $source ??= self::contentSource($page);
 
     $root = $config['source']['path'];
     $source = ltrim($source, '/');
@@ -166,6 +178,7 @@ class MarkdownFileIO extends MarkdownConfig
     $source ??= self::contentSource($page);
 
     $path = self::getMarkdownFilePath($page, $languageCode, $source);
+    
     if (!is_file($path)) {
       return null;
     }

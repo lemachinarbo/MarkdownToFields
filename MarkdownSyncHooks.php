@@ -469,29 +469,25 @@ class MarkdownSyncHooks
       return;
     }
 
+    $defaultLanguage = MarkdownLanguageResolver::getDefaultLanguage($page);
+    $oldName = $defaultLanguage ? (string) $dbPage->getLanguageValue($defaultLanguage, 'name') : (string) $dbPage->name;
+    $newName = $defaultLanguage ? (string) $page->getLanguageValue($defaultLanguage, 'name') : (string) $page->name;
+
+    if ($oldName === '' || $newName === '' || $oldName === $newName) {
+      return;
+    }
+
+    $oldPage = clone $dbPage;
+    if ($defaultLanguage) {
+      $oldPage->setLanguageValue($defaultLanguage, 'name', $oldName);
+    } else {
+      $oldPage->name = $oldName;
+    }
+
     $renamedCount = 0;
     foreach (MarkdownLanguageResolver::availableLanguageCodes($page) as $langCode) {
       try {
-        $language = MarkdownSyncEngine::resolveLanguage($page, $langCode);
-        if (!$language instanceof Language) {
-          continue;
-        }
-
-        $newName = (string) $page->getLanguageValue($language, 'name');
-        $oldName = (string) $dbPage->getLanguageValue($language, 'name');
-
-        if ($oldName === '' || $newName === '' || $oldName === $newName) {
-          continue;
-        }
-
-        // Construct paths
-        $oldPage = clone $dbPage;
-        // Ensure the oldPage clone has the specific old name for the current langCode context
-        if (!$language->isDefault()) {
-           $oldPage->setLanguageValue($language, 'name', $oldName);
-        } else {
-           $oldPage->name = $oldName;
-        }
+        $language = MarkdownLanguageResolver::resolveLanguage($page, $langCode);
 
         $oldPath = MarkdownFileIO::getMarkdownFilePath($oldPage, $langCode);
         $newPath = MarkdownFileIO::getMarkdownFilePath($page, $langCode);

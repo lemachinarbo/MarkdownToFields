@@ -381,10 +381,12 @@ class MarkdownSyncEngine extends MarkdownSessionManager
       }
 
       $page->of(false);
-
-      $languageContent = self::loadLanguageMarkdown($page, $language);
+      
       $isRenamingPage = $page->isChanged('name') || $page->get('_md_renaming_' . ($language ? $language->id : ''));
- 
+      $source = MarkdownFileIO::contentSource($page);
+      $path = MarkdownFileIO::getMarkdownFilePath($page, $languageCode, $source);
+      
+      $languageContent = self::loadLanguageMarkdown($page, $language);
       // Orphan discovery: If the primary file is missing during write, look for an orphan to relocate.
       // This prevents duplicates like roo.md and foo.md existing simultaneously.
       if (!$languageContent instanceof ContentData && !$isRenamingPage) {
@@ -736,7 +738,11 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     $files = glob($dir . '/*.md');
     if (!$files) return null;
 
-    $pageName = (string) $page->name;
+    $language = MarkdownLanguageResolver::resolveLanguage($page, $langCode);
+    $pageName = trim((string)$page->getLanguageValue($language, 'name'));
+    if ($pageName === '') {
+      $pageName = (string)$page->name;
+    }
 
     foreach ($files as $file) {
       $filename = basename($file);
@@ -745,7 +751,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
       try {
         // We use a low-level load to avoid recursion or heavy logic
-        $content = self::loadLanguageMarkdown($page, null, $filename);
+        $content = self::loadLanguageMarkdown($page, $language, $filename);
         if ($content) {
           $fm = $content->getFrontmatter();
           $fmName = trim((string)($fm['name'] ?? ''));

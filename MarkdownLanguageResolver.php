@@ -94,7 +94,7 @@ class MarkdownLanguageResolver extends MarkdownDocumentParser
     return self::FALLBACK_LANGUAGE;
   }
 
-  protected static function getDefaultLanguage(Page $page): ?Language
+  public static function getDefaultLanguage(Page $page): ?Language
   {
     $languages = $page->wire('languages');
     if (!$languages) {
