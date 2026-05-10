@@ -42,9 +42,12 @@ MarkdownToFields is a ProcessWire module that allows using Markdown files as the
 
 
 ## Git & Commit Standards
+
 - **No Auto-Committing**: Never run `git commit` autonomously. Instead, suggest that changes are ready and propose exactly what the commit message should be in a code block for the user to execute manually.
 - **Flat History Only**: Never create merge commits. Always squash or rebase to maintain a linear timeline.
+- **Scratch Discipline**: All scratch files, debug scripts, or temporary data created during implementation MUST be placed in `scratch/`. NEVER create scratch files in the project root.
 - **Commit Format**: Strictly follow the Conventional Commits specification. This drives the automated changelog.
+- **No Emojis**: Strictly forbidden in commits, PR titles, or descriptions.
 - **Translation Logic (Strict Mapping)**:
    - `add` -> commit as `feat: [description]`
    - `fix` -> commit as `fix: [description]`
@@ -60,16 +63,36 @@ MarkdownToFields is a ProcessWire module that allows using Markdown files as the
    - **Case**: The entire subject line must be lowercase.
    - **No Fluff**: No emojis, no "AI-generated" or "Verified" footers, and no trailing periods.
    - **Length**: Keep the subject line concise (under 50 characters).
-- **Example**:
 
-```text
-- **Example**:
-  feat: add input validation to hastemplate
-  
-  - this check uses a regex whitelist to prevent directory traversal
-  - it ensures template names only contain alphanumeric characters, underscores, and hyphens
-  - aligns validation with existing logic in the render method
-```
+## Conductor Protocol (Master Workflow)
+
+We use a 4-step "Conductor-Driven Development" lifecycle to ensure high-quality, autonomous maintenance:
+
+1.  **Planning**: A task is selected from the backlog and moved to `Active Tracks` in `todo.md` (or a dedicated tracks file). This update MUST be committed and pushed to `master` immediately to "lock" the track.
+2.  **Implementation**: Jules implements the plan on a dedicated branch. The Orchestrator monitors for completion; no PR is required as the Orchestrator will ingest the diff directly.
+3.  **Autonomous Review**: The Conductor (Orchestrator) monitors the session. If Jules is ready but blocked by manual gates (no auto-publish), the Conductor MUST **Overtake** by extracting the patch via API and pushing the PR manually.
+4.  **Finalization**: An agent verifies the work against the plan and runs tests. The track is moved from `Active` to `Completed`. This ledger update is committed to `master` as part of the final squash-merge of Jules' work.
+
+## Submission & PR Guidelines
+
+When creating a PR or submission description, you MUST use the template found in `.github/PULL_REQUEST_TEMPLATE.md`.
+
+**Title Format:** `type: brief description` (no emojis, no capital start, no trailing period)
+- **Message Structure (Required)**:
+   - Subject line must be exactly: `<type>: <imperative description>`
+   - Add a blank line after subject
+   - Add a short bullet body describing concrete changes
+   - Use `- ` bullets only (no nested lists)
+- **Style Rules**:
+   - **Case**: The entire subject line must be lowercase.
+   - **No Fluff**: No emojis, no "AI-generated" or "Verified" footers, and no trailing periods.
+   - **Length**: Keep the subject line concise (under 50 characters).
+
+## Maintenance & Sync
+
+- **Self-Documenting Rule**: You are responsible for keeping this file accurate. 
+- **Definition of Done**: A task is only complete if any changes to public methods, logic boundaries, or architecture are reflected in this file.
+- **Audit Trigger**: If you detect a mismatch between the code and this guide, update the guide immediately before proceeding with other changes.
 
 
 ---
@@ -189,12 +212,14 @@ Never log:
  
  ---
  
- ## Core Module Patching Workflow
+## Submodule Workflow
 
-When patching the core engine (`LetMeDown`), it is located in `/home/lemachi/projects/LetMeDown`.
+When patching submodules such as `LetMeDown`, they are located under `/home/lemachi/projects/`.
 
-**Rules for Submodules:**
-- It must be edited in its respective directory under `/home/lemachi/projects/LetMeDown` ONLY.
-- **Never** edit it directly in the vendor copy (`/home/lemachi/projects/MarkdownToFields/vendor/lemachinarbo/letmedown/...`) except for quick verification.
-- After editing, copy the changed files back to the `vendor/` directory in the current project to test it with the documentation builder and module logic.
-- This maintains the canonical source of truth while allowing local integration testing.
+Rules:
+
+- Edit submodules only in their real directories under `/home/lemachi/projects/` (e.g., `/home/lemachi/projects/LetMeDown`).
+- NEVER edit them directly in the `vendor/` copy except for quick verification.
+- After editing and building (if needed), copy the changed files into the `vendor/` copy for testing.
+- Making the `vendor/` copy dirty for testing is acceptable.
+- When asked to clean, reset the `vendor/` copy to its original state.
