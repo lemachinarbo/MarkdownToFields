@@ -193,7 +193,17 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     ?array &$log = null,
   ): array
   {
-    $pages = $this->wire('pages')->find("limit={$limit}");
+    $templates = $this->getEffectiveEnabledTemplates();
+    if (empty($templates)) {
+      return [
+        'processed' => 0,
+        'updatedPages' => 0,
+        'updatedImages' => 0,
+      ];
+    }
+
+    $selector = 'template=' . implode('|', $templates) . ", limit={$limit}";
+    $pages = $this->wire('pages')->find($selector);
     $processed = 0;
     $updatedPages = 0;
     $updatedImages = 0;
@@ -236,7 +246,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   }
 
   /** Determine enabled templates from site config or module state. */
-  private function getEffectiveEnabledTemplates(): array
+  public function getEffectiveEnabledTemplates(): array
   {
     $mdConfig = $this->wire('config')->MarkdownToFields ?? [];
     if (isset($mdConfig['enabledTemplates'])) {

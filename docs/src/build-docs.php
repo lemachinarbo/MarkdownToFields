@@ -82,6 +82,7 @@ class DocBuilder {
     private string $outputFile;
     private bool $updateMode = false;
     private int $figCounter = 1;
+    private array $reflectionCache = [];
 
     public function __construct(array $argv = []) {
         $this->docsDir = dirname(__DIR__);
@@ -313,7 +314,7 @@ class DocBuilder {
             if ($level > 1) return "{$className} [...]\n";
             
             $out .= "{$className}\n";
-            $ref = new \ReflectionClass($obj);
+            $ref = $this->reflectionCache[$className] ??= new \ReflectionClass($obj);
             $props = $ref->getProperties(\ReflectionProperty::IS_PUBLIC | \ReflectionProperty::IS_PROTECTED);
             
             foreach ($props as $prop) {
@@ -460,15 +461,21 @@ class DocBuilder {
 
             $ref = null;
             foreach ($potentialClasses as $c) {
+                if (isset($this->reflectionCache[$c])) {
+                    $ref = $this->reflectionCache[$c];
+                    $className = $c;
+                    break;
+                }
                 if (class_exists($c)) {
                     $className = $c;
-                    $ref = new \ReflectionClass($c);
+                    $ref = $this->reflectionCache[$c] = new \ReflectionClass($c);
                     break;
                 }
             }
 
             if (!$ref) {
-              $ref = new \ReflectionClass("LetMeDown\\" . $className);
+              $lmClassName = "LetMeDown\\" . $className;
+              $ref = $this->reflectionCache[$lmClassName] ??= new \ReflectionClass($lmClassName);
             }
             
             $table = "| Member | Type | Description |\n";

@@ -6,6 +6,54 @@ class MarkdownLanguageResolver extends MarkdownDocumentParser
 {
   protected const FALLBACK_LANGUAGE = 'en';
 
+  protected static array $languageCache = [];
+
+  protected static function getLanguageCache(Page $page): array
+  {
+    $defaultCode = self::getDefaultLanguageCode($page);
+    $languages = $page->wire('languages');
+    if (!$languages) {
+      return ['codeMap' => [], 'codes' => [$defaultCode]];
+    }
+
+    $cacheKey = spl_object_hash($languages);
+    if (isset(self::$languageCache[$cacheKey])) {
+      return self::$languageCache[$cacheKey];
+    }
+
+    $codeMap = [];
+    $codes = [$defaultCode];
+    $default = $languages->getDefault();
+
+    foreach ($languages as $lang) {
+      if (!$lang instanceof Language) {
+        continue;
+      }
+
+      $explicitCode = trim((string) $lang->get('code'));
+      if ($explicitCode !== '') {
+        $codeMap[$explicitCode] = $lang;
+      }
+
+      if ($default instanceof Language && (int) $lang->id === (int) $default->id) {
+        continue;
+      }
+
+      $codes[] = self::languageCodeFromLanguage(
+        $lang,
+        self::FALLBACK_LANGUAGE,
+      );
+    }
+
+    $result = [
+      'codeMap' => $codeMap,
+      'codes' => array_values(array_unique($codes)),
+    ];
+
+    self::$languageCache[$cacheKey] = $result;
+    return $result;
+  }
+
   public static function resolveLanguage(Page $page, $language): ?Language
   {
     if ($language instanceof Language) {
@@ -31,15 +79,9 @@ class MarkdownLanguageResolver extends MarkdownDocumentParser
 
       if ($selectorValue !== '') {
         // Prefer explicit code field when present, then name, then title.
-        foreach ($languages as $lang) {
-          if (!$lang instanceof Language) {
-            continue;
-          }
-          $langCode = trim((string) $lang->get('code'));
-          if ($langCode !== '' && $langCode === $selectorValue) {
-            $resolved = $lang;
-            break;
-          }
+        $cache = self::getLanguageCache($page);
+        if (isset($cache['codeMap'][$selectorValue])) {
+          $resolved = $cache['codeMap'][$selectorValue];
         }
         if (!$resolved instanceof Language) {
           $resolved = $languages->get('name=' . $selectorValue);
@@ -259,17 +301,12 @@ class MarkdownLanguageResolver extends MarkdownDocumentParser
         : $languageKey;
 
       if ($selectorValue !== '') {
-        foreach ($languages as $lang) {
-          if (!$lang instanceof Language) {
-            continue;
-          }
-          $langCode = trim((string) $lang->get('code'));
-          if ($langCode !== '' && $langCode === $selectorValue) {
-            return self::languageCodeFromLanguage(
-              $lang,
-              self::FALLBACK_LANGUAGE,
-            );
-          }
+        $cache = self::getLanguageCache($page);
+        if (isset($cache['codeMap'][$selectorValue])) {
+          return self::languageCodeFromLanguage(
+            $cache['codeMap'][$selectorValue],
+            self::FALLBACK_LANGUAGE,
+          );
         }
       }
     }
@@ -347,30 +384,7 @@ class MarkdownLanguageResolver extends MarkdownDocumentParser
   /** Returns all available language codes for the site. */
   public static function availableLanguageCodes(Page $page): array
   {
-    $codes = [];
-
-    $defaultCode = self::getDefaultLanguageCode($page);
-    $codes[] = $defaultCode;
-
-    $languages = $page->wire('languages');
-    if ($languages) {
-      $default = $languages->getDefault();
-      foreach ($languages as $language) {
-        if (!$language instanceof Language) {
-          continue;
-        }
-
-        if ($default instanceof Language && $language->id === $default->id) {
-          continue;
-        }
-
-        $codes[] = self::languageCodeFromLanguage(
-          $language,
-          self::FALLBACK_LANGUAGE,
-        );
-      }
-    }
-
-    return array_values(array_unique($codes));
+    $cache = self::getLanguageCache($page);
+    return $cache['codes'];
   }
 }

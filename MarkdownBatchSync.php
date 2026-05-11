@@ -37,7 +37,15 @@ class MarkdownBatchSync extends MarkdownSyncEngine
     int $ttlSeconds = 0,
     bool $useLock = true,
   ): int {
-    $pages = wire('pages')->find("limit={$limit}");
+    $module = wire('modules')->get('MarkdownToFields');
+    $templates = $module ? $module->getEffectiveEnabledTemplates() : [];
+
+    if (empty($templates)) {
+      return 0;
+    }
+
+    $selector = 'template=' . implode('|', $templates) . ", limit={$limit}";
+    $pages = wire('pages')->find($selector);
     $processed = 0;
     $updated = 0;
     $updatedPages = [];
