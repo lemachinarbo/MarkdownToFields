@@ -22,6 +22,10 @@ This file tracks the active development tracks for Jules and other agents.
 - [x] **isset() implementation** (LetMeDown 505916c)
   - [x] Add __isset() to Section and ContentData
   - [x] Verified via diagnostic check
+- [x] **Documentation Playground Hardening** (9aa2f57)
+  - [x] Remove eval() and PHP execution logic
+- [x] **Uninstall Optimization** (506edbd)
+  - [x] Batch fieldgroup saves to minimize database writes
 
 ## Backlog
 
