@@ -19,11 +19,13 @@ This file tracks the active development tracks for Jules and other agents.
 - [x] **Code Health & Security Hardening** (Sessions: 13660741353584511202, 6052995804715138381, 5317230512298581675)
   - [x] Dead code removal
   - [x] HTML purification integration
+- [x] **isset() implementation** (LetMeDown 505916c)
+  - [x] Add __isset() to Section and ContentData
+  - [x] Verified via diagnostic check
 
 ## Backlog
 
 - [ ] **Home image refresh logic**: Image logic is disconnected from the module refresh function. Pages still load old variants after refresh.
-- [ ] **isset() implementation**: `MarkdownSectionView` needs `__isset()` support for magic getters.
 - [ ] **dataSet('html') links rendering**: `intro` rendered as `MarkdownDataSet` even if it only contains normal links.
 - [ ] **Field Binder / Sync**: Concept for `<!-- page:1234:title -->` to sync text to original page/field to avoid inconsistency.
 - [ ] **Hardening pass for sync reliability**: Split `syncToMarkdown()` into steps, remove silent catches, add regression tests for rename/stale payloads/multilingual saves.
