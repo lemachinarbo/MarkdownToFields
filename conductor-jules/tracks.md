@@ -6,10 +6,14 @@ This file tracks the active development tracks for Jules and other agents.
 
 - [ ] **Uninstall Field Check Optimization** (Integrated: b71c689)
 - [ ] **Docs Reflection Optimization** (Session: 10046554523363063519)
-- [ ] **Cleanup: Unused markdownToHtml** (Session: 13296942377525011433)
+- [ ] **Cleanup: Unused markdownToHtml** (Integrated: 9762166)
 - [ ] **Cleanup: Unused normalizeMarkdownBody** (Integrated: 07dac0d)
 
 ## Completed
+
+- [x] **Cleanup: Unused markdownToHtml** (9762166)
+  - [x] Remove unused method from MarkdownHtmlConverter
+  - [x] Remove dead dependencies: Parsedown and ensureStructuralBreaksForRender
 
 - [x] **Uninstall Field Check Optimization** (b71c689)
   - [x] Batch fetch fields using $fields->find() to eliminate N+1 queries
