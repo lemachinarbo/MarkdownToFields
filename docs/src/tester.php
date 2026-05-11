@@ -67,24 +67,8 @@ function dump($obj) {
 if (isset($_POST['markdown'])) {
     header('Content-Type: application/json');
 
-    // Security Gate: PHP Execution is disabled by default.
-    $php = $_POST['php'] ?? '';
-    if ($php) {
-        $isLocal = in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1']);
-        $isDevEnv = getenv('DDEV_PROJECT') || getenv('IS_DDEV');
-        $isEnabled = file_exists(__DIR__ . '/.enable-playground');
-
-        if (!$isEnabled || (!$isLocal && !$isDevEnv)) {
-            http_response_code(403);
-            echo json_encode([
-                'error' => "Security Gate: PHP Execution is disabled. To enable it for local development:\n" .
-                           "1. Ensure you are on localhost or DDEV.\n" .
-                           "2. Create an empty file at docs/src/.enable-playground\n\n" .
-                           "This prevents accidental RCE on production servers."
-            ]);
-            exit;
-        }
-    }
+    // Security Gate: PHP Execution is removed to prevent RCE.
+    // The explorer remains functional for data inspection.
 
     try {
         $md = $_POST['markdown'];
@@ -97,28 +81,7 @@ if (isset($_POST['markdown'])) {
         $mockPage = new Page();
         $content = new MarkdownContentView($mockPage, $rawContent);
         
-        // Execute PHP logic
-        $renderedHtml = '';
-        if ($php) {
-            ob_start();
-            $page = new class($mockPage, $content) {
-                public function __construct(public $page, private $content) {}
-                public function content() { return $this->content; }
-                public function __get($name) { return $this->page->$name; }
-                public function __call($name, $args) { return $this->page->$name(...$args); }
-            };
-            // Execute the string as PHP
-            try {
-                // Remove optional tags if present
-                $cleanPhp = preg_replace('/^<\?php/', '', $php);
-                $cleanPhp = preg_replace('/\?>$/', '', $cleanPhp);
-                // Wrap in namespace so dump() and module classes are found
-                eval("namespace ProcessWire; " . $cleanPhp . ';'); 
-            } catch (\Throwable $e) {
-                echo "<div style='color:red; font-family:monospace;'>PHP Error: " . htmlspecialchars($e->getMessage()) . "</div>";
-            }
-            $renderedHtml = ob_get_clean();
-        }
+        $renderedHtml = '<em>PHP logic execution has been removed for security. Use the Explorer to verify data structures.</em>';
 
         // Use targeted dump if provided, otherwise the whole content
         $inspectTarget = $GLOBALS['__dumpTarget'] ?? $content;
@@ -278,20 +241,16 @@ function explorer($obj, $name = 'root', $depth = 0) {
             <div class="panel-header">Markdown</div>
             <div id="md-editor" class="editor"></div>
         </div>
-        <div id="panel-php" class="panel">
-            <div class="panel-header">PHP Logic</div>
-            <div id="php-editor" class="editor"></div>
-        </div>
-    </div>
-    <div id="split-bottom" class="split-v">
         <div id="panel-tree" class="panel">
-            <div class="panel-header">Explorer</div>
+            <div class="panel-header">Explorer (Data Structure)</div>
             <div class="scrollable">
                 <ul id="explorer-root"></ul>
             </div>
         </div>
+    </div>
+    <div id="split-bottom" class="split-v">
         <div id="panel-preview" class="panel">
-            <div class="panel-header">Preview</div>
+            <div class="panel-header">HTML Preview</div>
             <div class="scrollable preview" id="preview-area"></div>
         </div>
     </div>
@@ -303,17 +262,12 @@ function explorer($obj, $name = 'root', $depth = 0) {
     // Init Split.js
     Split(['#split-top', '#split-bottom'], {
         direction: 'vertical',
-        sizes: [50, 50],
+        sizes: [60, 40],
         gutterSize: 6
     });
 
-    Split(['#panel-md', '#panel-php'], {
+    Split(['#panel-md', '#panel-tree'], {
         sizes: [50, 50],
-        gutterSize: 6
-    });
-
-    Split(['#panel-tree', '#panel-preview'], {
-        sizes: [40, 60],
         gutterSize: 6
     });
 
