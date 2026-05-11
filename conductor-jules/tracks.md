@@ -12,6 +12,13 @@ This file tracks the active development tracks for Jules and other agents.
   - [x] Ledger Migration
   - [x] AGENTS.md Refresh
   - [x] PR Template Deployment
+- [x] **Performance Optimization Pass** (Sessions: 8161783200084660431, 18008867093354405958, 13122546743955225133)
+  - [x] Reflection caching in doc builder
+  - [x] Language caching in resolver
+  - [x] Batch sync optimization
+- [x] **Code Health & Security Hardening** (Sessions: 13660741353584511202, 6052995804715138381, 5317230512298581675)
+  - [x] Dead code removal
+  - [x] HTML purification integration
 
 ## Backlog
 
