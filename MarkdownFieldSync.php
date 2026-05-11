@@ -417,36 +417,6 @@ class MarkdownFieldSync extends MarkdownHashTracker
     return self::stringifyValue($value);
   }
 
-  protected static function collectLanguageFieldValues(
-    Page $page,
-    string $field,
-  ): array {
-    $values = [];
-    $defaultCode = self::getDefaultLanguageCode($page);
-
-    foreach (self::availableLanguageCodes($page) as $languageCode) {
-      $language =
-        $languageCode === $defaultCode
-          ? null
-          : self::resolveLanguage($page, $languageCode);
-
-      if ($languageCode !== $defaultCode && !$language instanceof Language) {
-        continue;
-      }
-
-      $raw = self::getFieldValueForLanguage($page, $field, $language);
-      $values[$languageCode] = self::stringifyPendingFieldValue($raw);
-    }
-
-    if (!$values) {
-      $values[$defaultCode] = self::stringifyPendingFieldValue(
-        $page->get($field),
-      );
-    }
-
-    return $values;
-  }
-
   protected static function applyFrontmatter(
     Page $page,
     ContentData $content,
