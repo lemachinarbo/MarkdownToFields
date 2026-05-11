@@ -2,55 +2,8 @@
 
 namespace ProcessWire;
 
-use Parsedown;
-
 class MarkdownHtmlConverter extends MarkdownFileIO
 {
-  protected static ?Parsedown $parsedown = null;
-
-  protected static function markdownToHtml(
-    string $markdown,
-    ?Page $page = null,
-    ?string $languageCode = null,
-  ): string {
-    if ($markdown === '') {
-      return '';
-    }
-    // Keep original markdown format intact; only adjust for render.
-    $renderMarkdown = self::ensureStructuralBreaksForRender($markdown);
-    $html = self::parsedown()->text($renderMarkdown);
-
-    if ($page) {
-      $html = self::processImagesToPageAssets($page, $html, $languageCode);
-      $config = self::config($page);
-      $baseUrl = is_array($config)
-        ? $config['imageBaseUrl'] ?? null
-        : null;
-      if ($baseUrl) {
-        $html = self::applyImageBaseUrl($html, $baseUrl);
-      }
-    }
-
-    // Purify HTML to allow safe tags (e.g., <br>) while preventing XSS.
-    return (string) wire('sanitizer')->purify($html);
-  }
-
-  /**
-   * Rendering-only normalization: ensure comments are on their own blocks
-   * so adjacent headings/lists parse correctly. Does not persist to storage.
-   */
-  protected static function ensureStructuralBreaksForRender(string $markdown): string
-  {
-    if ($markdown === '') {
-      return '';
-    }
-
-    $s = str_replace(["\r\n", "\r"], "\n", $markdown);
-    // Place comments on their own blocks for parsedown rendering
-    $s = preg_replace('/\s*<!--([\s\S]*?)-->\s*/', "\n\n<!--$1-->\n\n", $s);
-    return $s ?? $markdown;
-  }
-
   protected static function applyImageBaseUrl(
     string $html,
     string $baseUrl,
@@ -91,18 +44,6 @@ class MarkdownHtmlConverter extends MarkdownFileIO
       },
       $html,
     ) ?? $html;
-  }
-
-  protected static function parsedown(): Parsedown
-  {
-    if (!self::$parsedown) {
-      self::$parsedown = new Parsedown();
-      // We keep SafeMode(false) to allow raw HTML like <br> to pass through.
-      // Security purification is handled in markdownToHtml() via wire('sanitizer').
-      self::$parsedown->setSafeMode(false);
-    }
-
-    return self::$parsedown;
   }
 
   /** Copy referenced images into the page assets folder and rewrite src URLs. */
