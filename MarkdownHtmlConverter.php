@@ -32,17 +32,7 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     }
 
     // Purify HTML to allow safe tags (e.g., <br>) while preventing XSS.
-    // Security is handled here via ProcessWire's HTML Purifier rather than
-    // in Parsedown's SafeMode to preserve desired raw HTML tags.
-    $sanitizer = wire('sanitizer');
-    if ($sanitizer) {
-      $html = $sanitizer->purify($html);
-    } else {
-      // Fallback: If no sanitizer is available, escape all HTML to be safe.
-      $html = htmlspecialchars($html, ENT_QUOTES, 'UTF-8');
-    }
-
-    return $html;
+    return (string) wire('sanitizer')->purify($html);
   }
 
   protected static function normalizeMarkdownBody(string $markdown): string
