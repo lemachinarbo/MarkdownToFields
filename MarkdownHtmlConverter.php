@@ -35,21 +35,6 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     return (string) wire('sanitizer')->purify($html);
   }
 
-  protected static function normalizeMarkdownBody(string $markdown): string
-  {
-    if ($markdown === '') {
-      return '';
-    }
-
-    $markdown = str_replace(["\r\n", "\r"], "\n", $markdown);
-    $markdown = str_replace('&nbsp;', "\n\n", $markdown);
-    $markdown = str_replace("\xc2\xa0", "\n\n", $markdown);
-
-    $markdown = self::tidyMarkdownSpacing($markdown);
-
-    return trim($markdown, "\n");
-  }
-
   /**
    * Rendering-only normalization: ensure comments are on their own blocks
    * so adjacent headings/lists parse correctly. Does not persist to storage.
@@ -64,18 +49,6 @@ class MarkdownHtmlConverter extends MarkdownFileIO
     // Place comments on their own blocks for parsedown rendering
     $s = preg_replace('/\s*<!--([\s\S]*?)-->\s*/', "\n\n<!--$1-->\n\n", $s);
     return $s ?? $markdown;
-  }
-
-  protected static function tidyMarkdownSpacing(string $markdown): string
-  {
-    if ($markdown === '') {
-      return '';
-    }
-
-    $markdown = preg_replace('/^[ \t]+$/m', '', $markdown);
-    $markdown = preg_replace("/\n{3,}/", "\n\n", $markdown);
-
-    return $markdown;
   }
 
   protected static function applyImageBaseUrl(

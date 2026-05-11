@@ -3,3 +3,5 @@ todo.md
 .ddev/config.yaml
 docs/src/.enable-playground
 .qodo
+conductor-jules/scratch/*
+tmp-tasks.md
