@@ -9,8 +9,13 @@ namespace ProcessWire;
  * WireData objects so templates and page classes can use ProcessWire
  * ergonomics for light reshaping.
  */
-class MarkdownDataSet extends WireData
+class MarkdownDataSet extends WireData implements \Countable
 {
+  public function count(): int
+  {
+    return count($this->getArray());
+  }
+
   private const PROJECTION_RESERVED_KEYS = [
     'type',
     'key',
