@@ -40,6 +40,18 @@ MarkdownToFields is a ProcessWire module that allows using Markdown files as the
 ## Developer Environment
 - **PHP Runtime**: Always use **`ddev php`** for running any PHP CLI commands (e.g., `ddev php composer.phar`, `ddev php bin/console`) to maintain environment consistency.
 
+## ProcessWire Environment Sandbox
+
+This is a standalone module repository. The live ProcessWire testing environment is located at `../pwlayground/`.
+
+**1. API Access (AgentTools)**
+To query the ProcessWire database or test API logic, execute AgentTools commands against the playground root. 
+Example: `php ../pwlayground/index.php --at-eval 'echo wire()->pages->count();'`
+
+**2. Test Execution (WireTests)**
+To run the module's test suite, execute the WireTests runner in the playground root.
+Example: `php ../pwlayground/index.php test FooModule`
+
 ## Agent Configuration
 - **Test Command**: `ddev composer test` (Note: Initialize test suite first)
 - **Backlog Ledger**: `conductor-jules/tracks.md`
@@ -77,7 +89,7 @@ We use a 4-step "Conductor-Driven Development" lifecycle to ensure high-quality,
 2.  **Implementation**: Jules implements the plan on a dedicated branch. The Orchestrator monitors for completion; no PR is required as the Orchestrator will ingest the diff directly.
     - **Phase 1: Task Initiation**: The Orchestrator MUST manually verify the issue, sanitize all emojis from the prompt, and enrich the task with mandatory constraints (AGENTS.md standards, ProcessWire native APIs, Simplicity Gate) before delegating to Jules.
 3.  **Autonomous Review**: The Conductor (Orchestrator) monitors the session. If Jules is ready but blocked by manual gates (no auto-publish), the Conductor MUST **Overtake** by extracting the patch via API and pushing the PR manually.
-4.  **Finalization**: An agent verifies the work against the plan and runs tests. The track is moved from `Active` to `Completed`. This ledger update is committed to `master` as part of the final squash-merge of Jules' work.
+4.  **Finalization**: An agent verifies the work against the plan and runs tests. The track is moved from 'Active' to 'Completed' in `tracks.md`. This ledger update is committed to `master` as part of the final squash-merge of Jules' work.
 
 ## Submission & PR Guidelines
 
