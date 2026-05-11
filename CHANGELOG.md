@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.4.3](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.4.2...v1.4.3) (2026-05-11)
+
+
+### Bug Fixes
+
+* ensure localized property changes trigger markdown sync ([9721daf](https://github.com/lemachinarbo/MarkdownToFields/commit/9721dafd23c232bc3dee776fb687b193b8127a1b))
+* mitigate rce in documentation playground ([f8829e7](https://github.com/lemachinarbo/MarkdownToFields/commit/f8829e76e91069fe50e9a0182fe2d926639d95fc))
+* resolve name-reversion and path-caching during page renames ([1d24606](https://github.com/lemachinarbo/MarkdownToFields/commit/1d24606c345426419e3f1cc7a9762e826cbdaaf1))
+* use default language for all filenames ([b2c9c4d](https://github.com/lemachinarbo/MarkdownToFields/commit/b2c9c4d7898a0f2c33f366f22d1bd5c45b1571da))
+
+
+### Performance Improvements
+
+* optimize N+1 query in module uninstall routine ([c0aa58b](https://github.com/lemachinarbo/MarkdownToFields/commit/c0aa58b9dd01ce9ccb207065989f982bb8d49c99))
+
+
+### Miscellaneous Chores
+
+* initialize conductor-jules project management framework and pull request template ([7cd1637](https://github.com/lemachinarbo/MarkdownToFields/commit/7cd1637af9a8769bd05aa32001bac4639d44752c))
+* update agents.md with processwire template refinements ([2643685](https://github.com/lemachinarbo/MarkdownToFields/commit/26436859f0ebc9e31a1b47db1aa54ce9daf89a80))
+
 ## [1.4.2](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.4.1...v1.4.2) (2026-05-04)
 
 
