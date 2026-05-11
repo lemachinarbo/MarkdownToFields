@@ -473,30 +473,38 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     
     // Remove and delete fields (reverse order for fieldset pairs)
     $fieldsToDelete = array_reverse($fieldNames);
-    $deletedCount = 0;
-    $fieldgroupsCache = [];
     
+    // 1. Identify unique fieldgroups to clean up
+    $fieldgroupsToClean = [];
+    foreach ($templates as $template) {
+      $fg = $template->fieldgroup;
+      if ($fg && $fg->id) $fieldgroupsToClean[$fg->id] = $fg;
+    }
+
+    // 2. Remove all fields from each fieldgroup once
+    foreach ($fieldgroupsToClean as $fgId => $fg) {
+      $fieldgroup = $this->wire('fieldgroups')->get($fgId);
+      if (!$fieldgroup) continue;
+
+      $modified = false;
+      foreach ($fieldsToDelete as $fieldName) {
+        $field = $fields->get($fieldName);
+        if ($field && $fieldgroup->has($field)) {
+          $fieldgroup->remove($field);
+          $modified = true;
+        }
+      }
+
+      if ($modified) {
+        $fieldgroup->save();
+      }
+    }
+
+    // 3. Delete the fields themselves
+    $deletedCount = 0;
     foreach ($fieldsToDelete as $fieldName) {
       $field = $fields->get($fieldName);
-      if (!$field) {
-        continue;
-      }
-      
-      // Remove from all templates/fieldgroups
-      foreach ($templates as $template) {
-        $fgId = $template->fieldgroup->id;
-        if (!isset($fieldgroupsCache[$fgId])) {
-          // SAFETY: Reload fieldgroup fresh from database
-          $fieldgroupsCache[$fgId] = $this->wire('fieldgroups')->get($fgId);
-        }
-        $fieldgroup = $fieldgroupsCache[$fgId];
-        if (!$fieldgroup) continue;
-        
-        if ($fieldgroup->has($field)) {
-          $fieldgroup->remove($field);
-          $fieldgroup->save();
-        }
-      }
+      if (!$field) continue;
       
       // Reset flags before deletion
       $field->flags = 0;
