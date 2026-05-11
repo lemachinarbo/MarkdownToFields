@@ -577,6 +577,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   {
     $fields = $this->wire('fields');
     $fieldgroup = $template->fieldgroup;
+    if (!$fieldgroup || !$fieldgroup->id) return;
     $changed = false;
     
     // SAFETY: Force fresh reload from database to ensure complete state
@@ -584,14 +585,16 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $fieldgroupId = $fieldgroup->id;
     if ($fieldgroupId) {
       // Clear any cached state and reload
-      $fieldgroup = $this->wire('fieldgroups')->get($fieldgroupId);
-      if (!$fieldgroup) {
+      $reloaded = $this->wire('fieldgroups')->get($fieldgroupId);
+      if ($reloaded) {
+        $fieldgroup = $reloaded;
+      } else {
         MarkdownUtilities::logChannel(
           null,
           'Fieldgroup reload failed',
-          ['template' => $template->name],
+          ['template' => $template->name, 'id' => $fieldgroupId],
         );
-        return;
+        // Keep using the existing fieldgroup if reload failed
       }
     }
     
