@@ -449,12 +449,8 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
     $fieldsInUse = false;
     
     // Check if any field is still assigned to a template
-    foreach ($fieldNames as $fieldName) {
-      $field = $fields->get($fieldName);
-      if (!$field) {
-        continue;
-      }
-      
+    $foundFields = $fields->find('name=' . implode('|', $fieldNames));
+    foreach ($foundFields as $field) {
       foreach ($templates as $template) {
         if ($template->fieldgroup->has($field)) {
           $fieldsInUse = true;
