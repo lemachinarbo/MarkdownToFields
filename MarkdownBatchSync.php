@@ -20,10 +20,7 @@ class MarkdownBatchSync extends MarkdownSyncEngine
       return;
     }
 
-    $log = wire('log');
-    if ($log) {
-      $log->save($logChannel, $message);
-    }
+    wire('log')->save($logChannel, $message);
   }
 
   /**
@@ -54,46 +51,24 @@ class MarkdownBatchSync extends MarkdownSyncEngine
     $cacheKey = 'markdown-sync-last-run';
     $apcuKey = 'markdown-sync-lock';
 
-    try {
-      self::writeBatchLog(null, $logChannel, 'Starting markdown sync migration');
-    } catch (\Throwable $_e) {
-      // Logging is best-effort; ignore errors
-    }
+    self::writeBatchLog(null, $logChannel, 'Starting markdown sync migration');
 
     // If a global hash field name is supplied but doesn't exist in fields, disable persistence.
     if ($hashFieldName !== null) {
-      try {
-        $fieldsModule = wire('fields');
-        if (!$fieldsModule->get($hashFieldName)) {
-          $persist = false;
-          try {
-            self::logDebug(null, 'hash field missing; skipping persistence', [
-              'field' => $hashFieldName,
-            ]);
-          } catch (\Throwable $_e) {
-            // ignore
-          }
-        }
-      } catch (\Throwable $_e) {
-        // ignore
+      if (!wire('fields')->get($hashFieldName)) {
+        $persist = false;
+        self::logDebug(null, 'hash field missing; skipping persistence', [
+          'field' => $hashFieldName,
+        ]);
       }
     }
 
     // If TTL is set, skip if we recently ran (quick pre-check)
     if ($ttlSeconds > 0) {
-      try {
-        $last = wire('cache')->get($cacheKey) ?? 0;
-        if (time() - (int) $last < $ttlSeconds) {
-          try {
-            self::logDebug(
-              null,
-              'Skipping markdown sync: recent run within TTL',
-            );
-          } catch (\Throwable $_e) {
-          }
-          return 0;
-        }
-      } catch (\Throwable $_e) {
+      $last = wire('cache')->get($cacheKey) ?? 0;
+      if (time() - (int) $last < $ttlSeconds) {
+        self::logDebug(null, 'Skipping markdown sync: recent run within TTL');
+        return 0;
       }
     }
 
@@ -127,36 +102,27 @@ class MarkdownBatchSync extends MarkdownSyncEngine
       }
 
       if (!$gotLock) {
-        try {
-          self::logDebug(null, 'Skipping markdown sync: failed to obtain lock');
-        } catch (\Throwable $_e) {
-        }
+        self::logDebug(null, 'Skipping markdown sync: failed to obtain lock');
         return 0;
       }
 
       // re-check TTL after obtaining lock
       if ($ttlSeconds > 0) {
-        try {
-          $last = wire('cache')->get($cacheKey) ?? 0;
-          if (time() - (int) $last < $ttlSeconds) {
-            if ($lockFp) {
-              @flock($lockFp, LOCK_UN);
-              @fclose($lockFp);
-              @unlink(wire('config')->paths->cache . 'markdown-sync.lock');
-            }
-            if (function_exists('apcu_delete')) {
-              \call_user_func('apcu_delete', $apcuKey);
-            }
-            try {
-              self::logDebug(
-                null,
-                'Skipping markdown sync after re-check: recent run within TTL',
-              );
-            } catch (\Throwable $_e) {
-            }
-            return 0;
+        $last = wire('cache')->get($cacheKey) ?? 0;
+        if (time() - (int) $last < $ttlSeconds) {
+          if ($lockFp) {
+            flock($lockFp, LOCK_UN);
+            fclose($lockFp);
+            unlink(wire('config')->paths->cache . 'markdown-sync.lock');
           }
-        } catch (\Throwable $_e) {
+          if (function_exists('apcu_delete')) {
+            \call_user_func('apcu_delete', $apcuKey);
+          }
+          self::logDebug(
+            null,
+            'Skipping markdown sync after re-check: recent run within TTL',
+          );
+          return 0;
         }
       }
     }
@@ -230,14 +196,11 @@ class MarkdownBatchSync extends MarkdownSyncEngine
               self::logInfo($p, 'page link index refreshed', [
                 'changes' => $label,
               ]);
-              try {
-                self::writeBatchLog(
-                  $p,
-                  $logChannel,
-                  sprintf('Updated %s: %s', (string) $p->path, $label),
-                );
-              } catch (\Throwable $_e) {
-              }
+              self::writeBatchLog(
+                $p,
+                $logChannel,
+                sprintf('Updated %s: %s', (string) $p->path, $label),
+              );
             }
 
             // Uncomment for deep debugging to see all skipped pages:

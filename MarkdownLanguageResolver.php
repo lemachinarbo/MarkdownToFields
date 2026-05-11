@@ -72,10 +72,7 @@ class MarkdownLanguageResolver extends MarkdownDocumentParser
     $resolved = $languages->get($language);
 
     if (!$resolved instanceof Language && is_string($language)) {
-      $sanitizer = $languages->wire('sanitizer');
-      $selectorValue = $sanitizer
-        ? $sanitizer->selectorValue($language)
-        : trim((string) $language);
+      $selectorValue = $languages->wire('sanitizer')->selectorValue($language);
 
       if ($selectorValue !== '') {
         // Prefer explicit code field when present, then name, then title.
@@ -295,10 +292,7 @@ class MarkdownLanguageResolver extends MarkdownDocumentParser
         }
       }
 
-      $sanitizer = $languages->wire('sanitizer');
-      $selectorValue = $sanitizer
-        ? $sanitizer->selectorValue($languageKey)
-        : $languageKey;
+      $selectorValue = $languages->wire('sanitizer')->selectorValue($languageKey);
 
       if ($selectorValue !== '') {
         $cache = self::getLanguageCache($page);
