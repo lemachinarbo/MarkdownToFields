@@ -40,6 +40,11 @@ MarkdownToFields is a ProcessWire module that allows using Markdown files as the
 ## Developer Environment
 - **PHP Runtime**: Always use **`ddev php`** for running any PHP CLI commands (e.g., `ddev php composer.phar`, `ddev php bin/console`) to maintain environment consistency.
 
+## Agent Configuration
+- **Test Command**: `ddev composer test` (Note: Initialize test suite first)
+- **Backlog Ledger**: `conductor-jules/tracks.md`
+- **Scratch Directory**: `conductor-jules/scratch/`
+
 
 ## Git & Commit Standards
 
@@ -68,7 +73,7 @@ MarkdownToFields is a ProcessWire module that allows using Markdown files as the
 
 We use a 4-step "Conductor-Driven Development" lifecycle to ensure high-quality, autonomous maintenance:
 
-1.  **Planning**: A task is selected from the backlog and moved to `Active Tracks` in `todo.md` (or a dedicated tracks file). This update MUST be committed and pushed to `master` immediately to "lock" the track.
+1.  **Planning**: A task is selected from the backlog and moved to `Active Tracks` in `conductor-jules/tracks.md`. This update MUST be committed and pushed to `master` immediately to "lock" the track.
 2.  **Implementation**: Jules implements the plan on a dedicated branch. The Orchestrator monitors for completion; no PR is required as the Orchestrator will ingest the diff directly.
 3.  **Autonomous Review**: The Conductor (Orchestrator) monitors the session. If Jules is ready but blocked by manual gates (no auto-publish), the Conductor MUST **Overtake** by extracting the patch via API and pushing the PR manually.
 4.  **Finalization**: An agent verifies the work against the plan and runs tests. The track is moved from `Active` to `Completed`. This ledger update is committed to `master` as part of the final squash-merge of Jules' work.
