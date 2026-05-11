@@ -4,10 +4,10 @@ This file tracks the active development tracks for Jules and other agents.
 
 ## Active Tracks
 
-- [ ] **Uninstall Field Check Optimization** (Session: 9349026560926385029)
-- [ ] **Docs Reflection Optimization** (Session: 7610398596794288710)
-- [ ] **Cleanup: Unused markdownToHtml** (Session: 4920936449717480332)
-- [ ] **Cleanup: Unused normalizeMarkdownBody** (Session: 1697484876521565182)
+- [ ] **Uninstall Field Check Optimization** (Session: 14905954972625541906)
+- [ ] **Docs Reflection Optimization** (Session: 16942577555519459844)
+- [ ] **Cleanup: Unused markdownToHtml** (Session: 7407648760002380459)
+- [ ] **Cleanup: Unused normalizeMarkdownBody** (Session: 9820165336690832045)
 
 ## Completed
 
