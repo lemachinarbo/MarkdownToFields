@@ -4,6 +4,9 @@ This file tracks the active development tracks for Jules and other agents.
 
 ## Active Tracks
 
+- [ ] **Uninstall Field Check Optimization** (Session: 9349026560926385029)
+- [ ] **Docs Reflection Optimization** (Session: 7610398596794288710)
+
 ## Completed
 
 - [x] **Conductor Environment Setup** (Session: 050cdc09-a555-4d05-8c5c-fdb211fe2e68)
