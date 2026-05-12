@@ -15,10 +15,20 @@ class LetMeDown
   private const MARKER_NAME_PATTERN = '[A-Za-z0-9_-]+';
   private Parsedown $parsedown;
   private ?string $basePath;
+  private array $markerCache = [];
 
   public function __construct(?string $basePath = null, bool $allowRawHtml = false)
   {
-    $this->basePath = $basePath ? realpath($basePath) : null;
+    if ($basePath !== null) {
+      $resolvedPath = realpath($basePath);
+      if ($resolvedPath === false) {
+        throw new \RuntimeException("Invalid base path: {$basePath}");
+      }
+      $this->basePath = $resolvedPath;
+    } else {
+      $this->basePath = null;
+    }
+
     $this->parsedown = new Parsedown();
     // Treat single newlines as hard line breaks to match editor expectations.
     $this->parsedown->setBreaksEnabled(true);
@@ -338,17 +348,35 @@ class LetMeDown
         continue;
       }
 
-      if (!preg_match('/^[-*+]\s+(.*)$/', $line, $matches)) {
+      $itemText = $this->parseFrontmatterListItem($line);
+
+      if ($itemText === null) {
         return null;
       }
 
-      $itemMarkdown = $matches[1];
-      $itemHtml = $this->parsedown->text($itemMarkdown);
-      $itemText = trim(strip_tags($itemHtml));
-      $items[] = $itemText !== '' ? $itemText : trim($itemMarkdown);
+      $items[] = $itemText;
     }
 
     return $items;
+  }
+
+  /**
+   * Parse a single line from a block-style list into a plain-text item.
+   *
+   * @param string $line A single line from a candidate list field
+   * @return string|null The item text or null when the line is not a valid list item
+   */
+  private function parseFrontmatterListItem(string $line): ?string
+  {
+    if (!preg_match('/^[-*+]\s+(.*)$/', $line, $matches)) {
+      return null;
+    }
+
+    $itemMarkdown = $matches[1];
+    $itemHtml = $this->parsedown->text($itemMarkdown);
+    $itemText = trim(strip_tags($itemHtml));
+
+    return $itemText !== '' ? $itemText : trim($itemMarkdown);
   }
 
   /**
@@ -472,6 +500,10 @@ class LetMeDown
    */
   private function findAllMarkers(string $markdown): array
   {
+    if (isset($this->markerCache[$markdown])) {
+      return $this->markerCache[$markdown];
+    }
+
     $markers = [];
 
     // Find all HTML comments
@@ -483,6 +515,7 @@ class LetMeDown
     );
 
     if (empty($matches[0])) {
+      $this->markerCache[$markdown] = $markers;
       return $markers;
     }
 
@@ -506,6 +539,7 @@ class LetMeDown
       }
     }
 
+    $this->markerCache[$markdown] = $markers;
     return $markers;
   }
 
@@ -692,7 +726,7 @@ class LetMeDown
     // Parse HTML into DOM for consistent extraction
     $dom = new \DOMDocument();
     libxml_use_internal_errors(true);
-    @$dom->loadHTML('<?xml encoding="UTF-8"?><root>' . $html . '</root>');
+    @$dom->loadHTML('<?xml encoding="UTF-8"?><root>' . $html . '</root>', LIBXML_COMPACT | LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
     libxml_use_internal_errors(false);
 
     $xpath = new \DOMXPath($dom);
@@ -825,7 +859,7 @@ class LetMeDown
     // ... extract contentHtml and plainText ...
     $dom = new \DOMDocument();
     libxml_use_internal_errors(true);
-    @$dom->loadHTML('<?xml encoding="UTF-8"?><root>' . $html . '</root>');
+    @$dom->loadHTML('<?xml encoding="UTF-8"?><root>' . $html . '</root>', LIBXML_COMPACT | LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
     libxml_use_internal_errors(false);
 
     $contentHtml = '';
@@ -1003,6 +1037,7 @@ class LetMeDown
             blocks: $parsedSubContent['blocks'],
             fields: $parsedSubContent['fields'],
             subsections: [],
+            key: $range['name'],
           );
         }
       }
@@ -1016,14 +1051,16 @@ class LetMeDown
         blocks: $parsedMainContent['blocks'],
         fields: $parsedMainContent['fields'],
         subsections: $subsectionsData,
+        key: $sectionName ?: (string)count($sectionsList),
       );
 
       // Append to ordered list
       $sectionsList[] = $sectionObj;
 
       // Store by name if provided (first occurrence wins)
-      if ($sectionName && !isset($sectionsByName[$sectionName])) {
-        $sectionsByName[$sectionName] = $sectionObj;
+      $effectiveName = $sectionName ?: (string)(count($sectionsList) - 1);
+      if (!isset($sectionsByName[$effectiveName])) {
+        $sectionsByName[$effectiveName] = $sectionObj;
       }
     }
 
@@ -1087,7 +1124,7 @@ class LetMeDown
 
     $dom = new \DOMDocument();
     libxml_use_internal_errors(true);
-    @$dom->loadHTML('<?xml encoding="UTF-8"?>' . $wrappedHtml);
+    @$dom->loadHTML('<?xml encoding="UTF-8"?>' . $wrappedHtml, LIBXML_COMPACT | LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
     libxml_use_internal_errors(false);
 
     $xpath = new \DOMXPath($dom);
@@ -1431,6 +1468,26 @@ class LetMeDown
           $seenImages[$key] = true;
           $src = $imgNode->getAttribute('src') ?? '';
           $alt = $imgNode->getAttribute('alt') ?? '';
+          // Normalize and decode encoded schemes before checking allowed protocols.
+          // Optimization: Only process the beginning of the string for scheme detection.
+          $prefix = substr((string) $src, 0, 500);
+          $normalizedSrc = html_entity_decode($prefix, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+          $normalizedSrc = rawurldecode($normalizedSrc);
+
+          // Strip control characters and whitespace that browsers may ignore before the scheme.
+          $cleanSrc = trim(preg_replace('/[\x00-\x20]/', '', $normalizedSrc));
+          $scheme = parse_url($cleanSrc, PHP_URL_SCHEME);
+          if ($scheme === null && preg_match('/^([a-z0-9+.-]+):/i', $cleanSrc, $matches)) {
+              $scheme = $matches[1];
+          }
+
+          if ($scheme !== null) {
+              $scheme = strtolower($scheme);
+              if (!in_array($scheme, ['http', 'https'])) {
+                  $src = '#';
+              }
+          }
+
           $images[] = new ContentElement(
             text: "[$alt]",
             html: '<img src="' .
@@ -1562,19 +1619,29 @@ class LetMeDown
    */
   private function serializeNode(\DOMNode $node): string
   {
-    $dom = new \DOMDocument();
-    $dom->appendChild($dom->importNode($node, true));
-    $html = $dom->saveHTML();
-
     // For text nodes, return the text content directly
     if ($node->nodeType === XML_TEXT_NODE) {
       return $node->textContent;
     }
 
+    $html = '';
+    if ($node->ownerDocument) {
+      $html = $node->ownerDocument->saveHTML($node);
+    } else {
+      $dom = new \DOMDocument();
+      $dom->appendChild($dom->importNode($node, true));
+      $html = $dom->saveHTML();
+    }
+
     // For element nodes (like <p>, <ul>, etc.), preserve the full tag including attributes
     // Remove only the XML declaration wrapper, keep the element and its content
-    $html = preg_replace('/^<\?xml[^?]*?\?>/', '', $html);
-    $html = preg_replace('/<root>|<\/root>/', '', $html);
+    if (str_starts_with($html, '<?xml')) {
+      $pos = strpos($html, '?>');
+      if ($pos !== false) {
+        $html = substr($html, $pos + 2);
+      }
+    }
+    $html = str_replace(['<root>', '</root>'], '', $html);
 
     return trim($html);
   }
@@ -1679,15 +1746,14 @@ class LetMeDown
   {
     // Add line breaks between block elements for better text readability
     $htmlForText = preg_replace(
-      '~</(p|h[1-6]|ul|ol|blockquote)>~i',
-      "$0\n\n",
+      ['~</(?:p|h[1-6]|ul|ol|blockquote)>~i', '~</li>~i'],
+      ["\n\n", "\n"],
       $html,
     );
-    $htmlForText = preg_replace('~</li>~i', "$0\n", $htmlForText ?? '');
     $plainText = trim(strip_tags($htmlForText ?? ''));
     // Normalize excessive line breaks to max 2 consecutive
     $plainText = preg_replace('~\n{3,}~', "\n\n", $plainText);
-    return $plainText;
+    return $plainText ?? '';
   }
 }
 
@@ -1757,6 +1823,24 @@ class ContentData
       'rawDocument' => $this->getRawDocument(),
       default => null,
     };
+  }
+
+  public function __isset($name)
+  {
+    if (isset($this->sectionsByName[$name])) {
+      return true;
+    }
+    return in_array($name, [
+      'headings',
+      'blocks',
+      'images',
+      'links',
+      'lists',
+      'paragraphs',
+      'frontmatter',
+      'frontmatterRaw',
+      'rawDocument',
+    ]);
   }
 
   public function setMarkdown(string $markdown): void
@@ -1873,10 +1957,7 @@ class ContentData
   {
     $images = [];
     foreach ($this->getUniqueSections() as $section) {
-      $items = $section->images->getArrayCopy();
-      foreach ($items as $item) {
-        $images[] = $item;
-      }
+      array_push($images, ...$section->images->getArrayCopy());
     }
     return new ContentElementCollection($images);
   }
@@ -1885,10 +1966,7 @@ class ContentData
   {
     $links = [];
     foreach ($this->getUniqueSections() as $section) {
-      $items = $section->links->getArrayCopy();
-      foreach ($items as $item) {
-        $links[] = $item;
-      }
+      array_push($links, ...$section->links->getArrayCopy());
     }
     return new ContentElementCollection($links);
   }
@@ -1897,10 +1975,7 @@ class ContentData
   {
     $lists = [];
     foreach ($this->getUniqueSections() as $section) {
-      $items = $section->lists->getArrayCopy();
-      foreach ($items as $item) {
-        $lists[] = $item;
-      }
+      array_push($lists, ...$section->lists->getArrayCopy());
     }
     return new ContentElementCollection($lists);
   }
@@ -1909,10 +1984,7 @@ class ContentData
   {
     $paragraphs = [];
     foreach ($this->getUniqueSections() as $section) {
-      $items = $section->paragraphs->getArrayCopy();
-      foreach ($items as $item) {
-        $paragraphs[] = $item;
-      }
+      array_push($paragraphs, ...$section->paragraphs->getArrayCopy());
     }
     return new ContentElementCollection($paragraphs);
   }
@@ -1941,16 +2013,6 @@ class ContentData
     }
   }
 
-  private function collectHeadingsFromBlockChildrenOnly(
-    Block $block,
-    array &$headings,
-    array &$seen,
-  ): void {
-    // Only collect from children, skip the block's own heading
-    foreach ($block->children as $child) {
-      $this->collectHeadingsFromBlock($child, $headings, $seen);
-    }
-  }
 }
 
 /**
@@ -2272,10 +2334,7 @@ trait HasBlockCollections
   {
     $images = [];
     foreach ($this->blocks as $block) {
-      $items = $block->getAllImages()->getArrayCopy();
-      foreach ($items as $item) {
-        $images[] = $item;
-      }
+      array_push($images, ...$block->getAllImages()->getArrayCopy());
     }
     return new ContentElementCollection($images);
   }
@@ -2284,10 +2343,7 @@ trait HasBlockCollections
   {
     $links = [];
     foreach ($this->blocks as $block) {
-      $items = $block->getAllLinks()->getArrayCopy();
-      foreach ($items as $item) {
-        $links[] = $item;
-      }
+      array_push($links, ...$block->getAllLinks()->getArrayCopy());
     }
     return new ContentElementCollection($links);
   }
@@ -2296,10 +2352,7 @@ trait HasBlockCollections
   {
     $lists = [];
     foreach ($this->blocks as $block) {
-      $items = $block->getAllLists()->getArrayCopy();
-      foreach ($items as $item) {
-        $lists[] = $item;
-      }
+      array_push($lists, ...$block->getAllLists()->getArrayCopy());
     }
     return new ContentElementCollection($lists);
   }
@@ -2308,10 +2361,7 @@ trait HasBlockCollections
   {
     $paragraphs = [];
     foreach ($this->blocks as $block) {
-      $items = $block->getAllParagraphs()->getArrayCopy();
-      foreach ($items as $item) {
-        $paragraphs[] = $item;
-      }
+      array_push($paragraphs, ...$block->getAllParagraphs()->getArrayCopy());
     }
     return new ContentElementCollection($paragraphs);
   }
@@ -2356,6 +2406,24 @@ class Section
         => $this->getRealBlocks(), // Use the new method to get real blocks
       default => null,
     };
+  }
+
+  public function __isset($name)
+  {
+    if (isset($this->subsections[$name])) {
+      return true;
+    }
+    if (isset($this->fields[$name])) {
+      return true;
+    }
+    return in_array($name, [
+      'headings',
+      'images',
+      'links',
+      'lists',
+      'paragraphs',
+      'blocks',
+    ]);
   }
 
   public function subsection(string $name): ?self
@@ -2592,9 +2660,29 @@ class FieldData implements \IteratorAggregate
       }
     } elseif ($this->type === 'images') {
       foreach ($this->data as $img) {
+        $src = $img['src'] ?? '';
+
+        // Normalize and decode encoded schemes before checking allowed protocols.
+        $normalizedSrc = html_entity_decode((string) $src, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $normalizedSrc = rawurldecode($normalizedSrc);
+
+        // Strip control characters and whitespace that browsers may ignore before the scheme.
+        $cleanSrc = trim(preg_replace('/[\x00-\x20]/', '', $normalizedSrc));
+        $scheme = parse_url($cleanSrc, PHP_URL_SCHEME);
+        if ($scheme === null && preg_match('/^([a-z0-9+.-]+):/i', $cleanSrc, $matches)) {
+            $scheme = $matches[1];
+        }
+
+        if ($scheme !== null) {
+            $scheme = strtolower($scheme);
+            if (!in_array($scheme, ['http', 'https'])) {
+                $src = '#';
+            }
+        }
+
         $collection[] = new ContentElement(
           text: $img['alt'] ?? '',
-          html: '<img src="' . htmlspecialchars($img['src']) . '" alt="' . htmlspecialchars($img['alt'] ?? '') . '">',
+          html: '<img src="' . htmlspecialchars($src) . '" alt="' . htmlspecialchars($img['alt'] ?? '') . '">',
           data: $img,
         );
       }
@@ -2609,6 +2697,9 @@ class FieldData implements \IteratorAggregate
         // Strip control characters and whitespace that browsers may ignore before the scheme.
         $cleanHref = trim(preg_replace('/[\x00-\x20]/', '', $normalizedHref));
         $scheme = parse_url($cleanHref, PHP_URL_SCHEME);
+        if ($scheme === null && preg_match('/^([a-z0-9+.-]+):/i', $cleanHref, $matches)) {
+            $scheme = $matches[1];
+        }
 
         if ($scheme !== null) {
             $scheme = strtolower($scheme);
@@ -2989,6 +3080,13 @@ class PlainDataProjector
       ], static fn($value) => $value !== '' && $value !== null);
     }
 
+    if ($block->children !== []) {
+      $data['children'] = [];
+      foreach ($block->children as $child) {
+        $data['children'][] = self::blockData($child);
+      }
+    }
+
     return $data;
   }
 
@@ -3022,32 +3120,6 @@ class PlainDataProjector
     return $out;
   }
 
-  private static function collectionToArray($collection): array
-  {
-    if (!$collection instanceof \Traversable && !is_array($collection)) {
-      return [];
-    }
-
-    $items = [];
-    foreach ($collection as $item) {
-      if ($item instanceof ContentElement) {
-        $items[] = array_filter(array_merge($item->data, [
-          'html' => $item->html,
-          'text' => $item->text,
-        ]), static function ($value): bool {
-          if (is_string($value)) {
-            return trim($value) !== '';
-          }
-
-          return $value !== '';
-        });
-        continue;
-      }
-      $items[] = $item;
-    }
-
-    return $items;
-  }
 
   private static function hasMeaningfulString(string $value): bool
   {

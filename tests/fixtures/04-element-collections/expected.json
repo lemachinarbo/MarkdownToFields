@@ -1,0 +1,10 @@
+[
+    {
+        "key": "0",
+        "subsections": [],
+        "html": "<h1>Collection Test</h1>\n<p>This is the first paragraph.<br>\nIt spans multiple lines.</p>\n<p><img src=\"image1.png\" alt=\"First Image\"></p>\n<ul>\n<li>List item one</li>\n<li>List item two</li>\n</ul>\n<p>Here is a <a href=\"https://example.com\">link</a> in the second paragraph.</p>\n<p><img src=\"image2.jpg\" alt=\"Second Image\" title=\"With a title\"></p>\n<ol>\n<li>Ordered item one</li>\n<li>Ordered item two</li>\n</ol>",
+        "text": "Collection Test\n\nThis is the first paragraph.\nIt spans multiple lines.\n\nList item one\n\nList item two\n\nHere is a link in the second paragraph.\n\nOrdered item one\n\nOrdered item two",
+        "markdown": "# Collection Test\n\nThis is the first paragraph.\nIt spans multiple lines.\n\n![First Image](image1.png)\n\n- List item one\n- List item two\n\nHere is a [link](https://example.com) in the second paragraph.\n\n![Second Image](image2.jpg \"With a title\")\n\n1. Ordered item one\n2. Ordered item two\n",
+        "area": "sections/0"
+    }
+]

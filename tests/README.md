@@ -6,6 +6,7 @@
 - **Module Root:** Current directory.
 - **Testing Hub:** Located at `../pwlayground/` (or your specific path).
 - **All PHP commands must be executed from the Testing Hub root.**
+- **NOTE FOR REMOTE AGENTS:** You do not have access to the `../pwlayground/` Hub. Do not attempt to run the execution pipeline. Your task is only to create the fixtures.
 
 ## 2. Framework Strictness
 - **Forbidden:** PHPUnit, Pest, Mocks, Stubs, Spies.

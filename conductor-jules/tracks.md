@@ -2,11 +2,11 @@
 
 This file tracks the active development tracks for Jules and other agents.
 
-- [ ] **Test Case: Frontmatter Sync**
-- [ ] **Test Case: Section Tagging**
-- [ ] **Test Case: Block Hierarchy**
-- [ ] **Test Case: Element Collections**
-- [ ] **Test Case: Empty States**
+- [ ] **Test Case: Frontmatter Sync** (Session: 4188880691859131714)
+- [ ] **Test Case: Section Tagging** (Session: 9626251438065124631)
+- [ ] **Test Case: Block Hierarchy** (Session: 7430663594449533691)
+- [ ] **Test Case: Element Collections** (Session: 12603270156779872681)
+- [ ] **Test Case: Empty States** (Session: 2569144650059404077)
 - [ ] **Cleanup: Unused markdownToHtml** (Integrated: 9762166)
 - [ ] **Cleanup: Unused normalizeMarkdownBody** (Integrated: 07dac0d)
 

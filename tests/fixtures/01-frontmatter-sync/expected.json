@@ -1,0 +1,14 @@
+{
+    "title": "Sample Sync Test",
+    "date": "2024-05-12",
+    "tags": "frontmatter, sync, test",
+    "author": "test_agent",
+    "0": {
+        "key": "0",
+        "subsections": [],
+        "html": "<h1>Sync Test Document</h1>\n<p>This is the body content of the document used to test YAML frontmatter sync.</p>",
+        "text": "Sync Test Document\n\nThis is the body content of the document used to test YAML frontmatter sync.",
+        "markdown": "# Sync Test Document\nThis is the body content of the document used to test YAML frontmatter sync.\n",
+        "area": "sections/0"
+    }
+}

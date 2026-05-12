@@ -1,0 +1,53 @@
+[
+    {
+        "key": "0",
+        "subsections": [],
+        "html": "<h1>Level 1 Heading</h1>\n<p>Level 1 content</p>\n<h2>Level 2 Subheading</h2>\n<p>Level 2 content</p>\n<h3>Level 3 Subheading</h3>\n<p>Level 3 content</p>",
+        "text": "Level 1 Heading\n\nLevel 1 content\n\nLevel 2 Subheading\n\nLevel 2 content\n\nLevel 3 Subheading\n\nLevel 3 content",
+        "markdown": "<!-- body... -->\n\n# Level 1 Heading\n\nLevel 1 content\n\n## Level 2 Subheading\n\nLevel 2 content\n\n### Level 3 Subheading\n\nLevel 3 content\n\n<!-- / -->\n",
+        "body": {
+            "key": "body",
+            "items": [
+                {
+                    "html": "<h1>Level 1 Heading</h1><p>Level 1 content</p><h2>Level 2 Subheading</h2><p>Level 2 content</p><h3>Level 3 Subheading</h3><p>Level 3 content</p>",
+                    "text": "Level 1 Heading\n\nLevel 1 content\nLevel 2 Subheading\n\nLevel 2 content\nLevel 3 Subheading\n\nLevel 3 content",
+                    "markdown": "# Level 1 Heading\n\nLevel 1 content\n\n## Level 2 Subheading\n\nLevel 2 content\n\n### Level 3 Subheading\n\nLevel 3 content",
+                    "heading": {
+                        "html": "<h1>Level 1 Heading</h1>",
+                        "text": "Level 1 Heading",
+                        "level": 1
+                    },
+                    "children": [
+                        {
+                            "html": "<h2>Level 2 Subheading</h2><p>Level 2 content</p><h3>Level 3 Subheading</h3><p>Level 3 content</p>",
+                            "text": "Level 2 Subheading\n\nLevel 2 content\nLevel 3 Subheading\n\nLevel 3 content",
+                            "markdown": "## Level 2 Subheading\n\nLevel 2 content\n\n### Level 3 Subheading\n\nLevel 3 content",
+                            "heading": {
+                                "html": "<h2>Level 2 Subheading</h2>",
+                                "text": "Level 2 Subheading",
+                                "level": 2
+                            },
+                            "children": [
+                                {
+                                    "html": "<h3>Level 3 Subheading</h3><p>Level 3 content</p>",
+                                    "text": "Level 3 Subheading\n\nLevel 3 content",
+                                    "markdown": "### Level 3 Subheading\n\nLevel 3 content",
+                                    "heading": {
+                                        "html": "<h3>Level 3 Subheading</h3>",
+                                        "text": "Level 3 Subheading",
+                                        "level": 3
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "html": "<h1>Level 1 Heading</h1>\n<p>Level 1 content</p>\n<h2>Level 2 Subheading</h2>\n<p>Level 2 content</p>\n<h3>Level 3 Subheading</h3>\n<p>Level 3 content</p>",
+            "text": "Level 1 Heading\n\nLevel 1 content\n\nLevel 2 Subheading\n\nLevel 2 content\n\nLevel 3 Subheading\n\nLevel 3 content",
+            "markdown": "# Level 1 Heading\n\nLevel 1 content\n\n## Level 2 Subheading\n\nLevel 2 content\n\n### Level 3 Subheading\n\nLevel 3 content",
+            "area": "sections/0/body"
+        },
+        "area": "sections/0"
+    }
+]
