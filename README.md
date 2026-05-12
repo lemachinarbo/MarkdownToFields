@@ -1,5 +1,6 @@
 # Markdown to fields
-Use markdown as your content. Structure it with simple tags, and enjoy the markdown <-> ProcessWire fields sync. That’s MarkdownToFields.
+Use markdown as your content. Structure it with simple tags, and enjoy the markdown <-> ProcessWire fields sync. That’s MarkdownToFields. 
+It turns a flat text file into a **Queryable API**.
 
 Need help? See:
 
