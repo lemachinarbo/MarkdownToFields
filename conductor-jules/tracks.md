@@ -2,10 +2,11 @@
 
 This file tracks the active development tracks for Jules and other agents.
 
-## Active Tracks
-
-- [ ] **Uninstall Field Check Optimization** (Integrated: b71c689)
-- [ ] **Docs Reflection Optimization** (Session: 10046554523363063519)
+- [ ] **Test Case: Frontmatter Sync**
+- [ ] **Test Case: Section Tagging**
+- [ ] **Test Case: Block Hierarchy**
+- [ ] **Test Case: Element Collections**
+- [ ] **Test Case: Empty States**
 - [ ] **Cleanup: Unused markdownToHtml** (Integrated: 9762166)
 - [ ] **Cleanup: Unused normalizeMarkdownBody** (Integrated: 07dac0d)
 

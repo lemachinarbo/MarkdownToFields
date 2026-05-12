@@ -1,0 +1,15 @@
+# Exclude development-only files from the distribution ZIP
+/tests export-ignore
+/.github export-ignore
+/conductor-jules export-ignore
+/conductor-jules/scratch export-ignore
+/tmp-tasks.md export-ignore
+/wip.md export-ignore
+/todo.md export-ignore
+/AGENTS.md export-ignore
+/composer.json export-ignore
+/composer.lock export-ignore
+/.qodo export-ignore
+/.vscode export-ignore
+.gitattributes export-ignore
+.gitignore export-ignore
