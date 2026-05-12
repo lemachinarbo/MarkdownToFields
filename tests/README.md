@@ -18,8 +18,21 @@ We test behavior, not implementation. Do not write PHP test methods for edge cas
 2. **Files:** Include `input.md` (raw scenario) and `expected.json` (expected field array).
 3. **Execution:** The central runner at `site/modules/WireTests/tests/MarkdownToFields.php` (inside the Hub) handles the rest.
 
-## 4. Execution Pipeline
+## 4. Execution Pipeline (For Agents)
 To verify your work, instruct the user to run:
 ```bash
 cd ../pwlayground && php index.php test MarkdownToFields
+```
+
+## 5. Manual Execution (For Users)
+To run the tests manually from your local environment:
+1. Ensure your DDEV environment is running in the hub: `cd ../pwlayground && ddev start`
+2. Run the test command:
+   ```bash
+   ddev php public/index.php test MarkdownToFields
+   ```
+
+To automatically update all `expected.json` files to match the current engine output (Golden File update):
+```bash
+ddev exec "UPDATE_FIXTURES=1 php public/index.php test MarkdownToFields"
 ```
