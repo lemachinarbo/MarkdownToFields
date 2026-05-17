@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.4.4](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.4.3...v1.4.4) (2026-05-17)
+
+
+### Bug Fixes
+
+* integrate html purifier for secure markdown rendering ([43908e5](https://github.com/lemachinarbo/MarkdownToFields/commit/43908e54774cc48f2871fd809d6482731e30f92e))
+* prevent crash on templates without fieldgroups ([e958d87](https://github.com/lemachinarbo/MarkdownToFields/commit/e958d8796059da9ac83c79113d6fccc2c77fd923))
+* remove defensive fallback to stored hash ([7655781](https://github.com/lemachinarbo/MarkdownToFields/commit/7655781380fbed42913bfb7f686ecf299907e1e8))
+
+
+### Performance Improvements
+
+* batch fetch fields in uninstall check to eliminate N+1 queries ([b71c689](https://github.com/lemachinarbo/MarkdownToFields/commit/b71c68951ebcd37c6ff22373c49f071de5bb99d3))
+
+
+### Miscellaneous Chores
+
+* codify Leashed Delegation protocol in AGENTS.md ([cb30696](https://github.com/lemachinarbo/MarkdownToFields/commit/cb306961fd86829094c02ff8c21078ab55c51d86))
+* initialize golden file testing track ([26d4560](https://github.com/lemachinarbo/MarkdownToFields/commit/26d4560f0ee33fd05d796ef8c91b0550173831b8))
+* lock new active jules tracks in ledger ([596c497](https://github.com/lemachinarbo/MarkdownToFields/commit/596c497fbea26e1910f6f90a1e15a9bb4c0bf243))
+* lock verified Task 1 session in tracks.md ([8530f8b](https://github.com/lemachinarbo/MarkdownToFields/commit/8530f8bcd27b8989cae3dfef683f0ae91d0b00f8))
+* move Task 1 to Completed in tracks.md ([af887fa](https://github.com/lemachinarbo/MarkdownToFields/commit/af887fac5e06b614a121248ce1dbbb4f629ed522))
+* move Task 4 to Completed in tracks.md ([6ddfe46](https://github.com/lemachinarbo/MarkdownToFields/commit/6ddfe468733d56b8d084f3299fd2e7f449b2775b))
+* track final enriched delegation sessions on Jules ([079a4f0](https://github.com/lemachinarbo/MarkdownToFields/commit/079a4f0a9b4eeb92313c36b339edb517bba47882))
+* track final full-content performance and health sessions on Jules ([3473435](https://github.com/lemachinarbo/MarkdownToFields/commit/3473435d6c52190f8746f7073bb2ce87c948b9f3))
+* track new code health cleanup sessions on Jules ([5a6eaba](https://github.com/lemachinarbo/MarkdownToFields/commit/5a6eabaafb081230cdf9e48c15dad483c2abd7db))
+* track new performance optimization sessions on Jules ([8c94459](https://github.com/lemachinarbo/MarkdownToFields/commit/8c9445965138af80885d10394250f179927e9455))
+* track verified performance and health sessions on Jules ([f9c7988](https://github.com/lemachinarbo/MarkdownToFields/commit/f9c798856e286410bb0f68f8208e80e5f820e9da))
+* update tracks ledger with high-fidelity sessions for tasks 4 and 5 ([b1a52c3](https://github.com/lemachinarbo/MarkdownToFields/commit/b1a52c3ff1d9de2c457d2a08e6dd969502de7a75))
+* update tracks.md with isset implementation completion ([259c7cd](https://github.com/lemachinarbo/MarkdownToFields/commit/259c7cd6744988e2cea78e48f4a52127624d7c3e))
+* update tracks.md with jules security and performance task completion ([28d176f](https://github.com/lemachinarbo/MarkdownToFields/commit/28d176f65387fbddb754c31026f21689560fe4d8))
+
 ## [1.4.3](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.4.2...v1.4.3) (2026-05-11)
 
 
