@@ -62,7 +62,9 @@ class MarkdownFileIO extends MarkdownConfig
           if (is_string($override) && $override !== '') {
             return $override;
           }
-        } catch (\Throwable $e) {}
+        } catch (\Throwable $e) {
+          // Silence exceptions when checking for class overrides on unsaved pages
+        }
       }
 
       // 2. Fall back to localized page name using the default language context

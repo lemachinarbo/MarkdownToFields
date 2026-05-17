@@ -12,6 +12,10 @@ This file tracks the active development tracks for Jules and other agents.
 
 ## Completed
 
+- [x] **Code Health: Document Silenced Exceptions** (Integrated: 13216917539890387501)
+  - [x] Add comment in MarkdownContent.php explaining silenced exceptions during unsaved page creation
+  - [x] Add comment in MarkdownFileIO.php documenting silenced exceptions when checking class overrides on unsaved pages
+
 - [x] **Cleanup: Unused markdownToHtml** (9762166)
   - [x] Remove unused method from MarkdownHtmlConverter
   - [x] Remove dead dependencies: Parsedown and ensureStructuralBreaksForRender

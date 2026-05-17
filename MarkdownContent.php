@@ -112,6 +112,7 @@ trait MarkdownContent {
       }
     } catch (\Throwable $e) {
       // Unsaved pages can hit page-class overrides before IDs exist.
+      // Silence exceptions as this is an expected state during page creation.
     }
 
     // 'markdownField' in config.php is deprecated — the field name is always 'md_markdown'.
