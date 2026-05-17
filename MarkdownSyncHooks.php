@@ -153,8 +153,7 @@ class MarkdownSyncHooks
 
     $input = $event->wire('input');
     $hashFieldName = MarkdownEditor::hashField($page);
-    $expectedHash =
-      $input->post($hashFieldName) ?? MarkdownHashTracker::recallFileHash($page);
+    $expectedHash = $input->post($hashFieldName);
     $postedLanguageValues = [];
 
     $bodyPost = $input->post($documentField);

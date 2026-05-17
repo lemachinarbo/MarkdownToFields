@@ -2,6 +2,8 @@
 
 This file tracks the active development tracks for Jules and other agents.
 
+- [ ] **Performance: Cache snapshot index file reads** (Session: 12712479203828006873)
+- [ ] **Performance: Optimize DOM query loop in collectReadOnlyHostMounts** (Session: 15552125936496673555)
 - [ ] **Code Health: Remove leftover console statement** (Session: 8475759274777109420)
 - [ ] **Testing Improvement: Missing tests for buildScopeKeyFromMeta** (Session: 15009249872801566978)
 - [ ] **Testing Improvement: Missing test file for markdown-text-utils.js** (Session: 13446809845484129784)
