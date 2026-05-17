@@ -2,6 +2,9 @@
 
 This file tracks the active development tracks for Jules and other agents.
 
+- [ ] **Code Health: Remove leftover console statement** (Session: 8475759274777109420)
+- [ ] **Testing Improvement: Missing tests for buildScopeKeyFromMeta** (Session: 15009249872801566978)
+- [ ] **Testing Improvement: Missing test file for markdown-text-utils.js** (Session: 13446809845484129784)
 - [ ] **Test Case: Frontmatter Sync** (Session: 4188880691859131714)
 - [ ] **Test Case: Section Tagging** (Session: 9626251438065124631)
 - [ ] **Test Case: Block Hierarchy** (Session: 7430663594449533691)
