@@ -5,3 +5,4 @@ docs/src/.enable-playground
 .qodo
 conductor-jules/scratch/*
 tmp-tasks.md
+vendor/
