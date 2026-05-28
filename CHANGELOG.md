@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.5.0...v1.5.1) (2026-05-28)
+
+
+### Miscellaneous Chores
+
+* bump version to 1.5.0 and wire module.php to release-please ([a70b165](https://github.com/lemachinarbo/MarkdownToFields/commit/a70b1658acdf1e0d4dc3aa7cd78fd53dcb9d66f8))
+
 ## [1.5.0](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.4.4...v1.5.0) (2026-05-28)
 
 
