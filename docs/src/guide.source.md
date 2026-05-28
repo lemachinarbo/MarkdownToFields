@@ -848,6 +848,7 @@ With `dataSet('html')`:
 - simple content nodes collapse to their `html` value
 - simple text-like fields become easier to consume
 - structural nodes such as images, links, and sections stay structured
+- **Note**: the `html` projection actually returns a `MarkdownHtmlElement` object. It casts to a string seamlessly, but also exposes the `tag` and `innerHtml` properties, which is great for semantic rendering (e.g. `<div n:tag="$title->tag">{$title->innerHtml}</div>`).
 
 And `dataSet('text')` does the same kind of projection, but using `text` instead of `html`.
 

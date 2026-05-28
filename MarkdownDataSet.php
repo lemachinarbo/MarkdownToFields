@@ -23,6 +23,8 @@ class MarkdownDataSet extends WireData implements \Countable
     'html',
     'text',
     'markdown',
+    'innerHtml',
+    'tag',
     'items',
     'blocks',
     'subsections',
@@ -352,6 +354,15 @@ class MarkdownDataSet extends WireData implements \Countable
     }
 
     if ($this->shouldCollapseNode($value, $key)) {
+      if ($key === 'html') {
+        return new MarkdownHtmlElement(
+          $value['html'] ?? '',
+          $value['tag'] ?? '',
+          $value['innerHtml'] ?? ($value['html'] ?? ''),
+          $value['text'] ?? '',
+          $value['area'] ?? ''
+        );
+      }
       return $value[$key] ?? '';
     }
 
@@ -467,3 +478,36 @@ class MarkdownDataArray extends WireArray
     return array_keys($value) === range(0, count($value) - 1);
   }
 }
+
+/**
+ * String-castable object representing simple nodes projected as HTML,
+ * exposing tag name, inner HTML, and metadata properties.
+ */
+class MarkdownHtmlElement extends WireData implements \JsonSerializable
+{
+  public string $tag;
+  public string $innerHtml;
+  public string $text;
+  public string $area;
+  public string $html;
+
+  public function __construct(string $html, string $tag, string $innerHtml, string $text, string $area)
+  {
+    $this->html = $html;
+    $this->tag = $tag;
+    $this->innerHtml = $innerHtml;
+    $this->text = $text;
+    $this->area = $area;
+  }
+
+  public function __toString(): string
+  {
+    return $this->html;
+  }
+
+  public function jsonSerialize(): mixed
+  {
+    return $this->html;
+  }
+}
+

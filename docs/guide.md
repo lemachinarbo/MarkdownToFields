@@ -722,6 +722,7 @@ namespace ProcessWire;
 | `data()` | `method` |  |
 | `dataSet($mode?)` | `method` | Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values. / |
 | `field($name)` | `method` | Get a field by name / |
+| `collectHeadings($headings, $seen)` | `method` |  |
 
 
 
@@ -1390,16 +1391,30 @@ array (9)
   key => 'hero'
   area => 'hero'
   subsections => array (0)
-  cta => array (7)
+  cta => array (9)
     html => '<p><a href="/book">Book now</a></p>'
     text => 'Book now'
     markdown => '[Book now](/book)'
+    innerHtml => '<a href="/book">Book now</a>'
+    tag => 'p'
     href => '/book'
     type => 'link'
     key => 'cta'
     area => 'hero/cta'
-  intro => '<p>We grow food in the city.</p>'
-  title => '<h1>The Urban Farm</h1>'
+  intro => ProcessWire\MarkdownHtmlElement
+    tag: 'p'
+    innerHtml: 'We grow food in the city.'
+    text: 'We grow food in the city.'
+    area: 'hero/intro'
+    html: '<p>We grow food in the city.</p>'
+    data: array (0)
+  title => ProcessWire\MarkdownHtmlElement
+    tag: 'h1'
+    innerHtml: 'The Urban Farm'
+    text: 'The Urban Farm'
+    area: 'hero/title'
+    html: '<h1>The Urban Farm</h1>'
+    data: array (0)
 ```
 
 Example:
@@ -1421,6 +1436,7 @@ With `dataSet('html')`:
 - simple content nodes collapse to their `html` value
 - simple text-like fields become easier to consume
 - structural nodes such as images, links, and sections stay structured
+- **Note**: the `html` projection actually returns a `MarkdownHtmlElement` object. It casts to a string seamlessly, but also exposes the `tag` and `innerHtml` properties, which is great for semantic rendering (e.g. `<div n:tag="$title->tag">{$title->innerHtml}</div>`).
 
 And `dataSet('text')` does the same kind of projection, but using `text` instead of `html`.
 
@@ -1491,25 +1507,31 @@ array (9)
   key => 'hero'
   area => 'hero'
   subsections => array (0)
-  cta => array (7)
+  cta => array (9)
     html => '<p><a href="/book">Book now</a></p>'
     text => 'Book now'
     markdown => '[Book now](/book)'
+    innerHtml => '<a href="/book">Book now</a>'
+    tag => 'p'
     href => '/book'
     type => 'link'
     key => 'cta'
     area => 'hero/cta'
-  intro => array (6)
+  intro => array (8)
     html => '<p>We grow food in the city.</p>'
     text => 'We grow food in the city.'
     markdown => 'We grow food in the city.'
+    innerHtml => 'We grow food in the city.'
+    tag => 'p'
     type => 'text'
     key => 'intro'
     area => 'hero/intro'
-  title => array (6)
+  title => array (8)
     html => '<h1>The Urban Farm</h1>'
     text => 'The Urban Farm'
     markdown => '# The Urban Farm'
+    innerHtml => 'The Urban Farm'
+    tag => 'h1'
     type => 'heading'
     key => 'title'
     area => 'hero/title'

@@ -21,25 +21,31 @@ array (9)
   key => 'hero'
   area => 'hero'
   subsections => array (0)
-  cta => array (7)
+  cta => array (9)
     html => '<p><a href="/book">Book now</a></p>'
     text => 'Book now'
     markdown => '[Book now](/book)'
+    innerHtml => '<a href="/book">Book now</a>'
+    tag => 'p'
     href => '/book'
     type => 'link'
     key => 'cta'
     area => 'hero/cta'
-  intro => array (6)
+  intro => array (8)
     html => '<p>We grow food in the city.</p>'
     text => 'We grow food in the city.'
     markdown => 'We grow food in the city.'
+    innerHtml => 'We grow food in the city.'
+    tag => 'p'
     type => 'text'
     key => 'intro'
     area => 'hero/intro'
-  title => array (6)
+  title => array (8)
     html => '<h1>The Urban Farm</h1>'
     text => 'The Urban Farm'
     markdown => '# The Urban Farm'
+    innerHtml => 'The Urban Farm'
+    tag => 'h1'
     type => 'heading'
     key => 'title'
     area => 'hero/title'

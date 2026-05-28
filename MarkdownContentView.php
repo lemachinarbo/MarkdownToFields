@@ -338,6 +338,8 @@ class MarkdownFieldDataView extends FieldData implements MarkdownContentViewNode
       'html' => $this->html,
       'text' => $this->text,
       'markdown' => $this->markdown,
+      'innerHtml' => property_exists($this, 'innerHtml') ? $this->innerHtml : '',
+      'tag' => property_exists($this, 'tag') ? $this->tag : '',
     ], $data);
 
     return MarkdownNodeData::adaptData($this->page, $this, $data, $this->nodeArea);
