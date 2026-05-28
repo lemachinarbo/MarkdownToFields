@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.0](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.4.4...v1.5.0) (2026-05-28)
+
+
+### Features
+
+* introduce MarkdownHtmlElement for semantic rendering and update dataset projection to return element objects ([c0bfbed](https://github.com/lemachinarbo/MarkdownToFields/commit/c0bfbed46d21ddd0e19d3e8f055cf1ac17547853))
+
+
+### Miscellaneous Chores
+
+* remove vendor files ([d4568a6](https://github.com/lemachinarbo/MarkdownToFields/commit/d4568a64c70549e8dd9cb103ade8c7251c20ecab))
+* sync conductor protocol and commit rules ([f549020](https://github.com/lemachinarbo/MarkdownToFields/commit/f5490209749325964cc2d011ea63f66f45f9851b))
+
 ## [1.4.4](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.4.3...v1.4.4) (2026-05-17)
 
 
