@@ -262,38 +262,41 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
     $currentHashes = self::languageFileHashes($page, $languageCodes);
 
-    try {
-      if (!empty($postedMarkdownMap)) {
-        foreach ($languageCodes as $languageCode) {
-          if (!array_key_exists($languageCode, $postedMarkdownMap)) continue;
-          $postedMarkdown = (string) $postedMarkdownMap[$languageCode];
+    if (!empty($postedMarkdownMap)) {
+      foreach ($languageCodes as $languageCode) {
+        if (!array_key_exists($languageCode, $postedMarkdownMap)) continue;
+        $postedMarkdown = (string) $postedMarkdownMap[$languageCode];
 
-          if ($postedMarkdown === '') {
-            // Empty posted raw markdown can come from stale/partial form payloads.
-            // Ignore it here to avoid deleting existing markdown files.
-            continue;
+        if ($postedMarkdown === '') {
+          // Empty posted raw markdown can come from stale/partial form payloads.
+          // Ignore it here to avoid deleting existing markdown files.
+          continue;
+        }
+
+        $path = self::getMarkdownFilePath($page, $languageCode);
+        $existing = is_file($path) ? file_get_contents($path) : '';
+
+        if ($postedMarkdown !== $existing) {
+          self::ensureDirectory($path);
+
+          if (wire('files')->filePutContents($path, $postedMarkdown) === false) {
+            throw new WireException(
+              sprintf('Unable to write markdown file at %s', $path),
+            );
           }
 
-          $path = self::getMarkdownFilePath($page, $languageCode);
-          $existing = is_file($path) ? file_get_contents($path) : '';
-
-          if ($postedMarkdown !== $existing) {
-            self::ensureDirectory($path);
-            wire('files')->filePutContents($path, $postedMarkdown);
-            $hash = md5($postedMarkdown);
-            self::rememberFileHash($page, [$languageCode => $hash]);
-            // Stage the page fields so the ongoing save will persist them (avoid nested saves here)
-            $page->of(false);
-            $page->set($markdownField, [$languageCode => $postedMarkdown]);
-            $hashField = self::hashFieldName($page, null);
-            if ($hashField) {
-              $page->set($hashField, self::encodeHashPayload($page, [$languageCode => $hash]));
-            }
-            $postedWrittenLanguages[] = $languageCode;
+          $hash = md5($postedMarkdown);
+          self::rememberFileHash($page, [$languageCode => $hash]);
+          // Stage the page fields so the ongoing save will persist them (avoid nested saves here)
+          $page->of(false);
+          $page->set($markdownField, [$languageCode => $postedMarkdown]);
+          $hashField = self::hashFieldName($page, null);
+          if ($hashField) {
+            $page->set($hashField, self::encodeHashPayload($page, [$languageCode => $hash]));
           }
+          $postedWrittenLanguages[] = $languageCode;
         }
       }
-    } catch (\Throwable $e) {
     }
 
     // Skip hash mismatch check if we're currently syncing FROM markdown

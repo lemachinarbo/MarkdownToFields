@@ -1,0 +1,12 @@
+{
+  "title": "Posted Write Failure Fixture",
+  "name": "write-failure",
+  "0": {
+    "key": "0",
+    "subsections": [],
+    "html": "<h1>Posted Write Failure</h1>\n<p>This fixture backs the posted-markdown write failure regression.</p>",
+    "text": "Posted Write Failure\n\nThis fixture backs the posted-markdown write failure regression.",
+    "markdown": "# Posted Write Failure\nThis fixture backs the posted-markdown write failure regression.",
+    "area": "sections/0"
+  }
+}

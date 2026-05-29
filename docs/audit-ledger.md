@@ -20,7 +20,7 @@
 * **Impact:** Silent failure and hash/state divergence between disk, session state, and persisted page fields.
 * **Required Fix:** Remove the empty catch, propagate write failures as `WireException`, and abort the save before hashes or field values are updated.
 * **Required Fixture:** `tests/fixtures/08-posted-markdown-write-failure/` covering an unwritable markdown destination during `syncToMarkdown()`.
-* **Status:** Open
+* **Status:** Resolved
 
 ### MTF-004 - HIGH: contentSource Override Exceptions Fall Back to a Different File
 * **Location:** `MarkdownFileIO.php` (Lines 43-67)
