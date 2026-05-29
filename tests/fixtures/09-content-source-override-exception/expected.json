@@ -1,0 +1,12 @@
+{
+  "title": "Override Exception Fixture",
+  "name": "override-exception",
+  "0": {
+    "key": "0",
+    "subsections": [],
+    "html": "<h1>Override Exception</h1>\n<p>This fixture backs contentSource override exception handling checks.</p>",
+    "text": "Override Exception\n\nThis fixture backs contentSource override exception handling checks.",
+    "markdown": "# Override Exception\nThis fixture backs contentSource override exception handling checks.",
+    "area": "sections/0"
+  }
+}

@@ -28,7 +28,7 @@
 * **Impact:** Silent source fork and unexpected file creation or overwrite.
 * **Required Fix:** Only tolerate override exceptions for unsaved pages if that state is explicitly intended; otherwise throw and stop the sync.
 * **Required Fixture:** `tests/fixtures/09-content-source-override-exception/` covering a saved page whose `contentSource()` override throws.
-* **Status:** Open
+* **Status:** Resolved
 
 ### MTF-005 - HIGH: Non-Core Field Save Failures Do Not Abort Sync
 * **Location:** `MarkdownSyncEngine.php` (Lines 154-203)
