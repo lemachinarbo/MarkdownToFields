@@ -707,11 +707,12 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
     $bindingSyncCount = 0;
     foreach ($frontmatter as $fieldName => $frontValue) {
-      $pattern = "/(<!--\s+field:" . preg_quote($fieldName, "/") . "\s+-->.*?)(\*|__)([^*_]+)\\2/s";
-      $bodyContent = preg_replace_callback($pattern, function($matches) use ($frontValue, &$bindingSyncCount) {
-        $bindingSyncCount++;
-        return $matches[1] . $matches[2] . $frontValue . $matches[2];
-      }, $bodyContent);
+      $bodyContent = self::replaceBindingValue(
+        $bodyContent,
+        (string) $fieldName,
+        (string) $frontValue,
+        $bindingSyncCount,
+      );
     }
 
     if ($bindingSyncCount > 0) {
@@ -721,6 +722,67 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     }
 
     return $bodyContent;
+  }
+
+  protected static function replaceBindingValue(
+    string $bodyContent,
+    string $fieldName,
+    string $frontValue,
+    int &$bindingSyncCount,
+  ): string {
+    $pattern = '/<!--\s+field:' . preg_quote($fieldName, '/') . '\s+-->/';
+    $offset = 0;
+
+    while (preg_match($pattern, $bodyContent, $matches, PREG_OFFSET_CAPTURE, $offset)) {
+      $markerText = (string) $matches[0][0];
+      $markerOffset = (int) $matches[0][1];
+      $valueStart = $markerOffset + strlen($markerText);
+
+      while (isset($bodyContent[$valueStart]) && ($bodyContent[$valueStart] === ' ' || $bodyContent[$valueStart] === "\t")) {
+        $valueStart++;
+      }
+
+      $delimiter = self::bindingDelimiterAt($bodyContent, $valueStart);
+      if ($delimiter === null) {
+        $offset = $valueStart;
+        continue;
+      }
+
+      $lineEnd = strpos($bodyContent, "\n", $valueStart);
+      if ($lineEnd === false) {
+        $lineEnd = strlen($bodyContent);
+      }
+
+      $valueEnd = strrpos(substr($bodyContent, 0, $lineEnd), $delimiter);
+      if ($valueEnd === false || $valueEnd <= $valueStart) {
+        $offset = $lineEnd;
+        continue;
+      }
+
+      $replacement = $delimiter . $frontValue . $delimiter;
+      $bodyContent =
+        substr($bodyContent, 0, $valueStart) .
+        $replacement .
+        substr($bodyContent, $valueEnd + strlen($delimiter));
+
+      $bindingSyncCount++;
+      $offset = $valueStart + strlen($replacement);
+    }
+
+    return $bodyContent;
+  }
+
+  protected static function bindingDelimiterAt(string $bodyContent, int $offset): ?string
+  {
+    if (substr($bodyContent, $offset, 2) === '__') {
+      return '__';
+    }
+
+    if (substr($bodyContent, $offset, 1) === '*') {
+      return '*';
+    }
+
+    return null;
   }
 
   /** Remove module-managed keys (markdown/html/hash + tab sentinels) from frontmatter. */

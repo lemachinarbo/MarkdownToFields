@@ -76,7 +76,7 @@
 * **Impact:** Silent binder drift between frontmatter values and rendered markdown body text.
 * **Required Fix:** Replace the regex-only binder matcher with a parser that isolates the emphasized token without forbidding legitimate content characters.
 * **Required Fixture:** `tests/fixtures/15-field-binder-special-characters/` covering bound values such as `price_code`, `a*b`, and mixed emphasis characters.
-* **Status:** Open
+* **Status:** Resolved
 
 ### MTF-011 - MEDIUM: Image Asset Copy and Hash Persistence Fail Open
 * **Location:** `MarkdownHtmlConverter.php` (Lines 141-301)

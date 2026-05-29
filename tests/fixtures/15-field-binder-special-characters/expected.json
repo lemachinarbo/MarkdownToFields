@@ -1,0 +1,45 @@
+{
+  "sku": "price_code",
+  "formula": "a*b",
+  "mixed": "mix_*_value",
+  "0": {
+    "key": "0",
+    "subsections": [],
+    "html": "<h1>Binder Fixture</h1>\n<!-- field:sku -->*price_code*\n<!-- field:formula -->*a*b*\n<!-- field:mixed -->__mix_*_value__",
+    "text": "Binder Fixture\n\n*price_code*\n*a*b*\n__mix_*_value__",
+    "markdown": "# Binder Fixture\n\n<!-- field:sku -->*price_code*\n\n<!-- field:formula -->*a*b*\n\n<!-- field:mixed -->__mix_*_value__",
+    "mixed": {
+      "type": "binding",
+      "key": "mixed",
+      "html": "<p><strong>mix_*_value</strong></p>",
+      "text": "mix_*_value",
+      "markdown": "__mix_*_value__",
+      "innerHtml": "<strong>mix_*_value</strong>",
+      "tag": "p",
+      "area": "sections/0/mixed"
+    },
+    "formula": {
+      "type": "binding",
+      "key": "formula",
+      "html": "<p><em>a</em>b*</p>",
+      "text": "ab*",
+      "markdown": "*a*b*",
+      "innerHtml": "<em>a</em>b*",
+      "tag": "p",
+      "atomicValue": "a",
+      "area": "sections/0/formula"
+    },
+    "sku": {
+      "type": "binding",
+      "key": "sku",
+      "html": "<p><em>price_code</em></p>",
+      "text": "price_code",
+      "markdown": "*price_code*",
+      "innerHtml": "<em>price_code</em>",
+      "tag": "p",
+      "atomicValue": "price_code",
+      "area": "sections/0/sku"
+    },
+    "area": "sections/0"
+  }
+}
