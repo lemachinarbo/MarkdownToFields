@@ -256,6 +256,7 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     }
 
     $postedWrittenLanguages = [];
+    $deletedPostedLanguages = [];
 
     $currentHashes = self::languageFileHashes($page, $languageCodes);
 
@@ -265,8 +266,21 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         $postedMarkdown = (string) $postedMarkdownMap[$languageCode];
 
         if ($postedMarkdown === '') {
-          // Empty posted raw markdown can come from stale/partial form payloads.
-          // Ignore it here to avoid deleting existing markdown files.
+          self::deleteLanguageMarkdown($page, $languageCode);
+
+          $hash = self::getMarkdownFileHash($page, null, $languageCode);
+          self::rememberFileHash($page, [$languageCode => $hash]);
+
+          $page->of(false);
+          $page->set($markdownField, [$languageCode => '']);
+
+          $hashField = self::hashFieldName($page, null);
+          if ($hashField) {
+            $page->set($hashField, self::encodeHashPayload($page, [$languageCode => $hash]));
+          }
+
+          $postedWrittenLanguages[] = $languageCode;
+          $deletedPostedLanguages[] = $languageCode;
           continue;
         }
 
@@ -373,6 +387,10 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     $defaultCode = self::getDefaultLanguageCode($page);
 
     foreach ($languageCodes as $languageCode) {
+      if (in_array($languageCode, $deletedPostedLanguages, true)) {
+        continue;
+      }
+
       $language = self::resolveLanguage($page, $languageCode);
       $isDefaultLanguage = self::isDefaultLanguage($page, $language);
 

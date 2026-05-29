@@ -1,0 +1,11 @@
+{
+  "title": "Explicit Empty Submission",
+  "0": {
+    "key": "0",
+    "subsections": [],
+    "html": "<h1>Delete Me</h1>\n<p>This markdown file should be deleted when the editor posts an explicit empty payload.</p>",
+    "text": "Delete Me\n\nThis markdown file should be deleted when the editor posts an explicit empty payload.",
+    "markdown": "# Delete Me\nThis markdown file should be deleted when the editor posts an explicit empty payload.",
+    "area": "sections/0"
+  }
+}

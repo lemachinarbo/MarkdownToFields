@@ -84,7 +84,7 @@
 * **Impact:** Broken frontend asset URLs and stale image refresh state with no surfaced error.
 * **Required Fix:** Check copy and hash-write return values explicitly, throw on failed asset materialization, and only return a ProcessWire URL after the destination file exists.
 * **Required Fixture:** `tests/fixtures/16-image-copy-and-hash-write-failure/` covering a non-writable assets directory and a non-writable `image-hashes.json` sidecar.
-* **Status:** Open
+* **Status:** Resolved
 
 ### MTF-012 - MEDIUM: Empty Posted Markdown Cannot Intentionally Delete the Document
 * **Location:** `MarkdownSyncEngine.php` (Lines 271-275)
@@ -92,4 +92,4 @@
 * **Impact:** Inability to express intentional deletion and silent retention of stale source content.
 * **Required Fix:** Differentiate explicit empty submissions from missing form values and define a hard delete-or-empty-document policy for canonical markdown files.
 * **Required Fixture:** `tests/fixtures/17-explicit-empty-markdown-submission/` covering a deliberate full-document clear from the editor.
-* **Status:** Open
+* **Status:** Resolved
