@@ -36,7 +36,7 @@
 * **Impact:** Silent partial save and long-lived divergence between markdown frontmatter and ProcessWire fields.
 * **Required Fix:** Treat every mapped field save failure as a sync failure or explicitly roll back file and in-memory mutations before continuing.
 * **Required Fixture:** `tests/fixtures/10-noncore-field-save-failure-aborts-sync/` covering a mapped custom field that throws during `$page->save($field)`.
-* **Status:** Open
+* **Status:** Resolved
 
 ### MTF-006 - HIGH: Frontmatter Parser Corrupts Legitimate YAML-Like Input
 * **Location:** `MarkdownDocumentParser.php` (Lines 7-186)

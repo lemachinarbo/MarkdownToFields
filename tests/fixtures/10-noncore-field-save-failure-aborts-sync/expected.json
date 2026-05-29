@@ -1,0 +1,13 @@
+{
+  "title": "Non-Core Save Failure",
+  "name": "noncore-save-failure",
+  "audit_custom": "updated from markdown",
+  "0": {
+    "key": "0",
+    "subsections": [],
+    "html": "<h1>Non-Core Save Failure</h1>\n<p>This fixture backs mapped custom-field save failure handling.</p>",
+    "text": "Non-Core Save Failure\n\nThis fixture backs mapped custom-field save failure handling.",
+    "markdown": "# Non-Core Save Failure\nThis fixture backs mapped custom-field save failure handling.",
+    "area": "sections/0"
+  }
+}

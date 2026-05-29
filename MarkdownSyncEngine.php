@@ -189,27 +189,24 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
   private static function handleFailedFields(Page $page, array $failedFields): void
   {
-    $protectedFields = array_intersect(
-      ['name', 'title'],
-      array_keys($failedFields),
+    if (!$failedFields) {
+      return;
+    }
+
+    $firstError = reset($failedFields);
+    $errorPreview = is_string($firstError)
+      ? (strlen($firstError) > 200
+        ? substr($firstError, 0, 200) . '...'
+        : $firstError)
+      : json_encode($firstError);
+
+    $errorMsg = sprintf(
+      'Failed to save mapped fields (%s) during markdown sync: %s',
+      implode(', ', array_keys($failedFields)),
+      $errorPreview,
     );
 
-    if ($protectedFields) {
-      $firstError = reset($failedFields);
-      $errorPreview = is_string($firstError)
-        ? (strlen($firstError) > 200
-          ? substr($firstError, 0, 200) . '...'
-          : $firstError)
-        : json_encode($firstError);
-
-      $errorMsg = sprintf(
-        'Failed to save protected fields (%s) during markdown sync: %s',
-        implode(', ', $protectedFields),
-        $errorPreview,
-      );
-
-      throw new WireException($errorMsg);
-    }
+    throw new WireException($errorMsg);
   }
 
   /** Syncs page fields to markdown files. */
