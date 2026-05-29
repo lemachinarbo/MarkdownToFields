@@ -1,0 +1,12 @@
+{
+  "title": "Before Rename",
+  "name": "old-slug",
+  "0": {
+    "key": "0",
+    "subsections": [],
+    "html": "<h1>Rename Collision Fixture</h1>\n<p>This paragraph belongs to the current page.</p>",
+    "text": "Rename Collision Fixture\n\nThis paragraph belongs to the current page.",
+    "markdown": "# Rename Collision Fixture\nThis paragraph belongs to the current page.",
+    "area": "sections/0"
+  }
+}

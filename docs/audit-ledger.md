@@ -52,7 +52,7 @@
 * **Impact:** Silent file ownership collision and source-of-truth hijack.
 * **Required Fix:** Require a strong ownership check before adoption, and throw on any pre-existing target file that cannot be conclusively linked to the same page.
 * **Required Fixture:** `tests/fixtures/12-rename-collision-rejected/` covering rename onto an unrelated existing markdown file and a verified same-page orphan reunion.
-* **Status:** Open
+* **Status:** Resolved
 
 ### MTF-008 - HIGH: Link Rewrite Path Overwrites Referencing Pages Without Concurrency Guard
 * **Location:** `MarkdownBoundLinks.php` (Lines 118-204)

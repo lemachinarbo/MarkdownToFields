@@ -386,16 +386,16 @@ class MarkdownSyncHooks
     if ($page->id && $page->isChanged('name')) {
       $defaultCode = MarkdownLanguageResolver::getDefaultLanguageCode($page);
       $newPath = $currentPaths[$defaultCode] ?? null;
+      $oldPath = null;
 
       // Detect if the rename actually changed the markdown source path.
-      // If contentSource() is overridden to a static string, it won't change.
-      $changes = $page->getChanges(true);
-      $oldName = $changes['name'] ?? null;
+      // Use the stored page state rather than change-tracking payloads so the
+      // preflight guard sees the same prior path that the file mover will use.
       $pathChanged = true;
+      $dbPage = $page->wire('pages')->getFresh((int) $page->id);
 
-      if ($oldName !== null) {
-        $oldPage = clone $page;
-        $oldPage->name = $oldName;
+      if ($dbPage instanceof Page && $dbPage->id) {
+        $oldPage = clone $dbPage;
         $oldPath = MarkdownFileIO::getMarkdownFilePath($oldPage, $defaultCode);
         if ($oldPath === $newPath) {
           $pathChanged = false;
@@ -403,40 +403,15 @@ class MarkdownSyncHooks
       }
 
       if ($pathChanged && $newPath !== null && is_file($newPath)) {
-        // Orphan Adoption: If we can verify this is our file (via frontmatter), we allow it silently.
-        try {
-          $content = MarkdownFileIO::loadLanguageMarkdown($page, $defaultCode, basename($newPath));
-          if ($content) {
-            $frontmatter = $content->getFrontmatter();
-            $fileStoredName = trim((string) ($frontmatter['name'] ?? ''));
-            if ($fileStoredName !== '') {
-              $currentNames = [];
-              $languages = $page->wire('languages');
-              if ($languages) {
-                foreach ($languages as $lang) {
-                  $n = (string) $page->get('name' . ($lang->isDefault() ? '' : $lang->id));
-                  if ($n !== '') $currentNames[] = $n;
-                }
-              } else {
-                $currentNames[] = (string) $page->name;
-              }
-              
-              if (in_array($fileStoredName, array_unique($currentNames), true)) {
-                return; // Direct reunion, allow silently
-              }
-            }
-          }
-        } catch (\Throwable $_e) {
-          // Ignore read errors during adoption check
+        if (is_string($oldPath) && self::isVerifiedRenameReunion($oldPath, $newPath)) {
+          return;
         }
 
-        // If not a clear reunion, allow it but warn the user.
-        // This fulfills the "you pick the name, you pick the file" philosophy
-        // while remaining respectful by providing transparency.
-        $page->wire('session')?->warning(
+        throw new WireException(
           sprintf(
-            'Markdown: This page is now using "%s", an existing file found on the disk.',
-            basename($newPath)
+            'Markdown source collision: rename target "%s" already exists and cannot be linked to page %s. Remove or rename the existing file before renaming this page.',
+            basename($newPath),
+            $page->path,
           )
         );
       }
@@ -491,16 +466,8 @@ class MarkdownSyncHooks
         if ($oldPath === $newPath) continue;
 
         if (is_file($oldPath)) {
-          $canOverwrite = false;
-          if (!is_file($newPath)) {
-            $canOverwrite = true;
-          } else {
-            // Overwrite if orphan or same page
-            $collidingPage = $page->wire('pages')->get("md_markdown=" . basename($newPath));
-            if (!$collidingPage->id || (int)$collidingPage->id === (int)$page->id) {
-              $canOverwrite = true;
-            }
-          }
+          $canOverwrite =
+            !is_file($newPath) || self::isVerifiedRenameReunion($oldPath, $newPath);
 
           if ($canOverwrite) {
             MarkdownFileIO::ensureDirectory($newPath);
@@ -530,5 +497,21 @@ class MarkdownSyncHooks
         ]);
       }
     }
+  }
+
+  private static function isVerifiedRenameReunion(string $oldPath, string $newPath): bool
+  {
+    if (!is_file($oldPath) || !is_file($newPath)) {
+      return false;
+    }
+
+    $oldDocument = @file_get_contents($oldPath);
+    $newDocument = @file_get_contents($newPath);
+
+    if (!is_string($oldDocument) || !is_string($newDocument)) {
+      return false;
+    }
+
+    return $oldDocument === $newDocument;
   }
 }
