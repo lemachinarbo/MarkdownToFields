@@ -464,9 +464,6 @@ class MarkdownSyncHooks
     }
 
     $languages = $page->wire('languages');
-    if (!$languages) {
-      return;
-    }
 
     $defaultLanguage = MarkdownLanguageResolver::getDefaultLanguage($page);
     $oldName = $defaultLanguage ? (string) $dbPage->getLanguageValue($defaultLanguage, 'name') : (string) $dbPage->name;
@@ -510,7 +507,7 @@ class MarkdownSyncHooks
             if (rename($oldPath, $newPath)) {
               $msg = sprintf("Moved markdown file '%s' to '%s' to match page rename.", basename($oldPath), basename($newPath));
               MarkdownUtilities::sessionMessage($msg);
-              $page->setQuietly('_md_renaming_' . $language->id, true);
+              $page->setQuietly('_md_renaming_' . ($language ? $language->id : ''), true);
               MarkdownUtilities::logChannel($page, 'Moved markdown file on rename', [
                 'from' => $oldPath,
                 'to' => $newPath,

@@ -1,0 +1,12 @@
+{
+  "title": "Before Rename",
+  "name": "old-slug",
+  "0": {
+    "key": "0",
+    "subsections": [],
+    "html": "<h1>Rename Fixture</h1>\n<p>This paragraph is only stored in markdown and must move on rename.</p>",
+    "text": "Rename Fixture\n\nThis paragraph is only stored in markdown and must move on rename.",
+    "markdown": "# Rename Fixture\nThis paragraph is only stored in markdown and must move on rename.",
+    "area": "sections/0"
+  }
+}
