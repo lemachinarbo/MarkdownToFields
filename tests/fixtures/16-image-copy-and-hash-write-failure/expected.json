@@ -1,0 +1,11 @@
+{
+  "title": "Image Failure Fixture",
+  "0": {
+    "key": "0",
+    "subsections": [],
+    "html": "<h1>Image Failure Fixture</h1>\n<p><img src=\"sample.svg\" alt=\"Sample\"></p>",
+    "text": "Image Failure Fixture",
+    "markdown": "# Image Failure Fixture\n\n![Sample](sample.svg)",
+    "area": "sections/0"
+  }
+}

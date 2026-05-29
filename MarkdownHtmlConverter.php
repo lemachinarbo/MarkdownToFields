@@ -188,11 +188,20 @@ class MarkdownHtmlConverter extends MarkdownFileIO
         $destDir = dirname($destPath);
 
         if (!is_dir($destDir)) {
-          wire('files')?->mkdir($destDir, true);
+          $created = wire('files')?->mkdir($destDir, true);
+          if ($created === false || !is_dir($destDir)) {
+            throw new WireException(
+              sprintf('Unable to create image asset directory at %s', $destDir),
+            );
+          }
         }
 
         if (!is_file($destPath) || filemtime($sourceFile) > @filemtime($destPath)) {
-          @copy($sourceFile, $destPath);
+          if (!@copy($sourceFile, $destPath) || !is_file($destPath)) {
+            throw new WireException(
+              sprintf('Unable to copy image asset from %s to %s', $sourceFile, $destPath),
+            );
+          }
         }
 
         if (is_array($hashes)) {
@@ -207,6 +216,12 @@ class MarkdownHtmlConverter extends MarkdownFileIO
           $img = new Pageimage($wrapper, $destPath);
           return $img->url();
         } catch (\Throwable) {
+          if (!is_file($destPath)) {
+            throw new WireException(
+              sprintf('Image asset was not materialized at %s', $destPath),
+            );
+          }
+
           return $destBaseUrl . ltrim($candidate, '/');
         }
       }
@@ -298,7 +313,11 @@ class MarkdownHtmlConverter extends MarkdownFileIO
       return;
     }
 
-    @file_put_contents($path, $encoded);
+    if (@file_put_contents($path, $encoded) === false) {
+      throw new WireException(
+        sprintf('Unable to persist image hashes at %s', $path),
+      );
+    }
   }
 
   public static function resyncImageHashesForPage(Page $page): int

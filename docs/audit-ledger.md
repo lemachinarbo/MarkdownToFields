@@ -60,7 +60,7 @@
 * **Impact:** Silent cross-page overwrite and partial tree mutation.
 * **Required Fix:** Add optimistic concurrency checks before rewriting referencing pages and make file, field, and index updates fail atomically for each affected page.
 * **Required Fixture:** `tests/fixtures/13-link-rewrite-conflict-detection/` covering a renamed target page while a referencing page has a newer unsynced markdown revision.
-* **Status:** Open
+* **Status:** Resolved
 
 ### MTF-009 - MEDIUM: Unreadable Markdown Files Are Treated as Missing
 * **Location:** `MarkdownFileIO.php` (Lines 173-191)
@@ -68,7 +68,7 @@
 * **Impact:** Misdiagnosis of IO failures and downstream orphan-recovery or file-recreation behavior on the wrong premise.
 * **Required Fix:** Distinguish unreadable files from missing files and throw a dedicated exception for read failures.
 * **Required Fixture:** `tests/fixtures/14-unreadable-markdown-file/` covering an existing markdown file with denied read permission.
-* **Status:** Open
+* **Status:** Resolved
 
 ### MTF-010 - MEDIUM: Binder Sync Regex Rejects Valid Bound Values
 * **Location:** `MarkdownSyncEngine.php` (Lines 681-697)
