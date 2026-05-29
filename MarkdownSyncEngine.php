@@ -465,6 +465,11 @@ class MarkdownSyncEngine extends MarkdownSessionManager
         $frontmatter = [];
       }
 
+      $originalFrontmatterComparable = self::filterOutModuleFrontmatterKeys(
+        $page,
+        $frontmatter,
+      );
+
       $frontmatterUpdates = [];
 
       foreach ($map as $field => $frontKey) {
@@ -616,14 +621,27 @@ class MarkdownSyncEngine extends MarkdownSessionManager
       // Remove module-managed keys from frontmatter so we don't leak md_* entries
       $frontmatter = self::filterOutModuleFrontmatterKeys($page, $frontmatter);
 
+      $preserveExistingFrontmatter =
+        $frontRaw !== '' &&
+        !self::frontmatterValuesDiffer($originalFrontmatterComparable, $frontmatter);
+
       $hasDocumentContent = self::documentHasContent(
         $frontmatter,
         $bodyContent,
       );
 
-      $document = $hasDocumentContent
-        ? self::composeDocument($frontmatter, $bodyContent)
-        : '';
+      if ($hasDocumentContent) {
+        $documentFrontmatter = $preserveExistingFrontmatter
+          ? rtrim($frontRaw, "\r\n")
+          : self::buildFrontmatterRaw($frontmatter);
+
+        $document = self::composeDocumentWithFrontmatterRaw(
+          $documentFrontmatter,
+          $bodyContent,
+        );
+      } else {
+        $document = '';
+      }
 
       $storedMarkdown = (string) self::getFieldValueForLanguage(
         $page,

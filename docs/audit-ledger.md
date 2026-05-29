@@ -44,7 +44,7 @@
 * **Impact:** Content corruption and irreversible frontmatter shape changes on read/write cycles.
 * **Required Fix:** Replace the ad hoc parser with a strict parser that only closes on standalone fences, preserves indentation, and round-trips scalar strings without lossy coercion.
 * **Required Fixture:** `tests/fixtures/11-frontmatter-roundtrip-edge-cases/` covering inline `---`, nested structures, indented blocks, quoted numerics, booleans, and leading-zero strings.
-* **Status:** Open
+* **Status:** Resolved
 
 ### MTF-007 - HIGH: Rename Collision Logic Adopts Existing Files With Weak Ownership Proof
 * **Location:** `MarkdownSyncHooks.php` (Lines 386-430)

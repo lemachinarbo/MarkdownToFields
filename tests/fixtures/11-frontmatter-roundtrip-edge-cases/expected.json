@@ -1,0 +1,23 @@
+{
+  "title": "ACME --- Europe",
+  "catalog": {
+    "region": "west",
+    "flags": ["fast", "safe"]
+  },
+  "summary": {
+    "short": "007"
+  },
+  "quoted_numeric": "0123",
+  "leading_zero": "00123",
+  "boolean_string": "true",
+  "actual_boolean": true,
+  "null_string": "null",
+  "0": {
+    "key": "0",
+    "subsections": [],
+    "html": "<h1>Frontmatter Edge Cases</h1>\n<p>This fixture exercises strict frontmatter parsing.</p>",
+    "text": "Frontmatter Edge Cases\n\nThis fixture exercises strict frontmatter parsing.",
+    "markdown": "# Frontmatter Edge Cases\nThis fixture exercises strict frontmatter parsing.",
+    "area": "sections/0"
+  }
+}
