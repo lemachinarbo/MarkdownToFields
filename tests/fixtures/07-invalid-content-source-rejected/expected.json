@@ -1,0 +1,12 @@
+{
+  "title": "Invalid Source Fixture",
+  "name": "safe-name",
+  "0": {
+    "key": "0",
+    "subsections": [],
+    "html": "<h1>Invalid Source</h1>\n<p>This fixture backs contentSource override validation checks.</p>",
+    "text": "Invalid Source\n\nThis fixture backs contentSource override validation checks.",
+    "markdown": "# Invalid Source\nThis fixture backs contentSource override validation checks.",
+    "area": "sections/0"
+  }
+}

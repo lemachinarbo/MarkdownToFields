@@ -24,6 +24,10 @@ class MarkdownFileIO extends MarkdownConfig
       return false;
     }
 
+    if ($trimmed !== basename(str_replace('\\', '/', $trimmed))) {
+      return false;
+    }
+
     $ext = strtolower(pathinfo($trimmed, PATHINFO_EXTENSION));
     if ($ext !== 'md') {
       return false;
@@ -34,7 +38,26 @@ class MarkdownFileIO extends MarkdownConfig
       return false;
     }
 
+    if (str_contains($basename, '..')) {
+      return false;
+    }
+
     return true;
+  }
+
+  protected static function requireValidSource(Page $page, ?string $source): string
+  {
+    if (!self::isValidSource($source)) {
+      throw new WireException(
+        sprintf(
+          'Invalid markdown source for page %s: %s',
+          $page->path,
+          is_string($source) ? $source : gettype($source),
+        ),
+      );
+    }
+
+    return trim($source);
   }
 
   protected static $gettingContentSource = [];
@@ -60,9 +83,13 @@ class MarkdownFileIO extends MarkdownConfig
         try {
           $override = $page->contentSource();
           if (is_string($override) && $override !== '') {
-            return $override;
+            return self::requireValidSource($page, $override);
           }
         } catch (\Throwable $e) {
+          if ($pageId > 0) {
+            throw $e;
+          }
+
           // Silence exceptions when checking for class overrides on unsaved pages
         }
       }
@@ -74,7 +101,7 @@ class MarkdownFileIO extends MarkdownConfig
           : trim((string) $page->name);
           
       if ($pageName !== '') {
-        return $pageName . '.md';
+        return self::requireValidSource($page, $pageName . '.md');
       }
 
       throw new WireException(
@@ -128,10 +155,9 @@ class MarkdownFileIO extends MarkdownConfig
 
     $languageCode ??= self::getLanguageCode($page);
     $language = self::resolveLanguage($page, $languageCode);
-    $source ??= self::contentSource($page);
+    $source = self::requireValidSource($page, $source ?? self::contentSource($page));
 
     $root = $config['source']['path'];
-    $source = ltrim($source, '/');
 
     $languages = $page->wire('languages');
     $isMultilingual = $languages && count($languages) > 1;

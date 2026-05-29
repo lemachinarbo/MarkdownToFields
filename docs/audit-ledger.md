@@ -12,7 +12,7 @@
 * **Impact:** Security risk and filesystem integrity risk from writes outside the configured content root.
 * **Required Fix:** Validate every resolved source with a strict allowlist before path composition, reject traversal and non-`.md` targets, and fail hard on invalid overrides.
 * **Required Fixture:** `tests/fixtures/07-invalid-content-source-rejected/` covering `../escape.md`, `.hidden.md`, and `content.txt` override values.
-* **Status:** Open
+* **Status:** Resolved
 
 ### MTF-003 - CRITICAL: Posted Markdown Write Errors Are Silently Swallowed
 * **Location:** `MarkdownSyncEngine.php` (Lines 248-296)
