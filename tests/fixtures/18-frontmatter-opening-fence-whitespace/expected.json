@@ -1,0 +1,12 @@
+{
+  "title": "Whitespace Fence",
+  "name": "whitespace-fence",
+  "0": {
+    "key": "0",
+    "subsections": [],
+    "html": "<h1>Whitespace Fence</h1>\n<p>Frontmatter should still parse when the opening fence has trailing spaces.</p>",
+    "text": "Whitespace Fence\n\nFrontmatter should still parse when the opening fence has trailing spaces.",
+    "markdown": "# Whitespace Fence\n\nFrontmatter should still parse when the opening fence has trailing spaces.",
+    "area": "sections/0"
+  }
+}

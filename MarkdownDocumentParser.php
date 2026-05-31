@@ -10,11 +10,11 @@ class MarkdownDocumentParser extends MarkdownUtilities
   {
     $document = ltrim($document, "\xEF\xBB\xBF");
 
-    if (!preg_match('/\A---\r?\n/', $document)) {
+    if (!preg_match('/\A---[ \t]*\r?\n/', $document)) {
       return ['', ltrim($document, "\r\n")];
     }
 
-    if (preg_match('/\A---\r?\n(.*?)\r?\n---(?:\r?\n|\z)(.*)\z/s', $document, $match)) {
+    if (preg_match('/\A---[ \t]*\r?\n(.*?)\r?\n[ \t]*---[ \t]*(?:\r?\n|\z)(.*)\z/s', $document, $match)) {
       return [rtrim($match[1], "\r\n"), ltrim($match[2], "\r\n")];
     }
 
