@@ -13,32 +13,52 @@ class MarkdownFileIO extends MarkdownConfig
     return $pageName !== '' ? $pageName . '.md' : 'index.md';
   }
 
-  protected static function isValidSource(?string $source): bool
+  protected static function normalizeSource(?string $source): ?string
   {
     if (!is_string($source)) {
-      return false;
+      return null;
     }
 
     $trimmed = trim($source);
     if ($trimmed === '') {
+      return null;
+    }
+
+    $normalized = str_replace('\\', '/', $trimmed);
+    $normalized = ltrim($normalized, '/');
+
+    return $normalized !== '' ? $normalized : null;
+  }
+
+  protected static function isValidSource(?string $source): bool
+  {
+    $normalized = self::normalizeSource($source);
+    if ($normalized === null) {
       return false;
     }
 
-    if ($trimmed !== basename(str_replace('\\', '/', $trimmed))) {
+    if (str_contains($normalized, '//')) {
       return false;
     }
 
-    $ext = strtolower(pathinfo($trimmed, PATHINFO_EXTENSION));
+    $segments = explode('/', $normalized);
+    foreach ($segments as $segment) {
+      if ($segment === '' || $segment === '.' || $segment === '..') {
+        return false;
+      }
+
+      if (self::startsWith($segment, '.') || str_contains($segment, '..')) {
+        return false;
+      }
+    }
+
+    $ext = strtolower(pathinfo($normalized, PATHINFO_EXTENSION));
     if ($ext !== 'md') {
       return false;
     }
 
-    $basename = pathinfo($trimmed, PATHINFO_FILENAME);
+    $basename = pathinfo($normalized, PATHINFO_FILENAME);
     if ($basename === '' || self::startsWith($basename, '.')) {
-      return false;
-    }
-
-    if (str_contains($basename, '..')) {
       return false;
     }
 
@@ -47,7 +67,8 @@ class MarkdownFileIO extends MarkdownConfig
 
   protected static function requireValidSource(Page $page, ?string $source): string
   {
-    if (!self::isValidSource($source)) {
+    $normalized = self::normalizeSource($source);
+    if (!self::isValidSource($normalized)) {
       throw new WireException(
         sprintf(
           'Invalid markdown source for page %s: %s',
@@ -57,7 +78,7 @@ class MarkdownFileIO extends MarkdownConfig
       );
     }
 
-    return trim($source);
+    return $normalized;
   }
 
   protected static $gettingContentSource = [];
