@@ -398,10 +398,19 @@ class MarkdownHtmlConverter extends MarkdownFileIO
 
         $destDir = dirname($destPath);
         if (!is_dir($destDir)) {
-          wire('files')?->mkdir($destDir, true);
+          $created = wire('files')?->mkdir($destDir, true);
+          if ($created === false || !is_dir($destDir)) {
+            throw new WireException(
+              sprintf('Unable to create image asset directory at %s', $destDir),
+            );
+          }
         }
 
-        @copy($sourceFile, $destPath);
+        if (!@copy($sourceFile, $destPath) || !is_file($destPath)) {
+          throw new WireException(
+            sprintf('Unable to copy image asset from %s to %s', $sourceFile, $destPath),
+          );
+        }
 
         $map[$filename] = $sourceHash;
         $langChanged = true;
@@ -416,8 +425,16 @@ class MarkdownHtmlConverter extends MarkdownFileIO
 
     if ($changed) {
       $encoded = json_encode($decoded);
-      if ($encoded !== false) {
-        @file_put_contents($path, $encoded);
+      if ($encoded === false) {
+        throw new WireException(
+          sprintf('Unable to encode image hashes for %s', $path),
+        );
+      }
+
+      if (@file_put_contents($path, $encoded) === false) {
+        throw new WireException(
+          sprintf('Unable to persist image hashes at %s', $path),
+        );
       }
     }
 
