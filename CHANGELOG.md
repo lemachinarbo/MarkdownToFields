@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.5.2](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.5.1...v1.5.2) (2026-05-31)
+
+
+### Bug Fixes
+
+* abort on mapped field save failure ([82a9f50](https://github.com/lemachinarbo/MarkdownToFields/commit/82a9f50143b2ca586eaaa266b4ed899d820ae364))
+* abort on markdown write failure ([6e40457](https://github.com/lemachinarbo/MarkdownToFields/commit/6e40457d1d0844f52688278b3228e186fd371b6a))
+* delete explicit empty markdown ([0b5ccb5](https://github.com/lemachinarbo/MarkdownToFields/commit/0b5ccb5dcb4096534880f0e2dddbf50407dd2ce9))
+* fail loud on image assets ([89419ff](https://github.com/lemachinarbo/MarkdownToFields/commit/89419ff2961504e73ad6d479e1daaf8f9e332d22))
+* fail loud on image resync errors ([868eaa1](https://github.com/lemachinarbo/MarkdownToFields/commit/868eaa1e6c4795af82250025233fbf471e127906))
+* harden frontmatter round trips ([add9df1](https://github.com/lemachinarbo/MarkdownToFields/commit/add9df1e6173795edeea4df2f350c5c4d08ec510))
+* preserve single-language renames ([878e20b](https://github.com/lemachinarbo/MarkdownToFields/commit/878e20bda037f39ca4a100e9618005b46fdc6cf6))
+* record override exception coverage ([34b2e54](https://github.com/lemachinarbo/MarkdownToFields/commit/34b2e54488cd7a0a2e17560bbfd1469e5262dcc6))
+* reject invalid markdown sources ([54a1b64](https://github.com/lemachinarbo/MarkdownToFields/commit/54a1b647b72d00fe5626433fd53cb91a281caf76))
+* reject weak rename adoption ([f62d52f](https://github.com/lemachinarbo/MarkdownToFields/commit/f62d52f0f706c5242b9f03af799794d4f51f4523))
+* restore multiline binder syncing ([69b08b2](https://github.com/lemachinarbo/MarkdownToFields/commit/69b08b2f49a838d87204f70832b85489a9fc52d4))
+* restore nested source path support ([4e9d213](https://github.com/lemachinarbo/MarkdownToFields/commit/4e9d213b4abf2699176d2ee34511991a002d5d6d))
+* support special binder values ([ed96804](https://github.com/lemachinarbo/MarkdownToFields/commit/ed96804bf19c9b5f6f281805efd4ac8cccf51453))
+* tolerate whitespace on frontmatter fences ([82625bd](https://github.com/lemachinarbo/MarkdownToFields/commit/82625bd8050cfd5a37c3956b2e23b32a43386f0c))
+
+
+### Miscellaneous Chores
+
+* record audit track and normalize fixture json ([d09ba58](https://github.com/lemachinarbo/MarkdownToFields/commit/d09ba58dc7c2067a7d3a69bcb9e7a19598c8f3f3))
+
 ## [1.5.1](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.5.0...v1.5.1) (2026-05-28)
 
 
