@@ -1,0 +1,1313 @@
+You are a strict, adversarial code reviewer. Your only job is to find real bugs in this diff.
+You are NOT a helpful assistant. You are an auditor looking for failures.
+
+Here is the full diff under review:
+
+--- DIFF START ---
+diff --git a/docs/audit-ledger.md b/docs/audit-ledger.md
+new file mode 100644
+index 0000000..b3b167f
+--- /dev/null
++++ b/docs/audit-ledger.md
+@@ -0,0 +1,78 @@
++### MTF-001 - CRITICAL: Unsanitized Fragment HTML Reaches Live DOM
++* **Location:** `src/fullscreen-preview-sync.js` (Lines 101-116)
++* **Failure Mode:** Datastar fragment payloads are written into `outerHTML` and `innerHTML` without any sanitization or schema gate. A malformed or compromised fragment response can inject executable markup directly into the page.
++* **Impact:** Security risk, DOM takeover, and persistent preview corruption.
++* **Required Fix:** Enforce a strict fragment sanitization boundary before any DOM write, and reject payloads containing disallowed tags or attributes instead of patching them.
++* **Required Fixture:** Add a fragment-sync test that feeds a `datastar-patch-elements` payload containing `<script>` and inline event handlers and proves the patch is rejected or sanitized before DOM mutation.
++* **Status:** Resolved
++
++### MTF-002 - HIGH: Active Editor Can Rebind To Content The DOM Never Applied
++* **Location:** `src/fullscreen-post-save-sync.js` (Lines 614-623, 739-760)
++* **Failure Mode:** The code computes `appliedKeys` and `skippedKeys` from fragment results, but it still reseeds `setActiveMarkdownState()` and `primaryEditor.commands.setContent()` even when the active scoped key was skipped, missing, or never mounted. This creates a state split where the editor shows saved content while the preview DOM still shows stale content.
++* **Impact:** Silent UI desynchronization and incorrect baseline for the next edit/save cycle.
++* **Required Fix:** Gate active editor reseeding on an explicit successful apply for the active scoped key, and fail or defer reseeding when the active patch was skipped or unresolved.
++* **Required Fixture:** Add a save-response test where the active key is present in `requestedKeys` but absent from `patchResult.applied`, and assert that neither active markdown state nor editor content is updated.
++* **Status:** Resolved
++
++### MTF-003 - HIGH: Save Drift Guard Ignores Frontmatter Mutations
++* **Location:** `src/save-orchestration.js` (Lines 173-176)
++* **Failure Mode:** `plannedHashesByStateId` is built from `state.getDraft()` only, which excludes document frontmatter. A frontmatter-only mutation after plan construction will not change the planned hash even though the real outbound save payload changed.
++* **Impact:** Silent pre-network drift escapes the save guard and can commit unintended document metadata changes.
++* **Required Fix:** Hash the exact canonical save payload for each state, including frontmatter, instead of hashing body draft only.
++* **Required Fixture:** Add a save-plan test where the document body stays stable but frontmatter changes between plan construction and send, and assert the drift guard blocks the save.
++* **Status:** Resolved
++
++### MTF-004 - HIGH: Runtime Payload Hash Check Reuses Body-Only Draft
++* **Location:** `src/editor-fullscreen.js` (Lines 4500-4500, 4977-4978)
++* **Failure Mode:** The runtime check compares `plannedHash` against `hashStateIdentity(stateDraftMarkdown)`, where `stateDraftMarkdown` is only `state.getDraft()`. That means the preflight mismatch test duplicates the body-only blind spot and still cannot detect frontmatter drift before the POST.
++* **Impact:** Wrong canonical document can be transmitted even though the save pipeline appears to have a drift check.
++* **Required Fix:** Compare the planned hash against the same full outbound canonical markdown that will be posted and later committed.
++* **Required Fixture:** Add an editor-fullscreen save test that mutates only frontmatter after plan creation and proves the preflight hash mismatch path is triggered.
++* **Status:** Resolved
++
++### MTF-005 - HIGH: Empty Language Values Collapse Distinct States Into One Key
++* **Location:** `src/document-state.js` (Lines 184-185, 238-238)
++* **Failure Mode:** `lang` is normalized with `normalizeText()` and accepted even when empty, then used directly in `sessionId|lang` state identifiers. Any caller that drops or blanks the language can merge multiple translation states into the same storage slot.
++* **Impact:** Cross-language draft bleed, wrong-language saves, and non-deterministic state reuse.
++* **Required Fix:** Reject empty language values at `DocumentState` construction and `getOrCreate`, and fail fast instead of generating a key with an empty language suffix.
++* **Required Fixture:** Add document-state tests that call `new DocumentState(..., "")` and `getDocumentState(..., "")` and assert they throw before touching the store.
++* **Status:** Resolved
++
++### MTF-006 - MEDIUM: Fallback Save Path Silently Uses Raw Marker-Bearing Markdown On Projection Failure
++* **Location:** `src/save-orchestration.js` (Lines 100-121)
++* **Failure Mode:** When marker-bearing fallback input cannot be projected through `resolveCanonicalScopeSlice()` or `projectCanonicalSlice()`, the catch path returns raw `fallbackMarkdown`. That converts a projection invariant failure into a best-effort save input that may include structural markers or the wrong scope slice.
++* **Impact:** Silent wrong-scope save input and harder-to-diagnose corruption when no live editor is mounted.
++* **Required Fix:** Treat projection failure on marker-bearing fallback input as a blocked save boundary, not as permission to reuse the raw fallback string.
++* **Required Fixture:** Add a save-orchestration test with malformed marker-bearing fallback markdown that forces projection failure and assert the save path rejects instead of returning raw fallback content.
++* **Status:** Resolved
++
++### MTF-007 - MEDIUM: Stale-Scope Event Fires Before DOM Patch Completion
++* **Location:** `src/fullscreen-post-save-sync.js` (Lines 162-177)
++* **Failure Mode:** The module dispatches `mfe:fragment-stale-scope` before queued fragment patches are processed. Event subscribers observing the DOM at event time will see pre-patch state and can make decisions against an incomplete tree.
++* **Impact:** Ordering bugs, false stale-scope handling, and nondeterministic listener behavior.
++* **Required Fix:** Emit the stale-scope event only after patch processing completes, or split it into explicit pre-patch and post-patch events with documented semantics.
++* **Required Fixture:** Add a fragment-sync test with a listener that inspects the DOM during `mfe:fragment-stale-scope` and assert the event fires only after patch completion.
++* **Status:** Resolved
++
++### MTF-008 - MEDIUM: Raw Selectors From Fragment Payload Are Executed Without Validation
++* **Location:** `src/fullscreen-post-save-sync.js` (Lines 214-220)
++* **Failure Mode:** The fragment patch loop passes `patch.selector` straight into `document.querySelectorAll()` with no validation or exception boundary. An invalid or hostile selector can throw synchronously or cause broad unintended DOM targeting.
++* **Impact:** Patch-cycle aborts, preview corruption, and widened trust surface for server-provided selectors.
++* **Required Fix:** Validate selectors against the module's expected selector shape and reject invalid selector payloads before calling DOM query APIs.
++* **Required Fixture:** Add a fragment-sync test that injects an invalid selector in a patch payload and asserts the cycle reports a controlled error instead of throwing from `querySelectorAll()`.
++* **Status:** Resolved
++
++### MTF-009 - MEDIUM: Identity Parsers Disagree On Three-Part `data-mfe` Paths
++* **Location:** `src/identity-resolver.js` (Lines 59-65, 132-137)
++* **Failure Mode:** `parseDataMfe()` interprets a three-part path as a `field` shape with `section/subsection/name`, while `resolveDataMfeCandidates()` resolves the same three-part path to a `subsection:` candidate. Different callers can derive different canonical meanings from the same authored `data-mfe` value.
++* **Impact:** Wrong-key binding, unstable identity resolution across refactors, and patch targeting drift.
++* **Required Fix:** Define one canonical interpretation for three-part paths and make all identity helpers share the same mapping rules.
++* **Status:** Resolved
++
++### MTF-010 - LOW: Snapshot API Boundary Accepts Any Object-Shaped Success Payload
++* **Location:** `src/snapshot-service.js` (Lines 15-25)
++* **Failure Mode:** `assertApiResult()` treats any object with `status === 1` as valid and does not validate action-specific fields for snapshot list, diff, create, restore, or delete responses. Backend schema drift can therefore pass this boundary and fail later in callers.
++* **Impact:** Silent contract drift and late-failing snapshot workflows.
++* **Required Fix:** Validate response schema per snapshot action before returning data to callers.
++* **Required Fixture:** Add snapshot-service tests for each API action that prove malformed `status: 1` payloads are rejected when required fields are missing.
++* **Status:** Resolved
+\ No newline at end of file
+diff --git a/src/document-state.js b/src/document-state.js
+index 83611c3..b354eac 100644
+--- a/src/document-state.js
++++ b/src/document-state.js
+@@ -11,6 +11,14 @@ function normalizeText(value) {
+   return typeof value === "string" ? value : "";
+ }
+ 
++function normalizeRequiredLanguage(lang) {
++  const normalized = normalizeText(lang).trim();
++  if (!normalized) {
++    throw new Error("[mfe] document-state: language is required");
++  }
++  return normalized;
++}
++
+ function hashStateIdentity(value) {
+   const text = normalizeText(value);
+   let hash = 0;
+@@ -168,6 +176,7 @@ export class DocumentState {
+   constructor(payloadMeta, lang, options = {}) {
+     const meta =
+       payloadMeta && typeof payloadMeta === "object" ? payloadMeta : {};
++    const normalizedLang = normalizeRequiredLanguage(lang);
+     this.payloadMeta = {
+       pageId: normalizeText(meta.pageId) || "0",
+       fieldScope: normalizeText(meta.fieldScope || meta.scope) || "field",
+@@ -181,7 +190,7 @@ export class DocumentState {
+       normalizeText(meta.sessionId) ||
+       normalizeText(meta.originKey) ||
+       this.payloadMeta.fieldId;
+-    this.lang = normalizeText(lang);
++    this.lang = normalizedLang;
+     this.id = `${this.sessionId}|${this.lang}`;
+     Object.defineProperty(this, "scopeKind", {
+       value: this.payloadMeta.fieldScope,
+@@ -230,12 +239,13 @@ export class DocumentState {
+     if (!(store instanceof Map)) {
+       throw new Error("[mfe] document-state: store must be a Map");
+     }
++    const normalizedLang = normalizeRequiredLanguage(lang);
+     const fieldId =
+       normalizeText(payloadMeta?.fieldId) || buildPayloadFieldId(payloadMeta);
+     const originKey = normalizeText(payloadMeta?.originKey) || fieldId;
+     const sessionId =
+       normalizeText(payloadMeta?.sessionId) || originKey || fieldId;
+-    const stateId = `${sessionId}|${normalizeText(lang)}`;
++    const stateId = `${sessionId}|${normalizedLang}`;
+     const existing = store.get(stateId);
+     if (existing) {
+       existing.recordRebound({
+@@ -256,7 +266,7 @@ export class DocumentState {
+         originKey,
+         fieldId,
+       },
+-      lang,
++      normalizedLang,
+       options,
+     );
+     store.set(state.id, state);
+diff --git a/src/editor-fullscreen.js b/src/editor-fullscreen.js
+index 6e7fc7c..f73c531 100644
+--- a/src/editor-fullscreen.js
++++ b/src/editor-fullscreen.js
+@@ -4975,7 +4975,7 @@ function saveAllEditors() {
+         bytesMarkSavedArg,
+       });
+       const plannedHash = plannedHashesByStateId.get(state.id) || "";
+-      const payloadHash = hashStateIdentity(stateDraftMarkdown);
++      const payloadHash = hashStateIdentity(outboundMarkdownForSave);
+       if (plannedHash && plannedHash !== payloadHash) {
+         const mismatchError = new Error(
+           `[mfe] save-pipeline: draft hash drift before network for ${state.id}`,
+diff --git a/src/fullscreen-post-save-sync.js b/src/fullscreen-post-save-sync.js
+index 783848a..40a1b6e 100644
+--- a/src/fullscreen-post-save-sync.js
++++ b/src/fullscreen-post-save-sync.js
+@@ -22,7 +22,6 @@ import {
+ } from "./markdown-text-utils.js";
+ import {
+   applyChangedHtmlEditableOnly,
+-  applyDatastarPatchElement,
+   applyDatastarPatchToNodes,
+   applyEditableFallbackInSectionHosts,
+   hasDescendantScopedDrafts,
+@@ -34,6 +33,32 @@ import {
+ } from "./fullscreen-preview-sync.js";
+ import { resolveMarkdownForScopeFromCanonical } from "./canonical-state.js";
+ 
++function assertValidPatchSelector(selector) {
++  const value = String(selector || "").trim();
++  if (!value) {
++    throw new Error("[mfe] fragment patch blocked: invalid selector (empty)");
++  }
++  const isKeyIdSelector = /^\[data-mfe-key-id="[A-Za-z0-9_-]+"\]$/.test(value);
++  const isIdSelector = /^#[A-Za-z][A-Za-z0-9_-]*$/.test(value);
++  if (!isKeyIdSelector && !isIdSelector) {
++    throw new Error(
++      `[mfe] fragment patch blocked: invalid selector (${value})`,
++    );
++  }
++  return value;
++}
++
++function queryPatchSelectorNodes(selector) {
++  const validatedSelector = assertValidPatchSelector(selector);
++  try {
++    return Array.from(document.querySelectorAll(validatedSelector));
++  } catch (error) {
++    throw new Error(
++      `[mfe] fragment patch blocked: invalid selector (${validatedSelector})`,
++    );
++  }
++}
++
+ /**
+  * Requests rendered fragment patches and applies safe patch ordering rules.
+  * Does not participate in canonical save authority or mutation routing.
+@@ -172,13 +197,6 @@ export async function requestRenderedFragmentsDatastar({
+   const orderedMissingKeys = Array.isArray(staleScopeEventDetail?.missingKeys)
+     ? staleScopeEventDetail.missingKeys
+     : sortCanonicalScopedKeys(missingKeys);
+-  if (staleScopeEventDetail) {
+-    window.dispatchEvent(
+-      new CustomEvent("mfe:fragment-stale-scope", {
+-        detail: staleScopeEventDetail,
+-      }),
+-    );
+-  }
+   const appliedParents = new Set();
+   const queuedScopedKeys = queued
+     .map((entry) => String(entry.key || "").trim())
+@@ -217,7 +235,7 @@ export async function requestRenderedFragmentsDatastar({
+       }
+     }
+     const patchHtml = patch.elements || "";
+-    const candidateNodes = Array.from(document.querySelectorAll(patch.selector || ""));
++    const candidateNodes = queryPatchSelectorNodes(patch.selector || "");
+     const keyParts = String(patch.key || "").split(":");
+     const isSectionParentKey =
+       patch.key?.startsWith("section:") && keyParts.length === 2;
+@@ -274,7 +292,8 @@ export async function requestRenderedFragmentsDatastar({
+ 
+       const imageSynced = candidateNodes.reduce(
+         (count, node) =>
+-          count + syncNonEditableImagesFromPatch(node, patchHtml, resolveHostImageSrc),
++          count +
++          syncNonEditableImagesFromPatch(node, patchHtml, resolveHostImageSrc),
+         0,
+       );
+       if (imageSynced > 0) {
+@@ -346,8 +365,8 @@ export async function requestRenderedFragmentsDatastar({
+         return;
+       }
+     }
+-    const appliedCount = applyDatastarPatchElement({
+-      selector: patch.selector || "",
++    const appliedCount = applyDatastarPatchToNodes({
++      nodes: candidateNodes,
+       mode: patch.mode || "inner",
+       elements: patchHtml,
+       cycleId,
+@@ -382,6 +401,14 @@ export async function requestRenderedFragmentsDatastar({
+     }
+   });
+ 
++  if (staleScopeEventDetail) {
++    window.dispatchEvent(
++      new CustomEvent("mfe:fragment-stale-scope", {
++        detail: staleScopeEventDetail,
++      }),
++    );
++  }
++
+   const result = {
+     cycleId,
+     updated,
+@@ -444,8 +471,9 @@ export async function handlePrimarySaveResponse({
+     preferDocumentCacheFallback = false,
+     savedScopeKind = "",
+   } = options;
+-  const resolvedSavedScopeKind =
+-    normalizeScopeKind(savedScopeKind || activeFieldScope || "field");
++  const resolvedSavedScopeKind = normalizeScopeKind(
++    savedScopeKind || activeFieldScope || "field",
++  );
+   const activeScopedKey = getActiveScopedHtmlKey();
+   const htmlMapKeys =
+     data?.htmlMap && typeof data.htmlMap === "object"
+@@ -479,7 +507,9 @@ export async function handlePrimarySaveResponse({
+   );
+   const requestedKeysFromServer =
+     canonicalResponseKeys.size > 0
+-      ? rawRequestedKeysFromServer.filter((key) => canonicalResponseKeys.has(key))
++      ? rawRequestedKeysFromServer.filter((key) =>
++          canonicalResponseKeys.has(key),
++        )
+       : rawRequestedKeysFromServer;
+   debugWarn("[mfe:save-sync] fragment response", {
+     activeScopedKey,
+@@ -532,7 +562,9 @@ export async function handlePrimarySaveResponse({
+       source: "handlePrimarySaveResponse",
+     });
+   }
+-  const sections = Array.isArray(window.MarkdownFrontEditorConfig?.sectionsIndex)
++  const sections = Array.isArray(
++    window.MarkdownFrontEditorConfig?.sectionsIndex,
++  )
+     ? window.MarkdownFrontEditorConfig.sectionsIndex
+     : [];
+   const fields = Array.isArray(window.MarkdownFrontEditorConfig?.fieldsIndex)
+@@ -568,7 +600,10 @@ export async function handlePrimarySaveResponse({
+   if (compiled.report?.graphChecksum) {
+     window.__MFE_GRAPH = compiled.report.graphChecksum;
+   }
+-  if (compiled.report?.ambiguous?.length || compiled.report?.unresolved?.length) {
++  if (
++    compiled.report?.ambiguous?.length ||
++    compiled.report?.unresolved?.length
++  ) {
+     debugWarn("[mfe:bind] compile report", compiled.report);
+     const rows = [
+       ...(compiled.report.ambiguous || []).map((value) => ({
+@@ -588,6 +623,7 @@ export async function handlePrimarySaveResponse({
+     activeTarget?.getAttribute("data-page") ||
+     activeFieldId?.split(":")?.[0] ||
+     "0";
++  let allowActiveEditorReseed = true;
+   if (!requestedKeys.length) {
+     debugWarn(
+       "[mfe:fragment-sync] no canonical mount keys, preview patch skipped",
+@@ -595,6 +631,9 @@ export async function handlePrimarySaveResponse({
+         changedKeys: requestedKeysFromServer,
+       },
+     );
++    if (activeScopedKey && requestedKeysFromServer.includes(activeScopedKey)) {
++      allowActiveEditorReseed = false;
++    }
+   } else {
+     try {
+       const patchResult = await requestRenderedFragments({
+@@ -608,21 +647,33 @@ export async function handlePrimarySaveResponse({
+           ? compiled.report.graphKeys
+           : [],
+       });
++      const appliedKeys = Array.from(
++        new Set(
++          (Array.isArray(patchResult?.applied) ? patchResult.applied : [])
++            .filter((entry) => Number(entry?.updated || 0) > 0)
++            .map((entry) => String(entry?.key || ""))
++            .filter(Boolean),
++        ),
++      );
++      const skippedKeys = Array.from(
++        new Set([
++          ...nonMountedRequestedKeys,
++          ...requestedKeys.filter((key) => !appliedKeys.includes(key)),
++        ]),
++      );
++      if (activeScopedKey && requestedKeys.includes(activeScopedKey)) {
++        allowActiveEditorReseed = appliedKeys.includes(activeScopedKey);
++        if (!allowActiveEditorReseed) {
++          debugWarn("[mfe:save-sync] active editor reseed skipped", {
++            activeScopedKey,
++            requestedKeys,
++            appliedKeys,
++            skippedKeys,
++            cycleId: patchResult?.cycleId,
++          });
++        }
++      }
+       if (isDevMode()) {
+-        const appliedKeys = Array.from(
+-          new Set(
+-            (Array.isArray(patchResult?.applied) ? patchResult.applied : [])
+-              .filter((entry) => Number(entry?.updated || 0) > 0)
+-              .map((entry) => String(entry?.key || ""))
+-              .filter(Boolean),
+-          ),
+-        );
+-        const skippedKeys = Array.from(
+-          new Set([
+-            ...nonMountedRequestedKeys,
+-            ...requestedKeys.filter((key) => !appliedKeys.includes(key)),
+-          ]),
+-        );
+         debugWarn("[mfe:fragment-sync] coverage", {
+           cycleId: patchResult?.cycleId,
+           requestedKeys,
+@@ -633,7 +684,10 @@ export async function handlePrimarySaveResponse({
+       const staleScopeKeys = Array.isArray(patchResult?.staleScopeKeys)
+         ? patchResult.staleScopeKeys
+         : [];
+-      if (Array.isArray(patchResult?.missingKeys) && patchResult.missingKeys.length) {
++      if (
++        Array.isArray(patchResult?.missingKeys) &&
++        patchResult.missingKeys.length
++      ) {
+         const fallbackMissingKeys = patchResult.missingKeys.filter(
+           (key) =>
+             !staleScopeKeys.some((scopeKey) =>
+@@ -674,6 +728,9 @@ export async function handlePrimarySaveResponse({
+         message: error?.message || String(error),
+         changedKeys: requestedKeys,
+       });
++      if (activeScopedKey && requestedKeys.includes(activeScopedKey)) {
++        allowActiveEditorReseed = false;
++      }
+     }
+   }
+   syncFieldsIndexToEditableAttrs({
+@@ -686,7 +743,7 @@ export async function handlePrimarySaveResponse({
+   annotateBoundImages();
+   initEditors();
+ 
+-  if (updateActiveEditor && activeTarget) {
++  if (updateActiveEditor && activeTarget && allowActiveEditorReseed) {
+     const currentScopedMarkdown = trimTrailingLineBreaks(
+       typeof finalMarkdown === "string" ? finalMarkdown : "",
+     );
+diff --git a/src/fullscreen-preview-sync.js b/src/fullscreen-preview-sync.js
+index eb856ca..d820630 100644
+--- a/src/fullscreen-preview-sync.js
++++ b/src/fullscreen-preview-sync.js
+@@ -2,6 +2,14 @@ import { getMetaAttr } from "./editor-shared-helpers.js";
+ import { normalizeHtmlImageSources } from "./editor-image-annotations.js";
+ import { scopedHtmlKeyFromMeta } from "./sync-by-key.js";
+ 
++const DISALLOWED_FRAGMENT_TAGS = new Set([
++  "script",
++  "iframe",
++  "object",
++  "embed",
++  "template",
++]);
++
+ /**
+  * Patch editable hosts directly when fragment updates match known scoped keys.
+  * Does not read or mutate canonical markdown authority.
+@@ -103,6 +111,7 @@ export function applyDatastarPatchElement({
+  */
+ export function applyDatastarPatchToNodes({ nodes, mode, elements, cycleId }) {
+   if (!nodes.length) return 0;
++  assertSafeFragmentHtml(elements || "");
+   const patchMode = mode || "inner";
+   let updated = 0;
+   nodes.forEach((node) => {
+@@ -121,6 +130,41 @@ export function applyDatastarPatchToNodes({ nodes, mode, elements, cycleId }) {
+   return updated;
+ }
+ 
++function assertSafeFragmentHtml(html) {
++  const parsed = parseFragmentHtmlDocument(html);
++  if (!parsed?.body) {
++    throw new Error("Unsafe fragment HTML: unable to parse patch payload");
++  }
++  const elements = Array.from(parsed.body.querySelectorAll("*"));
++  elements.forEach((element) => {
++    const tagName = element.tagName?.toLowerCase() || "";
++    if (DISALLOWED_FRAGMENT_TAGS.has(tagName)) {
++      throw new Error(
++        `Unsafe fragment HTML: disallowed <${tagName}> tag in patch payload`,
++      );
++    }
++    Array.from(element.attributes || []).forEach((attribute) => {
++      const name = attribute.name?.toLowerCase() || "";
++      const value = String(attribute.value || "")
++        .trim()
++        .toLowerCase();
++      if (name.startsWith("on")) {
++        throw new Error(
++          `Unsafe fragment HTML: disallowed ${attribute.name} attribute in patch payload`,
++        );
++      }
++      if (
++        (name === "href" || name === "src" || name === "xlink:href") &&
++        value.startsWith("javascript:")
++      ) {
++        throw new Error(
++          `Unsafe fragment HTML: disallowed ${attribute.name} URL in patch payload`,
++        );
++      }
++    });
++  });
++}
++
+ /**
+  * Parse fragment HTML into a detached document for safe inspection.
+  * Does not sanitize or validate fragment semantics.
+@@ -360,4 +404,3 @@ export function isScopeOrDescendantKey(key, scopeKey) {
+   if (!key || !scopeKey) return false;
+   return key === scopeKey || isDescendantKey(key, scopeKey);
+ }
+-
+diff --git a/src/identity-resolver.js b/src/identity-resolver.js
+index 3784acb..4dc8f06 100644
+--- a/src/identity-resolver.js
++++ b/src/identity-resolver.js
+@@ -132,8 +132,7 @@ export function resolveDataMfeCandidates(rawValue, lookup) {
+   if (pathParts.length >= 3) {
+     const [a, b, c] = pathParts;
+     const fieldSubKey = `${a}/${b}/${c}`;
+-    if (fieldSubsectionKeys?.has(fieldSubKey))
+-      out.add(`subsection:${a}:${b}:${c}`);
++    if (fieldSubsectionKeys?.has(fieldSubKey)) out.add(`field:${a}:${b}:${c}`);
+     return Array.from(out);
+   }
+   return Array.from(out);
+diff --git a/src/save-orchestration.js b/src/save-orchestration.js
+index 091a616..a2de849 100644
+--- a/src/save-orchestration.js
++++ b/src/save-orchestration.js
+@@ -4,6 +4,14 @@ import {
+ } from "./canonical-scope-session.js";
+ import { normalizeScopeKind } from "./scope-slice.js";
+ 
++function getStateSavePayloadMarkdown(state) {
++  const bodyDraft = String(state?.getDraft?.() || "");
++  if (typeof state?.recomposeMarkdownForSave === "function") {
++    return String(state.recomposeMarkdownForSave(bodyDraft) || "");
++  }
++  return bodyDraft;
++}
++
+ export function detectDirtyDesync(params = {}) {
+   const {
+     sessionStates = [],
+@@ -114,8 +122,10 @@ export function resolveFallbackSaveEditorMarkdown(params = {}) {
+     if (scopeKind === "document" || displayText) {
+       return displayText;
+     }
+-  } catch (_error) {
+-    return fallbackMarkdown;
++  } catch (error) {
++    throw new Error(
++      `[mfe] fallback save blocked: marker-bearing projection failed (${error?.message || "unknown error"})`,
++    );
+   }
+ 
+   return fallbackMarkdown;
+@@ -173,7 +183,7 @@ export function buildSavePlan(params = {}) {
+     plannedHashesByStateId: new Map(
+       saveCandidates.map((state) => [
+         state.id,
+-        params.hashStateIdentity(String(state.getDraft() || "")),
++        params.hashStateIdentity(getStateSavePayloadMarkdown(state)),
+       ]),
+     ),
+   };
+diff --git a/src/snapshot-service.js b/src/snapshot-service.js
+index 8bb53ba..4d4d5e2 100644
+--- a/src/snapshot-service.js
++++ b/src/snapshot-service.js
+@@ -13,7 +13,7 @@ function buildUrl(action, params = {}) {
+   return `${path || ""}?${query.toString()}`;
+ }
+ 
+-async function assertApiResult(result) {
++async function assertApiResult(result, requiredFields = []) {
+   if (!result?.ok) {
+     throw new Error(`Request failed (${result?.status || "unknown"})`);
+   }
+@@ -24,6 +24,11 @@ async function assertApiResult(result) {
+   if (Number(data.status) !== 1) {
+     throw new Error(String(data.error || "Snapshot request failed"));
+   }
++  for (const field of requiredFields) {
++    if (!(field in data)) {
++      throw new Error(`Snapshot response missing required field: ${field}`);
++    }
++  }
+   return data;
+ }
+ 
+@@ -51,7 +56,7 @@ export async function listSnapshots({ pageId, lang }) {
+       parse: "json",
+     },
+   );
+-  return assertApiResult(result);
++  return assertApiResult(result, ["snapshots"]);
+ }
+ 
+ export async function createSnapshot({
+@@ -97,7 +102,7 @@ export async function getSnapshotDiff({
+       parse: "json",
+     },
+   );
+-  return assertApiResult(result);
++  return assertApiResult(result, ["diff"]);
+ }
+ 
+ export async function checkExternalChange({
+@@ -118,10 +123,15 @@ export async function checkExternalChange({
+       parse: "json",
+     },
+   );
+-  return assertApiResult(result);
++  return assertApiResult(result, ["changed", "currentHash"]);
+ }
+ 
+-export async function restoreSnapshot({ pageId, lang, snapshotId, label = "" }) {
++export async function restoreSnapshot({
++  pageId,
++  lang,
++  snapshotId,
++  label = "",
++}) {
+   const formData = await buildFormData({
+     action: "restoreSnapshot",
+     pageId,
+@@ -134,7 +144,7 @@ export async function restoreSnapshot({ pageId, lang, snapshotId, label = "" })
+     body: formData,
+     parse: "json",
+   });
+-  return assertApiResult(result);
++  return assertApiResult(result, ["documentMarkdownB64"]);
+ }
+ 
+ export async function deleteSnapshot({ pageId, lang, snapshotId }) {
+diff --git a/tests/document-state-core.test.js b/tests/document-state-core.test.js
+index d7d4989..2f075e0 100644
+--- a/tests/document-state-core.test.js
++++ b/tests/document-state-core.test.js
+@@ -38,6 +38,26 @@ describe("document-state core", () => {
+     expect(a.getDraft()).toBe("eins");
+   });
+ 
++  test("constructor rejects empty language values before creating a state id", () => {
++    expect(
++      () =>
++        new DocumentState(payload, "", {
++          initialPersistedMarkdown: "bonjour",
++        }),
++    ).toThrow(/language/i);
++  });
++
++  test("getDocumentState rejects empty language values before touching the store", () => {
++    const store = new Map();
++
++    expect(() =>
++      getDocumentState(store, payload, "", {
++        initialPersistedMarkdown: "eins",
++      }),
++    ).toThrow(/language/i);
++    expect(store.size).toBe(0);
++  });
++
+   test("setDraft and markSaved are the only dirty state transitions", () => {
+     const state = new DocumentState(payload, "fr", {
+       initialPersistedMarkdown: "bonjour",
+diff --git a/tests/editor-fullscreen-save-hash-contract.test.js b/tests/editor-fullscreen-save-hash-contract.test.js
+new file mode 100644
+index 0000000..af02bef
+--- /dev/null
++++ b/tests/editor-fullscreen-save-hash-contract.test.js
+@@ -0,0 +1,36 @@
++/** @jest-environment jsdom */
++
++import fs from "node:fs";
++import path from "node:path";
++
++const ROOT = path.resolve(process.cwd());
++const FULLSCREEN_PATH = path.join(ROOT, "src/editor-fullscreen.js");
++
++function readSource() {
++  return fs.readFileSync(FULLSCREEN_PATH, "utf8");
++}
++
++function runtimePayloadHash(markdown, hashStateIdentity) {
++  return hashStateIdentity(String(markdown || ""));
++}
++
++describe("editor fullscreen save hash preflight contract", () => {
++  test("runtime save hash checks the full outbound payload so frontmatter-only drift is caught before POST", () => {
++    const source = readSource();
++    const hashStateIdentity = (value) => String(value || "");
++    const plannedHash = "---\ntitle: First\n---\nBody stays the same";
++    const stateDraftMarkdown = "Body stays the same";
++    const outboundMarkdownForSave =
++      "---\ntitle: Second\n---\nBody stays the same";
++
++    expect(source).toContain(
++      "const payloadHash = hashStateIdentity(outboundMarkdownForSave);",
++    );
++    expect(
++      runtimePayloadHash(outboundMarkdownForSave, hashStateIdentity),
++    ).not.toBe(plannedHash);
++    expect(runtimePayloadHash(stateDraftMarkdown, hashStateIdentity)).not.toBe(
++      plannedHash,
++    );
++  });
++});
+diff --git a/tests/fullscreen-post-save-sync.test.js b/tests/fullscreen-post-save-sync.test.js
+new file mode 100644
+index 0000000..31286f7
+--- /dev/null
++++ b/tests/fullscreen-post-save-sync.test.js
+@@ -0,0 +1,265 @@
++/** @jest-environment jsdom */
++
++import { TextDecoder, TextEncoder } from "node:util";
++import { getSchema } from "@tiptap/core";
++import StarterKit from "@tiptap/starter-kit";
++import Link from "@tiptap/extension-link";
++import {
++  handlePrimarySaveResponse,
++  requestRenderedFragmentsDatastar,
++} from "../src/fullscreen-post-save-sync.js";
++import { getMetaAttr } from "../src/editor-shared-helpers.js";
++
++function buildTestSchema() {
++  return getSchema([
++    StarterKit.configure({
++      codeBlock: true,
++      link: false,
++      underline: false,
++    }),
++    Link.configure({
++      openOnClick: false,
++      linkOnPaste: true,
++    }),
++  ]);
++}
++
++function installFragmentFetchStub(ssePayload) {
++  const originalFetch = global.fetch;
++  const encoder = new TextEncoder();
++
++  global.fetch = jest.fn().mockImplementation((url) => {
++    if (String(url).includes("markdownFrontEditorToken=1")) {
++      return Promise.resolve({
++        ok: true,
++        status: 200,
++        text: async () => '<input name="csrf" value="token-value">',
++      });
++    }
++    if (String(url).includes("markdownFrontEditorFragments=1")) {
++      return Promise.resolve({
++        ok: true,
++        status: 200,
++        body: {
++          getReader() {
++            let done = false;
++            return {
++              async read() {
++                if (done) {
++                  return { done: true, value: undefined };
++                }
++                done = true;
++                return {
++                  done: false,
++                  value: encoder.encode(ssePayload),
++                };
++              },
++            };
++          },
++        },
++      });
++    }
++    throw new Error(`Unexpected fetch URL: ${url}`);
++  });
++
++  return () => {
++    global.fetch = originalFetch;
++  };
++}
++
++if (typeof global.TextEncoder === "undefined") {
++  global.TextEncoder = TextEncoder;
++}
++
++if (typeof global.TextDecoder === "undefined") {
++  global.TextDecoder = TextDecoder;
++}
++
++describe("fullscreen post-save sync active editor reseed", () => {
++  test("does not reseed the active editor when the active key was requested but not applied", async () => {
++    document.body.innerHTML = [
++      '<div id="host"',
++      ' class="fe-editable"',
++      ' data-page="123"',
++      ' data-mfe-scope="field"',
++      ' data-mfe-name="hero"',
++      ' data-markdown="stale body"></div>',
++    ].join("");
++    window.MarkdownFrontEditorConfig = {
++      sectionsIndex: [],
++      fieldsIndex: [],
++    };
++
++    const activeTarget = document.getElementById("host");
++    const setActiveMarkdownState = jest.fn();
++    const setContent = jest.fn();
++    const setTextSelection = jest.fn();
++    const clearDirty = jest.fn();
++    const requestRenderedFragments = jest.fn().mockResolvedValue({
++      cycleId: 41,
++      applied: [],
++      missingKeys: [],
++      skippedSectionKeys: [],
++      staleScopeKeys: [],
++    });
++
++    await handlePrimarySaveResponse({
++      data: {
++        htmlMap: {
++          "field:hero": "<div>saved html</div>",
++        },
++        changed: ["field:hero"],
++      },
++      finalMarkdown: "saved body",
++      options: {
++        updateActiveEditor: true,
++      },
++      activeFieldScope: "field",
++      activeFieldId: "123:hero",
++      activeTarget,
++      primaryEditor: {
++        schema: buildTestSchema(),
++        state: {
++          selection: { from: 1, to: 1 },
++        },
++        commands: {
++          setContent,
++          setTextSelection,
++        },
++      },
++      statusManager: {
++        clearDirty,
++      },
++      primaryDraftsByFieldId: new Map(),
++      draftMarkdownByScopedKey: new Map(),
++      getActiveScopedHtmlKey: () => "field:hero",
++      syncDirtyStatusForActiveField: jest.fn(),
++      setDocumentDraftMarkdown: jest.fn(),
++      traceStateMutation: ({ mutate }) => mutate(),
++      writeDocumentMarkdownCache: jest.fn(),
++      requestRenderedFragments,
++      setLastCompileReport: jest.fn(),
++      getLanguagesConfig: () => ({ current: "default" }),
++      resolveHostImageSrc: (_host, src) => src,
++      debugWarn: jest.fn(),
++      debugInfo: jest.fn(),
++      debugTable: jest.fn(),
++      isDevMode: () => true,
++      annotateBoundImages: jest.fn(),
++      initEditors: jest.fn(),
++      setActiveMarkdownState,
++      enforceBodyOnlyEditorInput: (markdown) => markdown,
++      sanitizeEditorMarkdownForScope: (markdown) => markdown,
++      decodeMaybeB64: (value) => value,
++      encodeMarkdownBase64: (value) => value,
++      normalizeCanonicalMarkdownForIngress: (markdown) => markdown,
++      normalizeScopeKind: (scope) => scope || "field",
++      normalizeLangValue: (lang) => lang || "default",
++      runWithoutDirtyTracking: (callback) => callback(),
++      getMetaAttr,
++    });
++
++    expect(requestRenderedFragments).toHaveBeenCalledWith(
++      expect.objectContaining({
++        pageId: "123",
++        lang: "default",
++        keys: ["field:hero"],
++      }),
++    );
++    expect(setActiveMarkdownState).not.toHaveBeenCalled();
++    expect(setContent).not.toHaveBeenCalled();
++    expect(setTextSelection).not.toHaveBeenCalled();
++    expect(activeTarget.getAttribute("data-markdown")).toBe("stale body");
++  });
++
++  test("stale-scope event fires only after fragment patches complete", async () => {
++    document.body.innerHTML = [
++      '<div id="section-host"><span>hero before</span></div>',
++      '<div id="body-host"><span>body before</span></div>',
++    ].join("");
++
++    const ssePayload = [
++      'event: datastar-patch-signals\ndata: signals {"mfe_missing":["field:hero:title"]}',
++      "event: datastar-patch-elements\ndata: key field:body:text\ndata: selector #body-host\ndata: mode inner\ndata: elements <p>body after</p>",
++      "",
++    ].join("\n\n");
++    const eventSnapshots = [];
++    const restoreFetch = installFragmentFetchStub(ssePayload);
++
++    const onStaleScope = () => {
++      eventSnapshots.push(
++        document.getElementById("body-host")?.innerHTML || "",
++      );
++    };
++    window.addEventListener("mfe:fragment-stale-scope", onStaleScope);
++
++    try {
++      const result = await requestRenderedFragmentsDatastar({
++        pageId: "123",
++        lang: "default",
++        keys: ["section:hero", "field:hero:title", "field:body:text"],
++        mountTargets: {
++          "field:body:text": [{ selector: "#body-host", mode: "inner" }],
++        },
++        graphChecksum: "",
++        graphNodeCount: 0,
++        graphKeys: [],
++        patchCycleCounter: {
++          next: () => 77,
++        },
++        hasPendingUnsavedChanges: () => false,
++        resolveHostImageSrc: (_host, src) => src,
++        debugWarn: jest.fn(),
++        debugInfo: jest.fn(),
++        isInlineOpen: () => false,
++        draftScopedKeys: [],
++      });
++
++      expect(result.updated).toBe(1);
++      expect(eventSnapshots).toEqual(["<p>body after</p>"]);
++      expect(document.getElementById("body-host")?.innerHTML).toBe(
++        "<p>body after</p>",
++      );
++    } finally {
++      window.removeEventListener("mfe:fragment-stale-scope", onStaleScope);
++      restoreFetch();
++    }
++  });
++
++  test("invalid fragment selectors fail with a controlled error instead of querySelectorAll", async () => {
++    document.body.innerHTML =
++      '<div id="body-host"><span>body before</span></div>';
++    const ssePayload = [
++      "event: datastar-patch-elements\ndata: key field:body:text\ndata: selector [[broken\ndata: mode inner\ndata: elements <p>body after</p>",
++      "",
++    ].join("\n\n");
++    const restoreFetch = installFragmentFetchStub(ssePayload);
++
++    try {
++      await expect(
++        requestRenderedFragmentsDatastar({
++          pageId: "123",
++          lang: "default",
++          keys: ["field:body:text"],
++          mountTargets: {
++            "field:body:text": [{ selector: "#body-host", mode: "inner" }],
++          },
++          graphChecksum: "",
++          graphNodeCount: 0,
++          graphKeys: [],
++          patchCycleCounter: {
++            next: () => 78,
++          },
++          hasPendingUnsavedChanges: () => false,
++          resolveHostImageSrc: (_host, src) => src,
++          debugWarn: jest.fn(),
++          debugInfo: jest.fn(),
++          isInlineOpen: () => false,
++          draftScopedKeys: [],
++        }),
++      ).rejects.toThrow(/fragment patch blocked: invalid selector/i);
++    } finally {
++      restoreFetch();
++    }
++  });
++});
+diff --git a/tests/fullscreen-preview-sync.test.js b/tests/fullscreen-preview-sync.test.js
+new file mode 100644
+index 0000000..e3bc1e4
+--- /dev/null
++++ b/tests/fullscreen-preview-sync.test.js
+@@ -0,0 +1,26 @@
++/** @jest-environment jsdom */
++
++import { applyDatastarPatchToNodes } from "../src/fullscreen-preview-sync.js";
++
++describe("fullscreen preview sync fragment boundary", () => {
++  test("rejects fragment payloads with script tags and inline event handlers before DOM mutation", () => {
++    document.body.innerHTML = '<div id="target"><span>safe</span></div>';
++    const target = document.getElementById("target");
++    const hostileHtml =
++      '<div id="target"><script>alert(1)</script><button onclick="alert(2)">Click</button></div>';
++
++    expect(() =>
++      applyDatastarPatchToNodes({
++        nodes: [target],
++        mode: "inner",
++        elements: hostileHtml,
++        cycleId: 7,
++      }),
++    ).toThrow(/disallowed|unsafe|sanitize/i);
++
++    expect(target.innerHTML).toBe("<span>safe</span>");
++    expect(target.getAttribute("data-mfe-last-patch")).toBeNull();
++    expect(document.body.querySelector("script")).toBeNull();
++    expect(document.body.querySelector("[onclick]")).toBeNull();
++  });
++});
+diff --git a/tests/identity-resolver.test.js b/tests/identity-resolver.test.js
+index 70a258d..123824d 100644
+--- a/tests/identity-resolver.test.js
++++ b/tests/identity-resolver.test.js
+@@ -2,7 +2,10 @@
+ 
+ import fs from "node:fs";
+ import path from "node:path";
+-import { buildSemanticLookup, scopedHtmlKeyFromMeta } from "../src/sync-by-key.js";
++import {
++  buildSemanticLookup,
++  scopedHtmlKeyFromMeta,
++} from "../src/sync-by-key.js";
+ import {
+   inferContextFromAncestors,
+   parseDataMfe,
+@@ -70,9 +73,9 @@ describe("identity resolver", () => {
+     expect(resolveDataMfeCandidates("field:hero/title", lookup)).toEqual([
+       "field:hero:title",
+     ]);
+-    expect(resolveDataMfeCandidates("subsection:hero/cta/title", lookup)).toEqual([
+-      "subsection:hero:cta:title",
+-    ]);
++    expect(
++      resolveDataMfeCandidates("subsection:hero/cta/title", lookup),
++    ).toEqual(["subsection:hero:cta:title"]);
+     expect(resolveDataMfeCandidates("hero", lookup)).toEqual([
+       "section:hero",
+       "field:hero",
+@@ -82,10 +85,27 @@ describe("identity resolver", () => {
+       "field:hero:cta",
+     ]);
+     expect(resolveDataMfeCandidates("hero/cta/title", lookup)).toEqual([
+-      "subsection:hero:cta:title",
++      "field:hero:cta:title",
+     ]);
+   });
+ 
++  test("three-part data-mfe paths resolve consistently between parseDataMfe and resolveDataMfeCandidates", () => {
++    const lookup = buildSemanticLookup({
++      sections: [{ name: "hero", subsections: [{ name: "cta" }] }],
++      fields: [{ name: "title", section: "hero", subsection: "cta" }],
++    });
++
++    const parsed = parseDataMfe("hero/cta/title");
++    expect(parsed?.scope).toBe("field");
++    expect(parsed?.section).toBe("hero");
++    expect(parsed?.subsection).toBe("cta");
++    expect(parsed?.name).toBe("title");
++
++    const candidates = resolveDataMfeCandidates("hero/cta/title", lookup);
++    expect(candidates).toContain("field:hero:cta:title");
++    expect(candidates).not.toContain("subsection:hero:cta:title");
++  });
++
+   test("context fallback resolves field/subsection keys from ancestors", () => {
+     const lookup = buildSemanticLookup({
+       sections: [{ name: "hero", subsections: [{ name: "cta" }] }],
+@@ -120,10 +140,9 @@ describe("identity resolver", () => {
+       section: "hero",
+       subsection: "cta",
+     });
+-    expect(resolveDataMfeCandidatesWithContext("title", subChild, lookup)).toEqual([
+-      "subsection:hero:cta:title",
+-      "field:hero:title",
+-    ]);
++    expect(
++      resolveDataMfeCandidatesWithContext("title", subChild, lookup),
++    ).toEqual(["subsection:hero:cta:title", "field:hero:title"]);
+     expect(resolveDataMfeKeyWithContext("title", subChild, lookup)).toBe("");
+   });
+ 
+@@ -170,7 +189,7 @@ describe("identity resolver", () => {
+     });
+ 
+     const syncByKeySource = readSource("src/sync-by-key.js");
+-    expect(syncByKeySource.includes("from \"./identity-resolver.js\"")).toBe(
++    expect(syncByKeySource.includes('from "./identity-resolver.js"')).toBe(
+       true,
+     );
+   });
+diff --git a/tests/save-orchestration.test.js b/tests/save-orchestration.test.js
+index ed519be..a7ea5db 100644
+--- a/tests/save-orchestration.test.js
++++ b/tests/save-orchestration.test.js
+@@ -34,6 +34,37 @@ describe("save-orchestration helpers", () => {
+     expect(events[0]?.type).toBe("SAVE_PLAN_BUILT");
+   });
+ 
++  test("buildSavePlan hashes the full save payload so frontmatter-only drift is detectable before send", () => {
++    const events = [];
++    let frontmatter = "---\ntitle: First\n---\n";
++    const state = {
++      id: "doc:en",
++      lang: "en",
++      isDirty: () => true,
++      isUnreplayable: () => false,
++      getDraft: () => "Body stays the same",
++      recomposeMarkdownForSave: (bodyDraft) => `${frontmatter}${bodyDraft}`,
++    };
++
++    const { plannedHashesByStateId } = buildSavePlan({
++      sessionStateKey: "session:frontmatter",
++      currentLang: "en",
++      activeFieldScope: "document",
++      listStatesForActiveSession: () => [state],
++      emitDocStateLog: (type, payload) => events.push({ type, payload }),
++      hashStateIdentity: (value) => String(value || ""),
++    });
++
++    frontmatter = "---\ntitle: Second\n---\n";
++    const outboundPayload = state.recomposeMarkdownForSave(state.getDraft());
++
++    expect(plannedHashesByStateId.get("doc:en")).toBe(
++      "---\ntitle: First\n---\nBody stays the same",
++    );
++    expect(plannedHashesByStateId.get("doc:en")).not.toBe(outboundPayload);
++    expect(events[0]?.type).toBe("SAVE_PLAN_BUILT");
++  });
++
+   test("detectDirtyDesync returns null when editor/state are equal", () => {
+     const cleanState = {
+       lang: "en",
+@@ -94,4 +125,25 @@ describe("save-orchestration helpers", () => {
+     expect(normalized).not.toContain("<!-- section:hero -->");
+     expect(normalized.length).toBeLessThan(canonicalBody.length);
+   });
++
++  test("marker-bearing fallback save markdown rejects when projection fails", () => {
++    const malformedCanonicalBody = [
++      "<!-- section:hero -->",
++      "Hero content",
++      "<!-- section:broken",
++    ].join("\n");
++
++    expect(() =>
++      resolveFallbackSaveEditorMarkdown({
++        fallbackMarkdown: malformedCanonicalBody,
++        canonicalBody: malformedCanonicalBody,
++        scopeMeta: {
++          scopeKind: "section",
++          section: "hero",
++          subsection: "",
++          name: "hero",
++        },
++      }),
++    ).toThrow(/projection|fallback|scope/i);
++  });
+ });
+diff --git a/tests/snapshot-service.test.js b/tests/snapshot-service.test.js
+new file mode 100644
+index 0000000..67865f7
+--- /dev/null
++++ b/tests/snapshot-service.test.js
+@@ -0,0 +1,116 @@
++import {
++  listSnapshots,
++  createSnapshot,
++  getSnapshotDiff,
++  checkExternalChange,
++  restoreSnapshot,
++  deleteSnapshot,
++} from "../src/snapshot-service.js";
++
++jest.mock("../src/network.js", () => ({
++  request: jest.fn(),
++}));
++jest.mock("../src/editor-core.js", () => ({
++  getSaveUrl: () => "/?markdownFrontEditorSave=1",
++  fetchCsrfToken: async () => ({ name: "_token", value: "test" }),
++}));
++
++import { request } from "../src/network.js";
++
++function okResult(data) {
++  return { ok: true, status: 200, data };
++}
++
++describe("snapshot-service boundary validation", () => {
++  beforeEach(() => {
++    request.mockReset();
++  });
++
++  test("listSnapshots rejects status:1 payload missing snapshots field", async () => {
++    request.mockResolvedValue(okResult({ status: 1 }));
++    await expect(listSnapshots({ pageId: 1, lang: "en" })).rejects.toThrow(
++      /snapshots/i,
++    );
++  });
++
++  test("listSnapshots accepts valid payload with snapshots array", async () => {
++    request.mockResolvedValue(okResult({ status: 1, snapshots: [] }));
++    const result = await listSnapshots({ pageId: 1, lang: "en" });
++    expect(Array.isArray(result.snapshots)).toBe(true);
++  });
++
++  test("getSnapshotDiff rejects status:1 payload missing diff field", async () => {
++    request.mockResolvedValue(okResult({ status: 1 }));
++    await expect(
++      getSnapshotDiff({ pageId: 1, lang: "en", snapshotId: "abc" }),
++    ).rejects.toThrow(/diff/i);
++  });
++
++  test("getSnapshotDiff accepts valid payload with diff string", async () => {
++    request.mockResolvedValue(okResult({ status: 1, diff: "- old\n+ new" }));
++    const result = await getSnapshotDiff({
++      pageId: 1,
++      lang: "en",
++      snapshotId: "abc",
++    });
++    expect(typeof result.diff).toBe("string");
++  });
++
++  test("checkExternalChange rejects status:1 payload missing changed field", async () => {
++    request.mockResolvedValue(okResult({ status: 1, currentHash: "abc123" }));
++    await expect(
++      checkExternalChange({ pageId: 1, lang: "en", knownHash: "abc123" }),
++    ).rejects.toThrow(/changed/i);
++  });
++
++  test("checkExternalChange accepts valid payload with changed and currentHash", async () => {
++    request.mockResolvedValue(
++      okResult({ status: 1, changed: false, currentHash: "abc123" }),
++    );
++    const result = await checkExternalChange({
++      pageId: 1,
++      lang: "en",
++      knownHash: "abc123",
++    });
++    expect(result).toHaveProperty("changed");
++    expect(result).toHaveProperty("currentHash");
++  });
++
++  test("restoreSnapshot rejects status:1 payload missing documentMarkdownB64 field", async () => {
++    request.mockResolvedValue(okResult({ status: 1 }));
++    await expect(
++      restoreSnapshot({ pageId: 1, lang: "en", snapshotId: "abc" }),
++    ).rejects.toThrow(/documentMarkdownB64/i);
++  });
++
++  test("restoreSnapshot accepts valid payload with documentMarkdownB64", async () => {
++    request.mockResolvedValue(
++      okResult({ status: 1, documentMarkdownB64: "dGVzdA==" }),
++    );
++    const result = await restoreSnapshot({
++      pageId: 1,
++      lang: "en",
++      snapshotId: "abc",
++    });
++    expect(typeof result.documentMarkdownB64).toBe("string");
++  });
++
++  test("deleteSnapshot passes with status:1 and no required fields", async () => {
++    request.mockResolvedValue(okResult({ status: 1 }));
++    await expect(
++      deleteSnapshot({ pageId: 1, lang: "en", snapshotId: "abc" }),
++    ).resolves.toBeDefined();
++  });
++
++  test("createSnapshot passes with status:1 and optional suppressed field absent", async () => {
++    request.mockResolvedValue(okResult({ status: 1 }));
++    await expect(
++      createSnapshot({
++        pageId: 1,
++        lang: "en",
++        eventType: "manual",
++        snapshotState: "persisted",
++      }),
++    ).resolves.toBeDefined();
++  });
++});
+
+--- DIFF END ---
+
+Review this diff thoroughly. Focus ONLY on these categories, in order of importance:
+
+### 1. FUNCTIONAL BUGS (MOST IMPORTANT)
+Logic errors, off-by-one errors, null/undefined dereferences, wrong variable
+usage, broken control flow, incorrect conditionals, missing edge cases, and code 
+that simply will not work as intended under normal operation.
+
+### 2. SILENT FAILURES
+Exceptions caught and swallowed with no logging or re-throw. Failed queries or
+API calls where the error is never propagated to the caller. Return values that
+callers never check. Missing null guards at system entry points (form input,
+database output, API responses).
+
+### 3. SECURITY (OWASP Top 10)
+SQL injection or query manipulation. XSS via unescaped output. CSRF on
+state-changing operations. Unvalidated input reaching the database, filesystem,
+or shell. Insecure direct object references. Broken access control on protected
+resources. Sensitive data in logs, error messages, or public responses.
+
+### 4. DRY VIOLATIONS
+Logic that is duplicated across two or more locations and should be extracted.
+Only report if the duplication creates a real maintenance hazard (e.g., the same 
+validation logic in two controllers) — not cosmetic similarity.
+
+### 5. MISSING EDGE CASE HANDLING
+What happens when an array is empty? When a query returns zero rows? When an
+optional value is null or false? When a file does not exist? Only report if the
+current code has NO guard at all and the failure mode is a real runtime error,
+not a hypothetical future scenario.
+
+---
+
+DO NOT REPORT:
+- Code style, formatting, or naming preferences (these are handled by linting)
+- Type annotation pedantry with no runtime consequence
+- Speculative "a future author might..." scenarios
+- Anything you cannot precisely locate with a file path and line number from the diff
+
+---
+
+For each finding, output EXACTLY this format:
+
+- **File:** `path/to/file.ext` (line N)
+- **Severity:** critical / high / medium / low
+- **Category:** Functional Bug / Silent Failure / Security / DRY / Edge Case
+- **Description:** [what is wrong and why]
+- **Failure Mode:** [what actually breaks at runtime — be specific]
+
+Return ONLY a raw markdown list, grouped by severity (critical first, then high, 
+medium, low). Do NOT offer fixes. Do NOT summarize. Do NOT add introductory or
+closing commentary.
+
+Your task is to write your findings as a markdown list into a new file: `conductor-audits/2026-05-30-main/jules-findings-raw.md` (for Jules) or output it directly to stdout (for local/interactive agents). Do NOT modify any other files in the repository.

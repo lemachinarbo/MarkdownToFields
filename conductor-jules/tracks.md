@@ -2,6 +2,10 @@
 
 This file tracks the active development tracks for Jules and other agents.
 
+## Active Tracks
+
+## Internal Review Queue
+
 - [ ] **Performance: Cache snapshot index file reads** (Session: 12712479203828006873)
 - [ ] **Performance: Optimize DOM query loop in collectReadOnlyHostMounts** (Session: 15552125936496673555)
 - [ ] **Code Health: Remove leftover console statement** (Session: 8475759274777109420)
@@ -16,6 +20,22 @@ This file tracks the active development tracks for Jules and other agents.
 - [ ] **Cleanup: Unused normalizeMarkdownBody** (Integrated: 07dac0d)
 
 ## Completed
+
+- [x] **[audit] main** (Session: 7039359998451057408)
+  - [x] Review-only audit completed for `origin/main..HEAD`
+  - [x] Ledger written to `conductor-audits/2026-05-30-main/audit-ledger.md`
+  - [x] Verdict: Merge after fixes
+
+- [x] **fix: preserve single-language renames** (Commit: 878e20b)
+- [x] **fix: reject invalid markdown sources** (Commit: 54a1b64)
+- [x] **fix: abort on markdown write failure** (Commit: 6e40457)
+- [x] **fix: record override exception coverage** (Commit: 34b2e54)
+- [x] **fix: abort on mapped field save failure** (Commit: 82a9f50)
+- [x] **fix: harden frontmatter round trips** (Commit: add9df1)
+- [x] **fix: reject weak rename adoption** (Commit: f62d52f)
+- [x] **fix: support special binder values** (Commit: ed96804)
+- [x] **fix: fail loud on image assets** (Commit: 89419ff)
+- [x] **fix: delete explicit empty markdown** (Commit: 0b5ccb5)
 
 - [x] **Code Health: Document Silenced Exceptions** (Integrated: 13216917539890387501)
   - [x] Add comment in MarkdownContent.php explaining silenced exceptions during unsaved page creation

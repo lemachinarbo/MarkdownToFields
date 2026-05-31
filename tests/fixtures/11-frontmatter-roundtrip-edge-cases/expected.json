@@ -2,7 +2,10 @@
   "title": "ACME --- Europe",
   "catalog": {
     "region": "west",
-    "flags": ["fast", "safe"]
+    "flags": [
+      "fast",
+      "safe"
+    ]
   },
   "summary": {
     "short": "007"
