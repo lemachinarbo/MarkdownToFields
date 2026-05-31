@@ -1,0 +1,22 @@
+{
+  "price": "USD 6000",
+  "0": {
+    "key": "0",
+    "subsections": [],
+    "html": "<h1>Binder Multiline</h1>\n<!-- field:price -->\n<p>Our premium package costs <em>USD 5500</em></p>",
+    "text": "Binder Multiline\n\nOur premium package costs USD 5500",
+    "markdown": "# Binder Multiline\n\n<!-- field:price -->\nOur premium package costs *USD 5500*",
+    "price": {
+      "type": "binding",
+      "key": "price",
+      "html": "<p>Our premium package costs <em>USD 5500</em></p>",
+      "text": "Our premium package costs USD 5500",
+      "markdown": "Our premium package costs *USD 5500*",
+      "innerHtml": "Our premium package costs <em>USD 5500</em>",
+      "tag": "p",
+      "atomicValue": "USD 5500",
+      "area": "sections/0/price"
+    },
+    "area": "sections/0"
+  }
+}

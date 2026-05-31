@@ -754,21 +754,25 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     while (preg_match($pattern, $bodyContent, $matches, PREG_OFFSET_CAPTURE, $offset)) {
       $markerText = (string) $matches[0][0];
       $markerOffset = (int) $matches[0][1];
-      $valueStart = $markerOffset + strlen($markerText);
+      $searchStart = $markerOffset + strlen($markerText);
+      $searchEnd = self::nextBindingMarkerOffset($bodyContent, $searchStart);
 
-      while (isset($bodyContent[$valueStart]) && ($bodyContent[$valueStart] === ' ' || $bodyContent[$valueStart] === "\t")) {
-        $valueStart++;
-      }
-
-      $delimiter = self::bindingDelimiterAt($bodyContent, $valueStart);
-      if ($delimiter === null) {
-        $offset = $valueStart;
+      $opening = self::findBindingOpeningDelimiter(
+        $bodyContent,
+        $searchStart,
+        $searchEnd,
+      );
+      if ($opening === null) {
+        $offset = $searchEnd;
         continue;
       }
 
+      $valueStart = $opening['offset'];
+      $delimiter = $opening['delimiter'];
+
       $lineEnd = strpos($bodyContent, "\n", $valueStart);
-      if ($lineEnd === false) {
-        $lineEnd = strlen($bodyContent);
+      if ($lineEnd === false || $lineEnd > $searchEnd) {
+        $lineEnd = $searchEnd;
       }
 
       $valueEnd = strrpos(substr($bodyContent, 0, $lineEnd), $delimiter);
@@ -788,6 +792,48 @@ class MarkdownSyncEngine extends MarkdownSessionManager
     }
 
     return $bodyContent;
+  }
+
+  protected static function nextBindingMarkerOffset(string $bodyContent, int $offset): int
+  {
+    $nextMarker = strpos($bodyContent, '<!-- field:', $offset);
+    if ($nextMarker === false) {
+      return strlen($bodyContent);
+    }
+
+    return $nextMarker;
+  }
+
+  protected static function findBindingOpeningDelimiter(
+    string $bodyContent,
+    int $offset,
+    int $searchEnd,
+  ): ?array {
+    $doubleOffset = strpos($bodyContent, '__', $offset);
+    if ($doubleOffset === false || $doubleOffset >= $searchEnd) {
+      $doubleOffset = null;
+    }
+
+    $singleOffset = strpos($bodyContent, '*', $offset);
+    if ($singleOffset === false || $singleOffset >= $searchEnd) {
+      $singleOffset = null;
+    }
+
+    if ($doubleOffset === null && $singleOffset === null) {
+      return null;
+    }
+
+    if ($doubleOffset !== null && ($singleOffset === null || $doubleOffset <= $singleOffset)) {
+      return [
+        'offset' => $doubleOffset,
+        'delimiter' => '__',
+      ];
+    }
+
+    return [
+      'offset' => $singleOffset,
+      'delimiter' => '*',
+    ];
   }
 
   protected static function bindingDelimiterAt(string $bodyContent, int $offset): ?string
