@@ -79,7 +79,7 @@ trait MarkdownContent {
 
     // Global auto-sync controls (opt-out by design)
     $autoSync = $mdConfig['autoSyncFrontmatter'] ?? true;
-    $exclude  = $mdConfig['excludeFrontmatterFields'] ?? [];
+    $exclude  = $mdConfig['excludeFrontmatterFields'] ?? ['name'];
     $include  = $mdConfig['includeFrontmatterFields'] ?? [];
     $hasInclude = !empty($include);
 

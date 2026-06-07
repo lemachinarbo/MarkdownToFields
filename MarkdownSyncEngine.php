@@ -260,6 +260,63 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
     $currentHashes = self::languageFileHashes($page, $languageCodes);
 
+    // Conflict check: run BEFORE any file write so a concurrent external edit
+    // is caught before we overwrite it, not after.
+    $skipHashCheck = !$page->id || isset(self::$syncingFromMarkdown[$page->id]);
+
+    if ($expectedSubset && !$skipHashCheck) {
+      $mismatch = self::detectHashMismatchLanguage(
+        $page,
+        $expectedSubset,
+        $currentHashes,
+      );
+
+      if ($mismatch !== null) {
+        $hasMarkdownPost = false;
+        $defaultCode = self::getDefaultLanguageCode($page);
+        $markdownFieldPosts = $postedByField[$markdownField] ?? [];
+        $languagePost = $markdownFieldPosts[$mismatch] ?? null;
+
+        if (
+          $languagePost === null &&
+          $mismatch === $defaultCode &&
+          isset($markdownFieldPosts[$defaultCode])
+        ) {
+          $languagePost = $markdownFieldPosts[$defaultCode];
+        }
+
+        if ($languagePost !== null) {
+          $hasMarkdownPost = true;
+        }
+
+        if ($hasMarkdownPost) {
+          // Proceed with save
+        } else {
+          $language = self::resolveLanguage($page, $mismatch);
+          $label =
+            $language instanceof Language
+              ? trim((string) ($language->title ?: $language->name))
+              : (string) $mismatch;
+
+          $current = $currentHashes[(string)$mismatch] ?? null;
+          $expected = $expectedHashes[(string)$mismatch] ?? null;
+
+          if ($page->isChanged('name') || ($current === 'missing' && ($expected === null || $expected === ''))) {
+            // No conflict, allow save to proceed
+          } else {
+            throw new WireException(
+              sprintf(
+                __(
+                  'The markdown file for language "%s" changed outside this editor. Please reload before saving again.',
+                ),
+                $label !== '' ? $label : (string) $mismatch,
+              ),
+            );
+          }
+        }
+      }
+    }
+
     if (!empty($postedMarkdownMap)) {
       foreach ($languageCodes as $languageCode) {
         if (!array_key_exists($languageCode, $postedMarkdownMap)) continue;
@@ -306,68 +363,6 @@ class MarkdownSyncEngine extends MarkdownSessionManager
             $page->set($hashField, self::encodeHashPayload($page, [$languageCode => $hash]));
           }
           $postedWrittenLanguages[] = $languageCode;
-        }
-      }
-    }
-
-    // Skip hash mismatch check if we're currently syncing FROM markdown
-    // (the sync operation itself updates both content and hash atomically)
-    // Also skip on new pages (no ID yet) where no prior hash can exist.
-    $skipHashCheck = !$page->id || isset(self::$syncingFromMarkdown[$page->id]);
-
-    if ($expectedSubset && !$skipHashCheck) {
-      $mismatch = self::detectHashMismatchLanguage(
-        $page,
-        $expectedSubset,
-        $currentHashes,
-      );
-
-      if ($mismatch !== null) {
-        $hasMarkdownPost = false;
-        $defaultCode = self::getDefaultLanguageCode($page);
-        $markdownFieldPosts = $postedByField[$markdownField] ?? [];
-        $languagePost = $markdownFieldPosts[$mismatch] ?? null;
-
-        if (
-          $languagePost === null &&
-          $mismatch === $defaultCode &&
-          isset($markdownFieldPosts[$defaultCode])
-        ) {
-          $languagePost = $markdownFieldPosts[$defaultCode];
-        }
-
-        if ($languagePost !== null) {
-          $hasMarkdownPost = true;
-        }
-
-        if ($hasMarkdownPost) {
-          // Proceed with save
-        } else {
-          $language = self::resolveLanguage($page, $mismatch);
-          $label =
-            $language instanceof Language
-              ? trim((string) ($language->title ?: $language->name))
-              : (string) $mismatch;
-
-          $current = $currentHashes[(string)$mismatch] ?? null;
-          $expected = $expectedHashes[(string)$mismatch] ?? null;
-
-          // Special case: If the file is missing and we didn't have an expected hash anyway,
-          // it's likely a rename or a new page. Let it pass.
-          // ALSO: If we just renamed the page, the new path might already exist (moved by handleRenameFiles),
-          // so we should be lenient.
-          if ($page->isChanged('name') || ($current === 'missing' && ($expected === null || $expected === ''))) {
-            // No conflict, allow save to proceed
-          } else {
-            throw new WireException(
-              sprintf(
-                __(
-                  'The markdown file for language "%s" changed outside this editor. Please reload before saving again.',
-                ),
-                $label !== '' ? $label : (string) $mismatch,
-              ),
-            );
-          }
         }
       }
     }
@@ -892,6 +887,14 @@ class MarkdownSyncEngine extends MarkdownSessionManager
       $filename = basename($file);
       // Skip the expected filename (we already tried it)
       if ($filename === $pageName . '.md') continue;
+
+      // Skip any file whose basename is the current slug of another page in
+      // this template — that file belongs to that page, not to us.
+      $candidateSlug = substr($filename, 0, -3); // strip .md
+      $otherPage = $page->wire('pages')->get(
+        'template=' . $page->template->name . ', name=' . $candidateSlug . ', id!=' . (int) $page->id . ', include=all',
+      );
+      if ($otherPage && $otherPage->id) continue;
 
       try {
         // We use a low-level load to avoid recursion or heavy logic

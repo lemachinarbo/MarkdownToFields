@@ -248,6 +248,16 @@ class MarkdownFileIO extends MarkdownConfig
     // Parse processed markdown directly in-memory so readonly elements are
     // created with final HTML. Prefer in-memory over temp files for cleanliness.
     $content = $parser->loadFromString($markdown);
+
+    // Sanitize HTML properties across the ContentData tree to neutralize XSS
+    // vectors (script tags, event handlers, javascript: hrefs) while preserving
+    // legitimate raw HTML that Markdown authors intentionally embed (<br>, <div>,
+    // <details>, <figure>, etc.). Uses ProcessWire's built-in HTML Purifier.
+    $sanitizer = wire('sanitizer');
+    if ($sanitizer) {
+      $seen = [];
+      self::sanitizeContentHtml($sanitizer, $content, $seen);
+    }
     // Post-process ContentData to handle image URLs in HTML properties
     self::processContentDataImages($page, $content, $languageCode);
 
@@ -617,6 +627,52 @@ class MarkdownFileIO extends MarkdownConfig
     if (isset($section->subsections) && is_array($section->subsections)) {
       foreach ($section->subsections as $subsection) {
         self::processSectionImages($page, $subsection);
+      }
+    }
+  }
+
+  /**
+   * Walk ContentData tree and sanitize all .html string properties via PW's
+   * HTML Purifier wrapper. Strips script tags, event-handler attributes, and
+   * javascript:/data: URIs while leaving legitimate embedded HTML intact.
+   */
+  protected static function sanitizeContentHtml($sanitizer, $item, array &$seen): void
+  {
+    if (is_object($item)) {
+      $oid = spl_object_id($item);
+      if (isset($seen[$oid])) {
+        return;
+      }
+      $seen[$oid] = true;
+
+      if (isset($item->html) && is_string($item->html)) {
+        try {
+          $item->html = $sanitizer->purify($item->html);
+        } catch (\Throwable $e) {
+          // Property is readonly on some LetMeDown node types; skip.
+        }
+      }
+
+      foreach (get_object_vars($item) as $value) {
+        self::sanitizeContentHtml($sanitizer, $value, $seen);
+      }
+
+      // Section::blocks is a protected property — access via reflection.
+      if ($item instanceof \LetMeDown\Section) {
+        try {
+          $prop = (new \ReflectionClass($item))->getProperty('blocks');
+          $prop->setAccessible(true);
+          $blocks = $prop->getValue($item);
+          if (is_array($blocks) || $blocks instanceof \ArrayObject) {
+            self::sanitizeContentHtml($sanitizer, $blocks, $seen);
+          }
+        } catch (\Throwable $e) {
+          // Reflection unavailable; blocks already visited via get_object_vars fallback.
+        }
+      }
+    } elseif (is_array($item) || $item instanceof \ArrayObject) {
+      foreach ($item as $child) {
+        self::sanitizeContentHtml($sanitizer, $child, $seen);
       }
     }
   }

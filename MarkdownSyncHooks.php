@@ -152,8 +152,7 @@ class MarkdownSyncHooks
     self::handleRenameFiles($page);
 
     $input = $event->wire('input');
-    $hashFieldName = MarkdownEditor::hashField($page);
-    $expectedHash = $input->post($hashFieldName);
+    $expectedHash = MarkdownHashTracker::recallFileHash($page);
     $postedLanguageValues = [];
 
     $bodyPost = $input->post($documentField);
@@ -367,12 +366,12 @@ class MarkdownSyncHooks
           continue;
         }
 
+        $isSuperuser = $page->wire('user') && $page->wire('user')->isSuperuser();
         throw new WireException(
           sprintf(
-            'Markdown source collision: page %s and page %s both resolve to %s for language %s. Rename one page or override contentSource() to a unique file.',
+            'Markdown source collision: page %s and another page both resolve to %s for language %s. Rename one page or override contentSource() to a unique file.',
             $page->path,
-            $candidate->path,
-            $currentPath,
+            $isSuperuser ? $currentPath . ' (other page: ' . $candidate->path . ')' : $currentPath,
             $languageCode,
           ),
         );
