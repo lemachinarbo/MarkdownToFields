@@ -392,6 +392,7 @@ Each section is represented by a `Section` object with these members:
 | `$fields` | `array` | Named field blocks inside the section |
 | `$subsections` | `array` | Nested subsections (not supported inside subsections themselves) |
 | `$key` | `string` | Unique name or identifier of this section |
+| `$cleanMarkdown` | `string` | Section markdown with all structural tags and nested subsections stripped |
 | `area()` | `method` | Returns the canonical area path string for this node. / |
 | `data()` | `method` | Returns a plain array of the section dataset |
 | `dataSet($mode?)` | `method` | Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values. |
@@ -527,6 +528,15 @@ ProcessWire\MarkdownContentView
        
        - One foo
        - One bar'
+  cleanMarkdown: 
+      '# Hello
+       
+       Intro text for hello section.
+       
+       ## Hello foo
+       
+       - One foo
+       - One bar'
   frontmatter: null
 ```
 
@@ -591,6 +601,7 @@ Subsections are returned as `Section` objects with the same core properties:
 | `$fields` | `array` | Named field blocks inside the section |
 | `$subsections` | `array` | Nested subsections (not supported inside subsections themselves) |
 | `$key` | `string` | Unique name or identifier of this section |
+| `$cleanMarkdown` | `string` | Section markdown with all structural tags and nested subsections stripped |
 | `area()` | `method` | Returns the canonical area path string for this node. / |
 | `data()` | `method` | Returns a plain array of the section dataset |
 | `dataSet($mode?)` | `method` | Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values. |
@@ -617,6 +628,7 @@ ProcessWire\MarkdownSectionView
     left => ProcessWire\MarkdownSectionView [...]
     right => ProcessWire\MarkdownSectionView [...]
   key: 'columns'
+  cleanMarkdown: '# Our Team'
 ```
 
 Note: using a sub removes that content from the section’s blocks. It does not become a child block; it becomes a named subsection.
@@ -1368,7 +1380,7 @@ namespace ProcessWire;
 
 ```php
 ProcessWire\MarkdownDataSet
-array (9)
+array (10)
   html => 
       '<h1>The Urban Farm</h1>
        <p>We grow food in the city.</p>
@@ -1387,6 +1399,12 @@ array (9)
        We grow food in the city.
        
        <!-- cta -->
+       [Book now](/book)'
+  cleanMarkdown => 
+      '# The Urban Farm
+       
+       We grow food in the city.
+       
        [Book now](/book)'
   key => 'hero'
   area => 'hero'
@@ -1484,7 +1502,7 @@ namespace ProcessWire;
 <a id="fig-data-hero-dump"></a> **FIG 46:** Dump of `$content->hero->data()`
 
 ```php
-array (9)
+array (10)
   html => 
       '<h1>The Urban Farm</h1>
        <p>We grow food in the city.</p>
@@ -1503,6 +1521,12 @@ array (9)
        We grow food in the city.
        
        <!-- cta -->
+       [Book now](/book)'
+  cleanMarkdown => 
+      '# The Urban Farm
+       
+       We grow food in the city.
+       
        [Book now](/book)'
   key => 'hero'
   area => 'hero'

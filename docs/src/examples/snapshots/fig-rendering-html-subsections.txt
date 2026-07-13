@@ -14,4 +14,14 @@ ProcessWire\MarkdownContentView
        ### Jane Doe
        
        Jane is our lead horticulturist with 10+ years of experience in urban farmin...'
+  cleanMarkdown: 
+      '# Our Team
+       
+       ### Jane Doe
+       
+       Jane is our lead horticulturist with 10+ years of experience in urban farming.
+       
+       ![Jane tending plants](jane-plants.jpg)
+       
+       ...'
   frontmatter: null

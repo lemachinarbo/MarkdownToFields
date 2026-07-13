@@ -1,4 +1,4 @@
-array (9)
+array (10)
   html => 
       '<h1>The Urban Farm</h1>
        <p>We grow food in the city.</p>
@@ -17,6 +17,12 @@ array (9)
        We grow food in the city.
        
        <!-- cta -->
+       [Book now](/book)'
+  cleanMarkdown => 
+      '# The Urban Farm
+       
+       We grow food in the city.
+       
        [Book now](/book)'
   key => 'hero'
   area => 'hero'

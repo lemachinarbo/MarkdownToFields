@@ -13,3 +13,4 @@ ProcessWire\MarkdownSectionView
     left => ProcessWire\MarkdownSectionView [...]
     right => ProcessWire\MarkdownSectionView [...]
   key: 'columns'
+  cleanMarkdown: '# Our Team'

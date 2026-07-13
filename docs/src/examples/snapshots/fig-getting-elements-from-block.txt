@@ -29,4 +29,13 @@ ProcessWire\MarkdownContentView
        - Emtibi
        
        Feel free to [call us](#), [visit us](...'
+  cleanMarkdown: 
+      '# Digital Studio
+       
+       Welcome to our studio! We create digital experiences for brands like:
+       
+       - Ramason
+       - Emtibi
+       
+       Feel free to [call us](#), [visit us](...'
   frontmatter: null

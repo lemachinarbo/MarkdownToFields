@@ -22,4 +22,13 @@ ProcessWire\MarkdownContentView
        
        - One foo
        - One bar'
+  cleanMarkdown: 
+      '# Hello
+       
+       Intro text for hello section.
+       
+       ## Hello foo
+       
+       - One foo
+       - One bar'
   frontmatter: null

@@ -42,4 +42,17 @@ ProcessWire\MarkdownContentView
        # Bye
        
        Short bye text.'
+  cleanMarkdown: 
+      '# Hello
+       
+       Intro text for hello section.
+       
+       ## Hello foo
+       
+       - One foo
+       - One bar
+       
+       # Bye
+       
+       Short bye text.'
   frontmatter: null

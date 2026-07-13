@@ -22,5 +22,12 @@ ProcessWire\MarkdownContentView
        <!-- intro... -->
          We grow food and ideas in the city.
          From rooftop gardens to indoor ...'
+  cleanMarkdown: 
+      '# The Urban Farm
+       
+         We grow food and ideas in the city.
+         From rooftop gardens to indoor farms, we craft systems that actually produce.
+       
+         We work ...'
   frontmatter: array (1)
     title => 'The Urban Farm Studio.'

@@ -34,4 +34,14 @@ ProcessWire\MarkdownContentView
        
        - Web design
        - App de...'
+  cleanMarkdown: 
+      '# About Us
+       
+       Welcome to our studio! We create digital experiences for modern brands.
+       
+       ## Our Services
+       
+       - Web design
+       - App development
+       - Content stra...'
   frontmatter: null
