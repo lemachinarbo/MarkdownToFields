@@ -69,6 +69,7 @@ class MarkdownContentView extends ContentData implements MarkdownContentViewNode
       'sections' => $wrappedSections,
       'sectionsByName' => $wrappedSectionsByName,
       'markdown' => $content->markdown,
+      'cleanMarkdown' => $content->cleanMarkdown,
       'frontmatter' => $content->getFrontmatter(),
       'frontmatterRaw' => $content->getFrontmatterRaw(),
     ]);
@@ -145,7 +146,8 @@ class MarkdownSectionView extends Section implements MarkdownContentViewNode
       $wrappedFields,
       $wrappedSubsections,
       $key,
-      $area
+      $area,
+      $section->cleanMarkdown
     );
   }
 
@@ -158,11 +160,12 @@ class MarkdownSectionView extends Section implements MarkdownContentViewNode
     array $fields = [],
     array $subsections = [],
     ?string $key = null,
-    string $area = ''
+    string $area = '',
+    string $cleanMarkdown = ''
   ) {
     $this->page = $page;
     $this->nodeArea = $area;
-    parent::__construct($html, $text, $markdown, $blocks, $fields, $subsections, $key);
+    parent::__construct($html, $text, $markdown, $blocks, $fields, $subsections, $key, $cleanMarkdown);
   }
 
   /**
@@ -187,6 +190,7 @@ class MarkdownSectionView extends Section implements MarkdownContentViewNode
       'html' => $this->html,
       'text' => $this->text,
       'markdown' => $this->markdown,
+      'cleanMarkdown' => $this->cleanMarkdown,
     ], $data);
 
     return MarkdownNodeData::adaptData($this->page, $this, $data, $this->nodeArea);

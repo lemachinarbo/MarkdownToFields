@@ -16,6 +16,7 @@
       "markdown": "__mix_*_value__",
       "innerHtml": "<strong>mix_*_value</strong>",
       "tag": "p",
+      "atomicValue": "mix_*_value",
       "area": "sections/0/mixed"
     },
     "formula": {
