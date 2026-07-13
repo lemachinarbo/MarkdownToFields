@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.6.0](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.5.2...v1.6.0) (2026-07-13)
+
+
+### Features
+
+* expose cleanMarkdown in view classes ([e7d1cf8](https://github.com/lemachinarbo/MarkdownToFields/commit/e7d1cf86a30b45fbdc23187d1bbeb3cd163d8be7))
+
+
+### Bug Fixes
+
+* (security) fix 6 confirmed vulnerabilities from pre-release audit ([6844d82](https://github.com/lemachinarbo/MarkdownToFields/commit/6844d82f892382c2dac7a7be10e92e389466ec62))
+
 ## [1.5.2](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.5.1...v1.5.2) (2026-05-31)
 
 
