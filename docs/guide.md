@@ -397,6 +397,7 @@ Each section is represented by a `Section` object with these members:
 | `data()` | `method` | Returns a plain array of the section dataset |
 | `dataSet($mode?)` | `method` | Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values. |
 | `subsection($name)` | `method` | Access a nested subsection by name |
+| `getCleanMarkdown($imageResolver?, $linkResolver?)` | `method` | Returns the section markdown with image and link references resolved via optional callbacks |
 | `field($name)` | `method` | Get a field by name / |
 | `blocksWithSubsections()` | `method` | Return a read-only projection of section blocks with named subsections merged into the hierarchy. Subsection blocks are appended as children of the first top-level block. This does not mutate the canonical structure or any existing content values. / |
 
@@ -606,6 +607,7 @@ Subsections are returned as `Section` objects with the same core properties:
 | `data()` | `method` | Returns a plain array of the section dataset |
 | `dataSet($mode?)` | `method` | Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values. |
 | `subsection($name)` | `method` | Access a nested subsection by name |
+| `getCleanMarkdown($imageResolver?, $linkResolver?)` | `method` | Returns the section markdown with image and link references resolved via optional callbacks |
 | `field($name)` | `method` | Get a field by name / |
 | `blocksWithSubsections()` | `method` | Return a read-only projection of section blocks with named subsections merged into the hierarchy. Subsection blocks are appended as children of the first top-level block. This does not mutate the canonical structure or any existing content values. / |
 

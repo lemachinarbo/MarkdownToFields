@@ -396,6 +396,7 @@ class DocBuilder {
                 'sections' => 'Array of all sections in the document',
                 'frontmatter' => 'Parsed frontmatter data',
                 'cleanMarkdown' => 'Markdown body with all frontmatter and structural comments stripped',
+                'getCleanMarkdown' => 'Returns the clean markdown body with image and link references resolved via optional callbacks',
                 'key' => 'Unique identifier for the content source (usually filename)',
                 'data' => 'Returns a plain array of the content dataset',
                 'dataSet' => "Returns a WireData wrapper for fluent data access. Accepts 'html' or 'text' to automatically collapse simple fields to their respective string values."
@@ -405,6 +406,7 @@ class DocBuilder {
                 'text' => 'Plain text version of the section content',
                 'markdown' => 'Raw markdown of the section',
                 'cleanMarkdown' => 'Section markdown with all structural tags and nested subsections stripped',
+                'getCleanMarkdown' => 'Returns the section markdown with image and link references resolved via optional callbacks',
                 'blocks' => 'Parsed block objects inside the section',
                 'fields' => 'Named field blocks inside the section',
                 'subsections' => 'Nested subsections (not supported inside subsections themselves)',
@@ -507,7 +509,7 @@ class DocBuilder {
                 $name = $method->getName();
                 
                 // Filter out Magic, Static, and Boring Getters
-                if (str_starts_with($name, '__') || $method->isStatic() || str_starts_with($name, 'get')) continue;
+                if (str_starts_with($name, '__') || $method->isStatic() || (str_starts_with($name, 'get') && $name !== 'getCleanMarkdown')) continue;
                 
                 // Formatted parameters
                 $params = [];
