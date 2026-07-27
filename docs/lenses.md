@@ -101,6 +101,22 @@ Nav items come from `MarkdownSiteStructure`:
    markdown-backed viewable children, labeled by each page's frontmatter
    `title`.
 
+The nav section's first heading, when present, is the site brand:
+
+```markdown
+<!-- section:nav -->
+
+# [Acme](/)
+
+- [Home](/)
+- [Services](/services/)
+```
+
+The heading link never becomes a nav item — only list links do. A heading
+without a link keeps the label and points to home. Without a structure
+file (or without a heading) the brand falls back to the homepage title
+linked to home.
+
 ## Content fragments
 
 `?section=hero,cta` returns the named sections authored in the markdown

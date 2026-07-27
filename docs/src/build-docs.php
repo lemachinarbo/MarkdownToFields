@@ -434,7 +434,8 @@ class DocBuilder {
                 'text' => 'Heading label (plain text)',
                 'html' => 'Full rendered <h1>...</h1> tag',
                 'innerHtml' => 'Content inside the heading tag',
-                'level' => 'Heading level (1-6)'
+                'level' => 'Heading level (1-6)',
+                'href' => 'Sanitized href of the heading\'s first inline link (e.g. `# [Brand](/)`), or null'
             ],
             'FieldData' => [
                'data' => 'Returns a plain array of the field dataset',

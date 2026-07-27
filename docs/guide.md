@@ -751,6 +751,7 @@ ProcessWire\MarkdownBlockView
   heading: LetMeDown\HeadingElement
     text: 'About Us'
     innerHtml: 'About Us'
+    href: null
     html: '<h1>About Us</h1>'
   level: 1  content: '<p>Welcome to our studio! We create digital experiences for modern brands.</p>'
   html: 
@@ -886,6 +887,7 @@ This is the main heading that defines the block’s title and level.
 | :--- | :--- | :--- |
 | `$text` | `string` | Heading label (plain text) |
 | `$innerHtml` | `string` | Content inside the heading tag |
+| `$href` | `string` | Sanitized href of the heading's first inline link (e.g. `# [Brand](/)`), or null |
 | `$html` | `string` | Full rendered <h1>...</h1> tag |
 
 
@@ -896,6 +898,7 @@ This is the main heading that defines the block’s title and level.
 LetMeDown\HeadingElement
   text: 'Digital Studio'
   innerHtml: 'Digital Studio'
+  href: null
   html: '<h1>Digital Studio</h1>'
 ```
 

@@ -6,7 +6,7 @@
 #   BASE_URL=https://example.com ./tests/lenses-http-matrix.sh
 #
 # Expects the playground fixtures: /about/ + about.md (sections hero, faq),
-# /services/ + services.md, home.md, site.md (nav), /nofile/ without a
+# /services/ + services.md, home.md, site.md (nav + brand heading), /nofile/ without a
 # markdown file, /draft/ unpublished with draft.md present.
 
 set -u
@@ -72,6 +72,7 @@ check "bare image refs resolve to assets"    "$BASE_URL/about.md"            '*/
 echo "== reader view =="
 check "browser .md URL is reader HTML"       "$BASE_URL/about.md"            "$BROWSER_ACCEPT" 200 'text/html'     '<h1>About the Playground</h1>'
 check "reader nav from site.md"              "$BASE_URL/about.md"            "$BROWSER_ACCEPT" 200 'text/html'     'services.md'
+check "reader brand from site.md heading"    "$BASE_URL/about.md"            "$BROWSER_ACCEPT" 200 'text/html'     'class="brand"><a href="[^"]*home\.md">PW Playground</a>' 'PW Playground</a></li>'
 check "reader content links stay in reader"  "$BASE_URL/services.md"         "$BROWSER_ACCEPT" 200 'text/html'     'href=".*about\.md#faq"'
 check "reader homepage works"                "$BASE_URL/home.md"             "$BROWSER_ACCEPT" 200 'text/html'     '<h1>Welcome to the Playground</h1>'
 

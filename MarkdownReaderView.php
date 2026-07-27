@@ -34,13 +34,16 @@ class MarkdownReaderView extends Wire
       $nav[] = ['label' => $item['label'], 'href' => self::readerHref($page, $item['url'])];
     }
 
+    $brand = MarkdownSiteStructure::brand($page, $module)
+      ?? ['label' => (string) $home->title, 'url' => $home->url];
+
     return [
       'lang' => MarkdownLanguageResolver::getLanguageCode($page),
       'title' => $meta['title'],
       'canonicalUrl' => $page->httpUrl,
       'rawMarkdownUrl' => $page->httpUrl . '?format=md',
-      'brandHtml' => '<a href="' . self::readerHref($page, $home->url) . '">'
-        . $this->wire()->sanitizer->entities($home->title) . '</a>',
+      'brandHtml' => '<a href="' . self::readerHref($page, $brand['url']) . '">'
+        . $this->wire()->sanitizer->entities($brand['label']) . '</a>',
       'nav' => $nav,
       'contentHtml' => $contentHtml,
       'footerHtml' => '<a href="' . $page->httpUrl . '">Full site</a> · '

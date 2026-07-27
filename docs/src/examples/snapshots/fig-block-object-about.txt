@@ -5,6 +5,7 @@ ProcessWire\MarkdownBlockView
   heading: LetMeDown\HeadingElement
     text: 'About Us'
     innerHtml: 'About Us'
+    href: null
     html: '<h1>About Us</h1>'
   level: 1  content: '<p>Welcome to our studio! We create digital experiences for modern brands.</p>'
   html: 
