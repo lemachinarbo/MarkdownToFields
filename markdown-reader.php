@@ -67,7 +67,7 @@ header {
   margin-bottom: 2rem;
 }
 header .brand { font-weight: 700; }
-header nav { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+header nav ul { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0; padding: 0; list-style: none; }
 footer {
   border-top: 1px solid var(--rule);
   padding-top: 0.75rem;
@@ -89,9 +89,11 @@ th, td { border: 1px solid var(--rule); padding: 0.3rem 0.6rem; }
   <span class="brand"><?php echo $brandHtml; ?></span>
   <?php if (count($nav)): ?>
   <nav>
-    <?php foreach ($nav as $item): ?>
-    <a href="<?php echo $e($item['href']); ?>"><?php echo $e($item['label']); ?></a>
-    <?php endforeach; ?>
+    <ul>
+      <?php foreach ($nav as $item): ?>
+      <li><a href="<?php echo $e($item['href']); ?>"><?php echo $e($item['label']); ?></a></li>
+      <?php endforeach; ?>
+    </ul>
   </nav>
   <?php endif; ?>
 </header>
