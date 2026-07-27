@@ -107,7 +107,7 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
     foreach ($this->lenses() as $lens) {
       if (!$lens->wants($page)) continue;
       $event->replace = true;
-      $event->return = $lens->render($page)->send();
+      $event->return = $this->sendResponse($lens->render($page));
       return;
     }
 
@@ -142,12 +142,33 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
       $response = $useReader
         ? $this->readerLens()->renderNotFound($pages->get('/'))
         : $this->rawLens()->renderNotFound();
-      $event->return = $response->send();
+      $event->return = $this->sendResponse($response);
       return;
     }
 
     $lens = $useReader ? $this->readerLens() : $this->rawLens();
-    $event->return = $lens->render($page)->send();
+    $event->return = $this->sendResponse($lens->render($page));
+  }
+
+  /**
+   * Single exit for every lens response, stamping the cache policy
+   * (decided in notes/architecture.md): successful responses are publicly
+   * cacheable for guests for 5 minutes — content changes only when the
+   * markdown file changes, and the ETag makes revalidation cheap. A
+   * logged-in user may be seeing pages guests cannot view, so their
+   * responses must never land in a shared cache. Errors are not cached.
+   */
+  protected function sendResponse(MarkdownLensResponse $response): string
+  {
+    if ($response->status !== 200) {
+      $response->headers[] = 'Cache-Control: no-cache';
+    } elseif ($this->wire()->user->isGuest()) {
+      $response->headers[] = 'Cache-Control: public, max-age=300';
+    } else {
+      $response->headers[] = 'Cache-Control: private, no-store';
+    }
+
+    return $response->send();
   }
 
   /**

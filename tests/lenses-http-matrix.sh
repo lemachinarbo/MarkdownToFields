@@ -95,6 +95,8 @@ check_header "raw response is noindex"       "$BASE_URL/about.md"            '*/
 check_header "raw response has canonical"    "$BASE_URL/about.md"            '*/*'             'rel="canonical"'
 check_header "raw response has ETag"         "$BASE_URL/about.md"            '*/*'             '^etag:'
 check_header "normal render advertises md"   "$BASE_URL/about/"              "$BROWSER_ACCEPT" 'rel="alternate"; type="text/markdown"'
+check_header "guest lens response is cacheable" "$BASE_URL/about.md"         '*/*'             'Cache-Control: public, max-age=300'
+check_header "lens 404 is not cached"        "$BASE_URL/nope.md"             '*/*'             'Cache-Control: no-cache'
 
 echo "== conditional GET =="
 etag=$(curl -sk -D - -o /dev/null "$BASE_URL/about.md" | grep -i '^etag:' | tr -d '\r' | cut -d' ' -f2)

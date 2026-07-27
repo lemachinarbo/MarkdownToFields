@@ -32,7 +32,11 @@ The homepage has no URL segment, so it is served at `/home.md`
 - **Caching**: every response gets a body-derived `ETag` and honors
   `If-None-Match` with `304`. `/foo.md` is a real query-free URL (a
   ProcessWire URL hook, not a rewrite), so front caches can treat it as a
-  first-class resource.
+  first-class resource. Cache policy is explicit: guests get
+  `Cache-Control: public, max-age=300` on successful responses (shared
+  caches and CDNs may cache them; the ETag keeps revalidation cheap);
+  logged-in users get `private, no-store` (they may be viewing pages
+  guests cannot); errors are `no-cache`.
 
 ## Raw markdown responses
 
