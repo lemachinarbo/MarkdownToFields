@@ -93,8 +93,10 @@ Customize in two ways:
 
 Nav items come from `MarkdownSiteStructure`:
 
-1. If the content directory has a `site.md` (name configurable) with a
-   `<!-- section:nav -->` holding a markdown list of links, that is the nav.
+1. If the content directory has a `site.md` (file name configurable) with
+   a `<!-- section:nav -->` holding a markdown list of links, that is the
+   nav. The section name is configurable too (`navSection`, default `nav`)
+   — set it to `mynav` and the module reads `<!-- section:mynav -->`.
 2. Otherwise the nav is derived from the page tree: home plus its
    markdown-backed viewable children, labeled by each page's frontmatter
    `title`.

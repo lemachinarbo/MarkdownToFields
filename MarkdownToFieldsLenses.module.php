@@ -79,6 +79,7 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
       'enableReader' => 1,
       'enableFragments' => 1,
       'structureFile' => 'site.md',
+      'navSection' => 'nav',
       'homepageName' => 'home',
       'excludedTemplates' => [],
     ]);
@@ -267,6 +268,12 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
     return $name !== '' ? $name : 'home';
   }
 
+  public function navSectionName(): string
+  {
+    $name = trim((string) $this->get('navSection'));
+    return $name !== '' ? $name : 'nav';
+  }
+
   /** Lenses in negotiation order: project-registered first, then built-ins. */
   protected function lenses(): array
   {
@@ -337,6 +344,7 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
       'enableReader' => 1,
       'enableFragments' => 1,
       'structureFile' => 'site.md',
+      'navSection' => 'nav',
       'homepageName' => 'home',
       'excludedTemplates' => [],
     ];
@@ -358,8 +366,15 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
     $field = $modules->get('InputfieldText');
     $field->name = 'structureFile';
     $field->label = 'Structure file';
-    $field->description = 'Markdown file in the content directory whose "nav" section defines the reader view navigation. When absent, navigation is derived from the page tree.';
+    $field->description = 'Markdown file in the content directory whose nav section defines the reader view navigation. When absent, navigation is derived from the page tree.';
     $field->value = $data['structureFile'];
+    $wrapper->add($field);
+
+    $field = $modules->get('InputfieldText');
+    $field->name = 'navSection';
+    $field->label = 'Nav section name';
+    $field->description = 'Name of the section in the structure file that holds the navigation list (default: nav, as in <!-- section:nav -->).';
+    $field->value = $data['navSection'];
     $wrapper->add($field);
 
     $field = $modules->get('InputfieldText');

@@ -40,7 +40,7 @@ class MarkdownSiteStructure
     // loadFromString, not load(): load() without a basePath rejects file
     // paths by design (LetMeDown's traversal protection).
     $content = (new \LetMeDown\LetMeDown())->loadFromString((string) file_get_contents($path));
-    $section = $content->sectionsByName['nav'] ?? null;
+    $section = $content->sectionsByName[$module->navSectionName()] ?? null;
     if ($section === null) return null;
 
     $httpRoot = $context->wire()->urls->httpRoot;
