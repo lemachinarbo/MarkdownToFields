@@ -10,8 +10,8 @@ alternate representations — no project code required.
 | `/foo.md` (browser, `Accept: text/html`) | Reader view — low-noise HTML |
 | `/foo/?format=md` | Raw markdown, always, regardless of Accept |
 | `/foo/` + `Accept: text/markdown` | Raw markdown via content negotiation |
-| `/foo/?part=hero,cta` | Just those named sections, as HTML |
-| `/foo/?part=hero&format=md` | Just those sections, as markdown |
+| `/foo/?section=hero,cta` | Just those named sections, as HTML |
+| `/foo/?section=hero&format=md` | Just those sections, as markdown |
 | `/foo/` (normal) | Normal render + `Link: rel="alternate"` markdown header |
 
 The homepage has no URL segment, so it is served at `/home.md`
@@ -92,7 +92,7 @@ Nav items come from `MarkdownSiteStructure`:
 
 ## Content fragments
 
-`?part=hero,cta` returns the named sections authored in the markdown
+`?section=hero,cta` returns the named sections authored in the markdown
 (`<!-- section:hero -->`), joined, as semantic HTML — or as clean markdown
 when combined with `?format=md` / `Accept: text/markdown`. Unknown section
 names 404. Fragments address the *content model*, never template

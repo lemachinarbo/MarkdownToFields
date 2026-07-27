@@ -75,10 +75,11 @@ check "reader content links stay in reader"  "$BASE_URL/services.md"         "$B
 check "reader homepage works"                "$BASE_URL/home.md"             "$BROWSER_ACCEPT" 200 'text/html'     '<h1>Welcome to the Playground</h1>'
 
 echo "== fragments =="
-check "?part returns section html"           "$BASE_URL/about/?part=hero"    '*/*'             200 'text/html'     'About the Playground' 'Frequently asked'
-check "?part multiple sections"              "$BASE_URL/about/?part=hero,faq" '*/*'            200 'text/html'     'Frequently asked'
-check "?part with format=md is markdown"     "$BASE_URL/about/?part=faq&format=md" '*/*'       200 'text/markdown' '## Frequently asked' 'About the Playground'
-check "?part unknown section 404s"           "$BASE_URL/about/?part=nope"    '*/*'             404 'text/html'     'Unknown section'
+check "?section returns section html"        "$BASE_URL/about/?section=hero" '*/*'             200 'text/html'     'About the Playground' 'Frequently asked'
+check "?section multiple sections"           "$BASE_URL/about/?section=hero,faq" '*/*'         200 'text/html'     'Frequently asked'
+check "?section with format=md is markdown"  "$BASE_URL/about/?section=faq&format=md" '*/*'    200 'text/markdown' '## Frequently asked' 'About the Playground'
+check "?section unknown section 404s"        "$BASE_URL/about/?section=nope" '*/*'             404 'text/html'     'Unknown section'
+check "?part is left to projects (no hijack)" "$BASE_URL/about/?part=header" '*/*'             200 'text/html'     '' 'Unknown section'
 
 echo "== 404s and exposure =="
 check "missing page .md 404s in markdown"    "$BASE_URL/nope.md"             '*/*'             404 'text/markdown' '404 Not Found'

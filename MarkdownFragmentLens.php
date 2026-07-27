@@ -3,13 +3,16 @@
 namespace ProcessWire;
 
 /**
- * Content fragments: ?part=hero,cta returns just those named sections of
- * the page's markdown, as semantic HTML by default or as clean markdown
- * when the request also negotiates markdown (?format=md or Accept:
- * text/markdown). Sections are addressed by the names authored in the
- * markdown itself (<!-- section:hero -->), never by template internals —
- * styled template fragments (Latte blocks etc.) are project territory,
- * served through a project-registered lens if needed.
+ * Content fragments: ?section=hero,cta returns just those named sections
+ * of the page's markdown, as semantic HTML by default or as clean
+ * markdown when the request also negotiates markdown (?format=md or
+ * Accept: text/markdown). Sections are addressed by the names authored in
+ * the markdown itself (<!-- section:hero -->) — hence the param name —
+ * never by template internals. Styled template fragments (Latte blocks,
+ * Datastar chrome) are project territory served through a
+ * project-registered lens, and conventionally use ?part=: both lexgeo and
+ * df were already fetching template blocks with ?part= when this lens was
+ * born, which is exactly why it must not claim that name.
  */
 class MarkdownFragmentLens implements MarkdownLens
 {
@@ -17,7 +20,7 @@ class MarkdownFragmentLens implements MarkdownLens
 
   public function wants(Page $page): bool
   {
-    return $page->wire()->input->get->text('part') !== '';
+    return $page->wire()->input->get->text('section') !== '';
   }
 
   public function render(Page $page): MarkdownLensResponse
@@ -26,7 +29,7 @@ class MarkdownFragmentLens implements MarkdownLens
     $wantsMarkdown = $input->get->text('format') === 'md'
       || str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'text/markdown');
 
-    $names = array_filter(array_map('trim', explode(',', $input->get->text('part'))));
+    $names = array_filter(array_map('trim', explode(',', $input->get->text('section'))));
     $content = $page->content();
     $sections = [];
 

@@ -25,7 +25,7 @@ require_once __DIR__ . '/MarkdownSiteStructure.php';
  * - /foo.md               raw markdown for agents, reader view for browsers
  * - /foo/?format=md       always raw markdown (explicit override)
  * - Accept: text/markdown raw markdown via content negotiation
- * - /foo/?part=hero,cta   named content sections, as HTML or markdown
+ * - /foo/?section=hero,cta named content sections, as HTML or markdown
  *
  * The decision tree, cache rules, and exposure rules are specified in
  * notes/architecture.md. Projects extend behavior by registering their
@@ -316,7 +316,7 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
     foreach ([
       'enableRaw' => ['Raw markdown', 'Serve clean markdown at /page.md, ?format=md, and Accept: text/markdown.'],
       'enableReader' => ['Reader view', 'Serve a low-noise HTML reading view when a browser opens /page.md.'],
-      'enableFragments' => ['Content fragments', 'Serve named markdown sections at ?part=name,name as HTML or markdown.'],
+      'enableFragments' => ['Content fragments', 'Serve named markdown sections at ?section=name,name as HTML or markdown.'],
     ] as $name => [$label, $description]) {
       $field = $modules->get('InputfieldCheckbox');
       $field->name = $name;
