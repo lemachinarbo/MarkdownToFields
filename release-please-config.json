@@ -6,8 +6,11 @@
       "extra-files": [
         {
           "type": "generic",
-          "path": "MarkdownToFields.module.php",
-          "search": "'version' => '{{version}}'"
+          "path": "MarkdownToFields.module.php"
+        },
+        {
+          "type": "generic",
+          "path": "MarkdownToFieldsLenses.module.php"
         }
       ]
     }
