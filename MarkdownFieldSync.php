@@ -489,24 +489,30 @@ class MarkdownFieldSync extends MarkdownHashTracker
       }
 
       $value = $frontmatter[$frontKey];
-      if (!is_scalar($value) && $value !== null && !is_array($value)) {
+      // Non-scalar frontmatter (lists, nested maps) is content data, not
+      // field data: ProcessWire core fields cannot take arrays (a list
+      // under a mapped field name used to abort the whole save with an
+      // SQL error), and structure-to-field mapping needs an explicit
+      // scheme before it can mean anything. Skipped values still survive
+      // the write-back round trip untouched. Author a YAML string (plain,
+      // quoted, or a | block) when the value is meant for a text field.
+      if (!is_scalar($value) && $value !== null) {
+        self::logDebug($page, 'skipped non-scalar frontmatter value for field', [
+          'field' => $field,
+          'frontmatterKey' => $frontKey,
+        ]);
         continue;
       }
 
-      if (is_array($value)) {
-        $pageValue = $value;
-      } else {
-        $pageValue = $value === null ? '' : (string) $value;
-        if ($field === 'name') {
-          $pageValue = self::sanitizePageNameValue($page, $pageValue);
-        }
+      $pageValue = $value === null ? '' : (string) $value;
+      if ($field === 'name') {
+        $pageValue = self::sanitizePageNameValue($page, $pageValue);
       }
 
       // Skip empty frontmatter assignments to preserve existing field values.
       // Homepage name is the only valid empty-name exception in ProcessWire.
       if (
-        !is_array($pageValue) &&
-        trim((string) $pageValue) === '' &&
+        trim($pageValue) === '' &&
         !self::allowsEmptyFrontmatterValue($page, $field)
       ) {
         continue;
@@ -536,11 +542,7 @@ class MarkdownFieldSync extends MarkdownHashTracker
         }
       }
 
-      if (is_array($pageValue)) {
-        if ($currentValue === $pageValue) {
-          continue;
-        }
-      } elseif ((string) $currentValue === (string) $pageValue) {
+      if ((string) $currentValue === $pageValue) {
         continue;
       }
 

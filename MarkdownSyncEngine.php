@@ -720,6 +720,11 @@ class MarkdownSyncEngine extends MarkdownSessionManager
 
     $bindingSyncCount = 0;
     foreach ($frontmatter as $fieldName => $frontValue) {
+      // Bindings are text replacements; non-scalar frontmatter (lists,
+      // nested maps) has no string form to bind.
+      if (!is_scalar($frontValue) && $frontValue !== null) {
+        continue;
+      }
       $bodyContent = self::replaceBindingValue(
         $bodyContent,
         (string) $fieldName,
