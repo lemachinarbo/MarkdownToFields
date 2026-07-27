@@ -2,6 +2,8 @@
 
 MarkdownToFields is a ProcessWire module that allows using Markdown files as the canonical source of truth for page content, providing bidirectional synchronization between those files and ProcessWire fields.
 
+This repo ships **two modules**: `MarkdownToFields` (content plane: sync + content API) and `MarkdownToFieldsLenses` (request plane: alternate HTTP representations of markdown-backed pages). See [docs/lenses.md](/docs/lenses.md) and `notes/architecture.md` for the Lenses design contract.
+
 ## What this module does
 
 - **Markdown-Driven Content**: Store page content in plain text Markdown files, making it portable and Git-friendly.
@@ -33,6 +35,18 @@ MarkdownToFields is a ProcessWire module that allows using Markdown files as the
 - `MarkdownToFields::load(Page $page, $language = null): ?ContentData` - Load parsed structured data.
 - `MarkdownToFields::save(Page $page, $language = null): void` - Persist current page data back to the markdown file.
 - `$page->content()` - (Via `MarkdownContent` trait) Access the structured content object in templates.
+
+### MarkdownToFieldsLenses (request plane)
+
+Autoload module, requires MarkdownToFields. Serves markdown-backed pages as: raw markdown (`/foo.md`, `?format=md`, `Accept: text/markdown`), a reader HTML view (browser at `/foo.md`), and content fragments (`?part=hero,cta`, HTML or markdown). All default-on at install; per-feature toggles and per-template opt-out in module config. Full behavior spec: [docs/lenses.md](/docs/lenses.md).
+
+- `MarkdownToFieldsLenses::addLens(MarkdownLens $lens)` - Register a project lens, checked before built-ins on Page::render.
+- `MarkdownToFieldsLenses::servable(Page $page): bool` - Whether lenses may answer for a page (markdown-backed + viewable + not excluded).
+- `MarkdownToFieldsLenses::markdownFor(Page $page): string` - Hookable: clean markdown with absolutized links/images.
+- `MarkdownToFieldsLenses::frontmatterFor(Page $page): array` - Hookable: curated title/description/canonical for markdown responses.
+- `MarkdownReaderView::slots(Page $page, string $contentHtml): array` - Hookable: reader view named parts; template overridable via `site/templates/markdown-reader.php`.
+- `MarkdownLens` interface (`wants()`/`render()`) + `MarkdownLensResponse` (body, type, status, headers; uniform ETag/304 in `send()`).
+- HTTP matrix test: `BASE_URL=... tests/lenses-http-matrix.sh` (defaults to pwlayground).
 
 > [!NOTE]
 > For detailed API usage, content tag reference, and examples, consult [guide.md](/docs/guide.md).
