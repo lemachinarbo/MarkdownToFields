@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.7.0](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.6.0...v1.7.0) (2026-07-27)
+
+
+### Features
+
+* add lenses module for markdown request negotiation ([64f6712](https://github.com/lemachinarbo/MarkdownToFields/commit/64f6712236acb1f4084e82fb43006235b5c33e21))
+* derive reader brand from site.md nav heading ([0509270](https://github.com/lemachinarbo/MarkdownToFields/commit/0509270c333b26daffde93a617d3ce6ea744a72e))
+* make structure nav section name configurable ([8564aa7](https://github.com/lemachinarbo/MarkdownToFields/commit/8564aa777075da66e8cbd4592f699dfcc0ace3a1))
+* send explicit cache policy on lens responses ([be300e9](https://github.com/lemachinarbo/MarkdownToFields/commit/be300e96e931b9679a764961a0fe47bc53cbbd10))
+
+
+### Bug Fixes
+
+* resolve bare image refs to page assets in lens markdown ([465d7c2](https://github.com/lemachinarbo/MarkdownToFields/commit/465d7c248af1ee370177118baaffc0f736b66bf1))
+* skip non-scalar frontmatter values in field sync ([91f8d35](https://github.com/lemachinarbo/MarkdownToFields/commit/91f8d350a0659ca0d6c4272cd0796020f6d962c2))
+* use list markup for reader view navigation ([c0e6fdd](https://github.com/lemachinarbo/MarkdownToFields/commit/c0e6fddebc0688fe845b140eb70f2798ef9da963))
+* wire module versions to release please ([d898dc1](https://github.com/lemachinarbo/MarkdownToFields/commit/d898dc1378bc38169827eff64a4fb6805de43467))
+
+
+### Miscellaneous Chores
+
+* bump lemachinarbo/letmedown to 1.10.0 ([30331cd](https://github.com/lemachinarbo/MarkdownToFields/commit/30331cd32e5e776bd84d6b6f58a00644b0cd45e0))
+* drop stale note-file entries from .gitignore ([6ed1528](https://github.com/lemachinarbo/MarkdownToFields/commit/6ed15289f69468831d69b620c9510c923c4b6df5))
+
 ## [1.6.0](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.5.2...v1.6.0) (2026-07-13)
 
 
