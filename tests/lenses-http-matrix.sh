@@ -67,6 +67,7 @@ check "?format=md stays raw for browsers"    "$BASE_URL/about/?format=md"    "$B
 check "Accept: text/markdown negotiates raw" "$BASE_URL/about/"              'text/markdown'   200 'text/markdown' '# About the Playground'
 check "homepage at /home.md"                 "$BASE_URL/home.md"             '*/*'             200 'text/markdown' '# Welcome to the Playground'
 check "internal links absolutized"           "$BASE_URL/about.md"            '*/*'             200 'text/markdown' 'link to services](https://'
+check "bare image refs resolve to assets"    "$BASE_URL/about.md"            '*/*'             200 'text/markdown' 'tiny test image](https://.*/site/assets/files/'
 
 echo "== reader view =="
 check "browser .md URL is reader HTML"       "$BASE_URL/about.md"            "$BROWSER_ACCEPT" 200 'text/html'     '<h1>About the Playground</h1>'
@@ -79,6 +80,7 @@ check "?section returns section html"        "$BASE_URL/about/?section=hero" '*/
 check "?section multiple sections"           "$BASE_URL/about/?section=hero,faq" '*/*'         200 'text/html'     'Frequently asked'
 check "?section with format=md is markdown"  "$BASE_URL/about/?section=faq&format=md" '*/*'    200 'text/markdown' '## Frequently asked' 'About the Playground'
 check "?section unknown section 404s"        "$BASE_URL/about/?section=nope" '*/*'             404 'text/html'     'Unknown section'
+check "fragment md resolves bare images too" "$BASE_URL/about/?section=hero&format=md" '*/*'   200 'text/markdown' 'tiny test image](https://.*/site/assets/files/'
 check "?part is left to projects (no hijack)" "$BASE_URL/about/?part=header" '*/*'             200 'text/html'     '' 'Unknown section'
 
 echo "== 404s and exposure =="

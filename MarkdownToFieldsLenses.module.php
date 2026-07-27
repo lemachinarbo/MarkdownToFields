@@ -202,19 +202,27 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
   }
 
   /**
-   * Default image/link resolvers for clean markdown: scheme URLs pass
-   * through, root-relative paths become absolute, same-page fragments
-   * are pinned to the page they were authored on.
+   * Image/link resolvers for clean markdown: scheme URLs pass through,
+   * root-relative paths become absolute, bare image filenames resolve to
+   * the page's own assets (where the sync stores them — markdown served
+   * to an external consumer must never reference an image it cannot
+   * fetch), and same-page fragments are pinned to the page they were
+   * authored on. Hookable — one hook covers full documents AND fragments;
+   * override when a project serves processed variants instead.
    */
-  public function resolvers(Page $page): array
+  public function ___resolvers(Page $page): array
   {
     $httpRoot = rtrim($this->wire()->urls->httpRoot, '/');
     $toAbsolute = fn(string $url): string => $httpRoot . '/' . ltrim($url, '/');
 
     return [
-      'image' => function (string $ref, string $alt) use ($toAbsolute): string {
+      'image' => function (string $ref, string $alt) use ($page, $toAbsolute): string {
         if (preg_match('#^https?://#i', $ref)) return $ref;
         if (str_starts_with($ref, '/')) return $toAbsolute($ref);
+        $name = basename($ref);
+        if (is_file($page->filesManager()->path() . $name)) {
+          return $toAbsolute($page->filesManager()->url() . $name);
+        }
         return $ref;
       },
       'link' => function (string $ref, string $text) use ($page, $toAbsolute): string {

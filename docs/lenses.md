@@ -50,8 +50,13 @@ canonical: https://example.com/about/
 `title` falls back through frontmatter `seo_title` → `title` → the
 ProcessWire title. `description` comes from frontmatter `description` →
 `summary`. Root-relative links and images are absolutized (agents have no
-base URL to resolve against); same-page fragments are pinned to the page
-they were authored on.
+base URL to resolve against), bare image filenames resolve to the page's
+own assets — served markdown never references an image the consumer can't
+fetch — and same-page fragments are pinned to the page they were authored
+on. The same resolvers apply to content fragments. To serve processed
+variants instead (responsive sizes, WebP), hook
+`MarkdownToFieldsLenses::resolvers` — one hook covers documents and
+fragments — or `markdownFor` for full control of whole documents.
 
 To change how markdown or metadata is produced (custom image pipeline,
 different fields), hook the module:
