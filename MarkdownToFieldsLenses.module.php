@@ -45,7 +45,7 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
   {
     return [
       'title' => 'Markdown to fields: Lenses',
-      'version' => '1.5.2', // x-release-please-version
+      'version' => '1.7.0', // x-release-please-version
       'summary' => 'Serve markdown-backed pages as raw markdown, a reader view, and content fragments. Multiple lenses over one URL',
       'author' => 'Lemachi Narbo',
       'icon' => 'eye',

@@ -58,7 +58,7 @@ class MarkdownToFields extends WireData implements Module, ConfigurableModule
   {
     return [
       'title' => 'Markdown to fields',
-      'version' => '1.5.2', // x-release-please-version
+      'version' => '1.7.0', // x-release-please-version
       'summary' => 'Markdown files as your content source of truth',
       'description' =>
         'Use markdown as your content. Structure it with simple tags, and enjoy the markdown <-> ProcessWire fields sync',
