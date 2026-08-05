@@ -129,8 +129,11 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
     $pages = $this->wire()->pages;
     $path = (string) $event->arguments('it');
 
-    if ($path === '/' . $this->homepageName()) {
+    $hp = '/' . $this->homepageName();
+    if ($path === $hp) {
       $path = '/';
+    } elseif (str_ends_with($path, $hp)) {
+      $path = substr($path, 0, -strlen($hp));
     }
 
     $wantsHtml = str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'text/html');
