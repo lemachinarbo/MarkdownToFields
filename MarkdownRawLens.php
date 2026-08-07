@@ -36,9 +36,11 @@ class MarkdownRawLens implements MarkdownLens
     $frontmatter .= "---\n\n";
 
     $body = $frontmatter . trim($this->module->markdownFor($page)) . "\n";
+    $tokenCount = str_word_count(strip_tags($body));
 
     return new MarkdownLensResponse($body, 'text/markdown; charset=utf-8', 200, [
       'X-Robots-Tag: noindex',
+      'x-markdown-tokens: ' . $tokenCount,
       'Link: <' . $page->httpUrl . '>; rel="canonical"',
     ]);
   }

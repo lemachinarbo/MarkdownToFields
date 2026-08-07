@@ -6,13 +6,14 @@ alternate representations — no project code required.
 
 | Request | Response |
 |---|---|
-| `/foo.md` (agent, script, curl) | Raw clean markdown |
+| `/foo.md` (agent, script, curl) | Raw clean markdown + `x-markdown-tokens` header |
 | `/foo.md` (browser, `Accept: text/html`) | Reader view — low-noise HTML |
 | `/foo/?format=md` | Raw markdown, always, regardless of Accept |
 | `/foo/` + `Accept: text/markdown` | Raw markdown via content negotiation |
 | `/foo/?section=hero,cta` | Just those named sections, as HTML |
 | `/foo/?section=hero&format=md` | Just those sections, as markdown |
-| `/foo/` (normal) | Normal render + `Link: rel="alternate"` markdown header |
+| `/foo/` (normal) | Normal render + RFC 8288 agent discovery `Link` headers |
+| `/llms.txt`, `/auth.md`, `/.well-known/*` | Turn-key agent discovery & protocol fallback endpoints |
 
 The homepage has no URL segment, so it is served at `/home.md`
 (configurable).

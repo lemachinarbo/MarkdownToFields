@@ -15,6 +15,7 @@ require_once __DIR__ . '/MarkdownReaderLens.php';
 require_once __DIR__ . '/MarkdownFragmentLens.php';
 require_once __DIR__ . '/MarkdownReaderView.php';
 require_once __DIR__ . '/MarkdownSiteStructure.php';
+require_once __DIR__ . '/MarkdownAgentEndpoints.php';
 
 /**
  * MarkdownToFieldsLenses – multiple lenses over one URL
@@ -40,13 +41,14 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
   private ?MarkdownRawLens $rawLens = null;
   private ?MarkdownReaderLens $readerLens = null;
   private ?MarkdownFragmentLens $fragmentLens = null;
+  private ?MarkdownAgentEndpoints $agentEndpoints = null;
 
   public static function getModuleInfo()
   {
     return [
       'title' => 'Markdown to fields: Lenses',
       'version' => '1.7.0', // x-release-please-version
-      'summary' => 'Serve markdown-backed pages as raw markdown, a reader view, and content fragments. Multiple lenses over one URL',
+      'summary' => 'Serve markdown-backed pages as raw markdown, a reader view, content fragments, and agent discovery endpoints. Multiple lenses over one URL',
       'author' => 'Lemachi Narbo',
       'icon' => 'eye',
       'requires' => ['MarkdownToFields', 'ProcessWire>=3.0.173', 'PHP>=8.1'],
@@ -70,6 +72,22 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
     if ($this->lensEnabled('enableRaw') || $this->lensEnabled('enableReader')) {
       $this->addHook('!^(?<it>/.+)\.md$!', $this, 'handleMarkdownUrl');
     }
+
+    if ($this->lensEnabled('enableLlmsEndpoints') || $this->lensEnabled('enableApiCatalog') || $this->lensEnabled('enableProtocolCards') || $this->lensEnabled('enableCommerceManifests')) {
+      $this->ensureWellKnownDir();
+      $this->addHook('!^/(?<endpoint>llms\.txt|llms-full\.txt|auth\.md|\.well-known/.+)$!', $this, 'handleAgentEndpoints');
+    }
+
+    $this->checkProCacheNotice();
+  }
+
+  protected function ensureWellKnownDir()
+  {
+    $dir = $this->wire()->config->paths->root . '.well-known';
+    if (!is_dir($dir)) {
+      @mkdir($dir, 0755, true);
+      @file_put_contents($dir . '/.gitkeep', "# Allow .well-known routing\n");
+    }
   }
 
   public function install()
@@ -78,6 +96,11 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
       'enableRaw' => 1,
       'enableReader' => 1,
       'enableFragments' => 1,
+      'enableAgentHeaders' => 1,
+      'enableLlmsEndpoints' => 1,
+      'enableApiCatalog' => 1,
+      'enableProtocolCards' => 0,
+      'enableCommerceManifests' => 0,
       'structureFile' => 'site.md',
       'navSection' => 'nav',
       'homepageName' => 'home',
@@ -98,7 +121,7 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
   /**
    * Content negotiation on the canonical URL: first lens that wants the
    * request replaces the normal page render. When none does, the page
-   * renders normally and advertises its markdown alternate.
+   * renders normally and advertises its markdown alternate and agent discovery headers.
    */
   public function negotiateRender(HookEvent $event)
   {
@@ -112,9 +135,66 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
       return;
     }
 
-    if ($this->lensEnabled('enableRaw') && !headers_sent()) {
-      $mdUrl = $page->httpUrl . '?format=md';
-      header("Link: <$mdUrl>; rel=\"alternate\"; type=\"text/markdown\"", false);
+    if (!headers_sent()) {
+      if ($this->lensEnabled('enableRaw')) {
+        $mdUrl = $page->httpUrl . '?format=md';
+        header("Link: <$mdUrl>; rel=\"alternate\"; type=\"text/markdown\"", false);
+      }
+      if ($this->lensEnabled('enableAgentHeaders')) {
+        $httpRoot = rtrim($this->wire()->urls->httpRoot, '/');
+        if ($this->lensEnabled('enableApiCatalog')) {
+          header("Link: <{$httpRoot}/.well-known/api-catalog>; rel=\"api-catalog\"", false);
+        }
+        if ($this->lensEnabled('enableProtocolCards')) {
+          header("Link: <{$httpRoot}/.well-known/agent-skills/index.json>; rel=\"agent-skills\"", false);
+          header("Link: <{$httpRoot}/.well-known/mcp/server-card.json>; rel=\"mcp-server-card\"", false);
+          header("Link: <{$httpRoot}/.well-known/agent-card.json>; rel=\"agent-card\"", false);
+        }
+        if ($this->lensEnabled('enableLlmsEndpoints')) {
+          header("Link: <{$httpRoot}/llms.txt>; rel=\"describedby\"; type=\"text/plain\"", false);
+          header("Link: <{$httpRoot}/auth.md>; rel=\"authorizing-agent\"; type=\"text/markdown\"", false);
+        }
+      }
+    }
+  }
+
+  /**
+   * Serve agent discovery and protocol fallback endpoints (llms.txt, auth.md, .well-known/*)
+   * when no physical file exists on disk.
+   */
+  public function handleAgentEndpoints(HookEvent $event)
+  {
+    $endpoint = (string) $event->arguments('endpoint');
+    $ep = ltrim($endpoint, '/');
+
+    // Filter endpoint handling by active module toggles
+    if (in_array($ep, ['llms.txt', 'llms-full.txt', 'auth.md', '.well-known/auth.md'], true) && !$this->lensEnabled('enableLlmsEndpoints')) return;
+    if (in_array($ep, ['.well-known/api-catalog', '.well-known/oauth-protected-resource', '.well-known/oauth-authorization-server'], true) && !$this->lensEnabled('enableApiCatalog')) return;
+    if (str_starts_with($ep, '.well-known/mcp') || str_starts_with($ep, '.well-known/agent-') || $ep === '.well-known/dns-aid' || $ep === '.well-known/web-bot-auth') {
+      if (!$this->lensEnabled('enableProtocolCards')) return;
+    }
+    if (in_array($ep, ['.well-known/x402', '.well-known/mpp', '.well-known/ucp', '.well-known/acp'], true) && !$this->lensEnabled('enableCommerceManifests')) return;
+
+    $endpoints = $this->agentEndpoints ??= new MarkdownAgentEndpoints();
+    $response = $endpoints->handle($endpoint);
+    if ($response !== null) {
+      $event->return = $this->sendResponse($response);
+    }
+  }
+
+  protected function checkProCacheNotice()
+  {
+    if (!$this->wire()->user->isSuperuser()) return;
+    if (!$this->wire()->modules->isInstalled('ProCache')) return;
+
+    $htaccess = $this->wire()->config->paths->root . '.htaccess';
+    if (!is_file($htaccess)) return;
+
+    $content = file_get_contents($htaccess);
+    if (str_contains($content, 'pwpcstep') && !str_contains($content, 'HTTP:Accept')) {
+      $this->warning(
+        $this->_('ProCache is active. Add `RewriteCond %{HTTP:Accept} !text/markdown` to your ProCache block in .htaccess so AI agents receive Markdown.')
+      );
     }
   }
 
@@ -346,6 +426,11 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
       'enableRaw' => 1,
       'enableReader' => 1,
       'enableFragments' => 1,
+      'enableAgentHeaders' => 1,
+      'enableLlmsEndpoints' => 1,
+      'enableApiCatalog' => 1,
+      'enableProtocolCards' => 0,
+      'enableCommerceManifests' => 0,
       'structureFile' => 'site.md',
       'navSection' => 'nav',
       'homepageName' => 'home',
@@ -357,12 +442,34 @@ class MarkdownToFieldsLenses extends WireData implements Module, ConfigurableMod
       'enableRaw' => ['Raw markdown', 'Serve clean markdown at /page.md, ?format=md, and Accept: text/markdown.'],
       'enableReader' => ['Reader view', 'Serve a low-noise HTML reading view when a browser opens /page.md.'],
       'enableFragments' => ['Content fragments', 'Serve named markdown sections at ?section=name,name as HTML or markdown.'],
+      'enableAgentHeaders' => ['Agent discovery headers', 'Serve RFC 8288 Link headers for agent discovery on HTML responses.'],
+      'enableLlmsEndpoints' => ['LLMS.txt & Auth.md fallbacks', 'Serve fallback responses for /llms.txt, /llms-full.txt, and /auth.md when no physical file exists.'],
+      'enableApiCatalog' => ['API Catalog fallbacks', 'Serve fallback responses for /.well-known/api-catalog and OAuth metadata when no physical file exists.'],
+      'enableProtocolCards' => ['Protocol cards (Opt-in)', 'Serve fallback cards for MCP server card, Agent Card, Agent Skills, DNS-AID, and Web Bot Auth.'],
+      'enableCommerceManifests' => ['Commerce manifests (Opt-in)', 'Serve fallback manifests for x402, MPP, UCP, and ACP declaring free public access.'],
     ] as $name => [$label, $description]) {
       $field = $modules->get('InputfieldCheckbox');
       $field->name = $name;
       $field->label = $label;
       $field->description = $description;
-      $field->checked = (bool) $data[$name];
+      $field->checked = (bool) ($data[$name] ?? 0);
+      $wrapper->add($field);
+    }
+
+    $root = $this->wire()->config->paths->root;
+    $existingFiles = [];
+    foreach (['llms.txt', 'llms-full.txt', 'auth.md', '.well-known/api-catalog', '.well-known/mcp/server-card.json', '.well-known/agent-card.json'] as $rel) {
+      if (is_file($root . $rel)) {
+        $existingFiles[] = "<code>" . htmlspecialchars($rel) . "</code>";
+      }
+    }
+    if (count($existingFiles) > 0) {
+      $field = $modules->get('InputfieldMarkup');
+      $field->label = 'Existing files';
+      $fileList = implode(', ', $existingFiles);
+      $pronoun = count($existingFiles) === 1 ? 'it' : 'them';
+      $verb = count($existingFiles) === 1 ? 'was' : 'were';
+      $field->value = "<p class='description'>{$fileList} {$verb} found on disk. We didn't replace {$pronoun}.</p>";
       $wrapper->add($field);
     }
 
