@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.8.0](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.7.0...v1.8.0) (2026-08-07)
+
+
+### Features
+
+* add turn-key agent readiness and discovery endpoints ([4534501](https://github.com/lemachinarbo/MarkdownToFields/commit/4534501d10818a41335e4ad9fe8083617ee3f984))
+
+
+### Bug Fixes
+
+* support language-prefixed homepage .md URLs in MarkdownToFieldsLenses ([7636a52](https://github.com/lemachinarbo/MarkdownToFields/commit/7636a5215c49a7d3004255713d2f7671ac78a127))
+
+
+### Miscellaneous Chores
+
+* initialize agent and conductor protocols ([189cd4e](https://github.com/lemachinarbo/MarkdownToFields/commit/189cd4e05bfdfd1465408176f5c3306fd707624d))
+
 ## [1.7.0](https://github.com/lemachinarbo/MarkdownToFields/compare/v1.6.0...v1.7.0) (2026-07-27)
 
 
